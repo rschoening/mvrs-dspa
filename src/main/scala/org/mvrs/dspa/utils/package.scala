@@ -4,6 +4,9 @@ import java.util.{Optional, Properties}
 
 import org.apache.flink.api.common.serialization.TypeInformationSerializationSchema
 import org.apache.flink.api.common.typeinfo.TypeInformation
+import org.apache.flink.streaming.api.functions.AssignerWithPeriodicWatermarks
+import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor
+import org.apache.flink.streaming.api.windowing.time.Time
 //import org.apache.avro.{Schema, SchemaBuilder}
 //import org.apache.flink.formats.avro.typeutils.AvroSerializer
 //import org.apache.flink.formats.avro.{AvroDeserializationSchema, AvroRowSerializationSchema}
@@ -67,5 +70,11 @@ package object utils {
       topic, new TypeInformationSerializationSchema[T](typeInfo, env.getConfig), props)
     consumer.setStartFromEarliest()
     consumer
+  }
+
+  def timeStampExtractor[T](maxOutOfOrderness: Time, extract: T => Long): AssignerWithPeriodicWatermarks[T] = {
+    new BoundedOutOfOrdernessTimestampExtractor[T](maxOutOfOrderness) {
+      override def extractTimestamp(c: T): Long = extract(c)
+    }
   }
 }
