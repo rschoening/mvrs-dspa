@@ -1,10 +1,11 @@
 package org.mvrs.dspa.functions
 
-import java.util.Calendar
-
+import org.apache.flink.streaming.api.datastream.DataStreamUtils
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
+
+import scala.collection.JavaConverters._
 
 class ScaledReplayFunctionSuite extends AbstractTestBase {
 
@@ -20,11 +21,15 @@ class ScaledReplayFunctionSuite extends AbstractTestBase {
     // create a stream of custom elements and apply transformations
     val eventTimes = List(1000L, 2000L, 1000L)
 
-    env.fromCollection(eventTimes)
+    val stream: DataStream[(Long, Long)] = env.fromCollection(eventTimes)
       .process(new ScaledReplayFunction(identity, 1, 100))
-      .map((_, Calendar.getInstance.getTime.toInstant))
-      .print
+      .map((_, System.currentTimeMillis))
+
     env.execute()
+
+    // Note: this must be called *after* execute()
+    val list = DataStreamUtils.collect(stream.javaStream).asScala.toList
+    list.foreach(println(_))
 
     val endTime = System.currentTimeMillis
     val duration = endTime - startTime
@@ -34,14 +39,7 @@ class ScaledReplayFunctionSuite extends AbstractTestBase {
 
     // job overhead is ~ 500 ms
 
-    // TODO come up with tighter assertion
+    // TODO come up with tighter assertion (based on processing times in collected tuples)
     assert(duration >= minDuration)
   }
 }
-
-
-//     val env = StreamExecutionEnvironment.getExecutionEnvironment
-//    val stream = env.fromElements(10000, 20000, 30000)
-//      .process(new ScaledReplayFunction(e => e.toLong, 100.0, 10))
-//
-//    stream.print()
