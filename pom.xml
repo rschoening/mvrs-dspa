@@ -118,13 +118,6 @@ under the License.
         </dependency>
 
         <!-- unit testing -->
-        <!-- https://mvnrepository.com/artifact/junit/junit -->
-        <!--<dependency>-->
-            <!--<groupId>junit</groupId>-->
-            <!--<artifactId>junit</artifactId>-->
-            <!--<version>4.12</version>-->
-            <!--<scope>test</scope>-->
-        <!--</dependency>-->
 
         <!-- https://mvnrepository.com/artifact/org.scalacheck/scalacheck -->
         <dependency>
@@ -140,11 +133,11 @@ under the License.
             <version>3.0.7</version>
         </dependency>
 
-        <!--<dependency>-->
-            <!--<groupId>org.scalatestplus</groupId>-->
-            <!--<artifactId>scalatestplus-junit_${scala.binary.version}</artifactId>-->
-            <!--<version>1.0.0-SNAP4</version>-->
-        <!--</dependency>-->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-test-utils_${scala.binary.version}</artifactId>
+            <version>${flink.version}</version>
+        </dependency>
 
         <!-- https://mvnrepository.com/artifact/org.scalatest/scalatest-maven-plugin -->
         <dependency>
