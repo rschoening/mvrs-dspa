@@ -3,9 +3,6 @@ package org.mvrs.dspa.preparation
 import org.apache.flink.api.common.functions.RichMapFunction
 import org.apache.flink.api.common.state.{MapState, MapStateDescriptor}
 import org.apache.flink.configuration.Configuration
-import org.apache.flink.runtime.state.StateBackend
-import org.apache.flink.runtime.state.memory.MemoryStateBackend
-import org.apache.flink.streaming.api.CheckpointingMode
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.events.CommentEvent
 import org.mvrs.dspa.utils
@@ -21,8 +18,6 @@ object LoadCommentEvents extends App {
   // set up the streaming execution environment
   implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
   env.setParallelism(1) // do data preparation in one worker only
-  env.enableCheckpointing(10000, CheckpointingMode.EXACTLY_ONCE)
-  env.setStateBackend(new MemoryStateBackend().asInstanceOf[StateBackend])
 
   val stream = env
     .readTextFile(filePath)
