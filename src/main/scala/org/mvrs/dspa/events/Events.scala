@@ -4,6 +4,8 @@ import java.time.ZonedDateTime
 
 import scala.collection.Set
 
+case class PostStatistics(postId: Long, time: Long, commentCount: Int, replyCount: Int, distinctUsersCount: Int)
+
 trait ForumEvent {
   val personId: Long
   val creationDate: ZonedDateTime
