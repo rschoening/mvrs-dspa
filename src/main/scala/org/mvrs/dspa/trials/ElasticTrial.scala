@@ -65,5 +65,22 @@ object ElasticTrial extends App {
   // Response also supports familiar combinators like map / flatMap / foreach:
   resp foreach (search => println(s"There were ${search.totalHits} total hits"))
 
+
+  client.execute {
+    catIndices()
+  }.await.result.foreach(println)
+
+  client.execute {
+    getMapping("features" / "personFeatures")
+  }.await.result.foreach(_.mappings.foreach(println))
+
+  client.execute {
+    search("features" / "personFeatures") // 10 hits returned (we'll anyway always do point queries)
+  }.await.foreach(resp => resp.hits.hits.foreach(h => println(s"$h")))
+
+  client.execute {
+    get("635").from("features" / "personFeatures")
+  }.await.foreach(resp => println(resp))
+
   client.close()
 }

@@ -4,20 +4,28 @@ import java.util.{Optional, Properties}
 
 import org.apache.flink.api.common.serialization.TypeInformationSerializationSchema
 import org.apache.flink.api.common.typeinfo.TypeInformation
+import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
 import org.apache.flink.streaming.api.functions.AssignerWithPeriodicWatermarks
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor
 import org.apache.flink.streaming.api.windowing.time.Time
+
+import scala.reflect.ClassTag
 //import org.apache.avro.{Schema, SchemaBuilder}
 //import org.apache.flink.formats.avro.typeutils.AvroSerializer
 //import org.apache.flink.formats.avro.{AvroDeserializationSchema, AvroRowSerializationSchema}
 //import org.apache.flink.types.Row
-import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer, FlinkKafkaProducer}
 import org.apache.kafka.clients.producer.ProducerConfig
 
 
 package object utils {
+
+  import org.apache.flink.streaming.api.scala._
+
+  def readCsv[T: ClassTag](path: String)(implicit env: ExecutionEnvironment, typeInformation: TypeInformation[T]): DataSet[T] =
+    env.readCsvFile[T](path, fieldDelimiter = "|", ignoreFirstLine = true)
+
   //  def createAvroKafkaProducer(topicId: String,
   //                             bootstrapServers: String,
   //                             partitioner: Option[FlinkKafkaPartitioner[Row]] = None)
