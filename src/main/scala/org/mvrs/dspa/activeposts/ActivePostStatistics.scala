@@ -156,7 +156,7 @@ class StatisticsSinkFunction(uri: String, indexName: String, typeName: String) e
           "replyCount" -> record.replyCount,
           "commentCount" -> record.commentCount,
           "likeCount" -> record.likeCount,
-          "distinctUsersCount" -> record.distinctUsersCount,
+          "distinctUserCount" -> record.distinctUsersCount,
           "timestamp" -> record.time)
     }.await
   }
