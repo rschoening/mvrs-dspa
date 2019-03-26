@@ -21,9 +21,7 @@ class ScaledReplayFunction[I](extractEventTime: I => Long, speedupFactor: Double
       firstEventTime = eventTime // first message, don't delay
     }
     else {
-      val eventReplayTime = toReplayTime(replayStartTime, firstEventTime, eventTime)
-
-      val replayWait = eventReplayTime - now
+      val replayWait = if (speedupFactor == 0) 0 else toReplayTime(replayStartTime, firstEventTime, eventTime) - now
 
       // TODO add random delay (use priority queue to schedule replay in delayed processing time order)
 
