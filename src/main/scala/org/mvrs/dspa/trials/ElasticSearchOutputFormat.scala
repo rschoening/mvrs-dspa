@@ -8,6 +8,7 @@ abstract class ElasticSearchOutputFormat[T](uri: String) extends OutputFormat[T]
 
   private var client: Option[ElasticClient] = None
 
+  // TODO add support for batching?
   def process(record: T, client: ElasticClient): Unit
 
   override def configure(parameters: Configuration): Unit = {}

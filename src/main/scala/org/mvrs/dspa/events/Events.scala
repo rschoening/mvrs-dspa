@@ -4,13 +4,14 @@ import java.time.ZonedDateTime
 
 import scala.collection.Set
 
-case class PostStatistics(postId: Long, time: Long, commentCount: Int, replyCount: Int, distinctUsersCount: Int)
+case class PostStatistics(postId: Long, time: Long, commentCount: Int, replyCount: Int, likeCount: Int, distinctUsersCount: Int)
 
 trait ForumEvent {
   val personId: Long
   val creationDate: ZonedDateTime
 
   def timeStamp: Long
+
   def postId: Long
 }
 
@@ -31,6 +32,7 @@ final case class CommentEvent(id: Long,
                               placeId: Int) extends ForumEvent {
   // TODO add learning test for zoneddatetime to (comparable) epoch timestamp: are these timestamps comparable when from different zones?
   def timeStamp: Long = creationDate.toInstant.toEpochMilli
+
   def postId: Long = replyToPostId.get
 }
 
@@ -46,6 +48,7 @@ final case class PostEvent(id: Long,
                            forumId: Long,
                            placeId: Int) extends ForumEvent {
   def timeStamp: Long = creationDate.toInstant.toEpochMilli
+
   def postId: Long = id
 }
 

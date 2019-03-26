@@ -76,6 +76,7 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
       val bucketsToDrop = mutable.MutableList[Long]()
       var commentCount = 0
       var replyCount = 0
+      var likeCount = 0
 
       bucketMapState.iterator().asScala.foreach(
         entry => {
@@ -87,6 +88,7 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
             val bucket = entry.getValue
             commentCount += bucket.commentCount
             replyCount += bucket.replyCount
+            likeCount += bucket.likeCount
           }
         })
 
@@ -106,7 +108,7 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
         }
       )
 
-      out.collect(PostStatistics(ctx.getCurrentKey, timestamp, commentCount, replyCount, activeUserSet.size))
+      out.collect(PostStatistics(ctx.getCurrentKey, timestamp, commentCount, replyCount, likeCount, activeUserSet.size))
 
       LOG.info(s"registering FOLLOWING timer for $timestamp + $slide (current watermark: ${ctx.timerService.currentWatermark()})")
 
@@ -135,6 +137,7 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
     value.eventType match {
       case EventType.Comment => updateBucket(bucketTimestamp, _.commentCount += 1)
       case EventType.Reply => updateBucket(bucketTimestamp, _.replyCount += 1)
+      case EventType.Like => updateBucket(bucketTimestamp, _.likeCount += 1)
       case _ => // do nothing with posts and likes
     }
 
@@ -164,12 +167,12 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
     if (bucketMapState.contains(bucketTimestamp))
       bucketMapState.get(bucketTimestamp)
     else {
-      val newBucket = Bucket(0, 0)
+      val newBucket = Bucket()
       bucketMapState.put(bucketTimestamp, newBucket)
       newBucket
     }
   }
 
-  case class Bucket(var commentCount: Int, var replyCount: Int)
+  case class Bucket(var commentCount: Int = 0, var replyCount: Int = 0, var likeCount: Int = 0)
 
 }

@@ -30,8 +30,8 @@ object LoadRecommendationFeaturesBatch extends App {
 
   val client = ElasticClient(ElasticProperties(elasticSearchUri))
   try {
-    dropIndex(client, featuresIndex)
-    dropIndex(client, bucketsIndex)
+    utils.dropIndex(client, featuresIndex)
+    utils.dropIndex(client, bucketsIndex)
     createFeaturesIndex(client, featuresIndex, personFeaturesTypeName)
     createFeaturesIndex(client, featuresIndex, forumFeaturesTypeName)
     createBucketIndex(client, bucketsIndex, bucketTypeName)
@@ -136,16 +136,7 @@ object LoadRecommendationFeaturesBatch extends App {
 
   }
 
-  private def dropIndex(client: ElasticClient, indexName: String) = {
-    // we must import the dsl
-    import com.sksamuel.elastic4s.http.ElasticDsl._
-
-    client.execute {
-      deleteIndex(indexName)
-    }.await
-  }
-
-  private class BucketsOutputFormat(uri: String, indexName: String, typeName: String)
+  class BucketsOutputFormat(uri: String, indexName: String, typeName: String)
     extends ElasticSearchOutputFormat[(Long, Seq[(Long, MinHashSignature)])](uri) {
 
     import com.sksamuel.elastic4s.http.ElasticDsl._
