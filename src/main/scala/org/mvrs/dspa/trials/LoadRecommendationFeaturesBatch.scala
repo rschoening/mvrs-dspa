@@ -12,7 +12,7 @@ import org.mvrs.dspa.utils
 
 object LoadRecommendationFeaturesBatch extends App {
   implicit val env: ExecutionEnvironment = ExecutionEnvironment.getExecutionEnvironment
-  env.setParallelism(5)
+  env.setParallelism(1)
 
   val rootPath = raw"C:\\data\\dspa\\project\\1k-users-sorted\\tables"
   val hasInterestCsv = Paths.get(rootPath, "person_hasInterest_tag.csv").toString
@@ -40,19 +40,20 @@ object LoadRecommendationFeaturesBatch extends App {
     client.close()
   }
 
-  val minHasher: MinHasher32 = createMinHasher()
-
   val personInterests = utils.readCsv[(Long, Long)](hasInterestCsv).map(toFeature(_, "I"))
   val personWork = utils.readCsv[(Long, Long)](worksAtCsv).map(toFeature(_, "W"))
   val personStudy = utils.readCsv[(Long, Long)](studyAtCsv).map(toFeature(_, "S"))
 
   // TODO do example for hierarchy (place, tag structure) --> flatten over all levels
-  val personFeatures: DataSet[(Long, Set[String])] =
+  val personFeatures: DataSet[(Long, Seq[String])] =
     personInterests
       .union(personWork)
       .union(personStudy)
       .groupBy(_._1)
-      .reduceGroup(ts => (ts.collectFirst { case t => t._1 }.get, ts.map(_._2).toSet))
+      .reduceGroup(ts => (ts.collectFirst { case t => t._1 }.get,
+        ts.map(_._2).toSeq.sorted))
+
+  val minHasher: MinHasher32 = createMinHasher()
 
   val personMinHashes: DataSet[(Long, MinHashSignature)] =
     personFeatures.map(t => (t._1, minHasher.combineAll(t._2.map(minHasher.init))))
@@ -67,7 +68,7 @@ object LoadRecommendationFeaturesBatch extends App {
     personMinHashBuckets
       .flatMap((t: (Long, MinHashSignature, List[Long])) => t._3.map(bucket => (bucket, (t._1, t._2))))
       .groupBy(_._1) // group by bucket id
-      .reduceGroup(ts => (ts.collectFirst { case (bucket, _) => bucket }.get, ts.map(_._2).toSeq)) // TODO revise: why are some sets empty
+      .reduceGroup(ts => (ts.collectFirst { case (bucket, _) => bucket }.get, ts.map(_._2).toSeq.sortBy(_._1))) // TODO revise: why are some sets empty
       .filter(_._2.nonEmpty)
 
   buckets.first(10).print()
@@ -170,13 +171,13 @@ object LoadRecommendationFeaturesBatch extends App {
   }
 
   private class FeaturesOutputFormat(uri: String, indexName: String, typeName: String)
-    extends ElasticSearchOutputFormat[(Long, Set[String])](uri) {
+    extends ElasticSearchOutputFormat[(Long, Seq[String])](uri) {
 
     import com.sksamuel.elastic4s.http.ElasticDsl._
 
     //    import scala.concurrent.ExecutionContext.Implicits.global
 
-    override def process(record: (Long, Set[String]), client: ElasticClient): Unit = {
+    override def process(record: (Long, Seq[String]), client: ElasticClient): Unit = {
       client.execute {
         indexInto(indexName / typeName)
           .withId(record._1.toString)
