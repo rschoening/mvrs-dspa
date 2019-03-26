@@ -29,9 +29,7 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
   private lazy val lastActivityState = getRuntimeContext.getState(lastActivityDescriptor)
   private lazy val windowEndState = getRuntimeContext.getState(windowEndDescriptor)
   private lazy val bucketMapState = getRuntimeContext.getMapState(bucketMapDescriptor)
-  private lazy val personMapState = getRuntimeContext.getMapState(personMapDescriptor)
 
-  private val personMapDescriptor = new MapStateDescriptor[Long, Long]("persons", classOf[Long], classOf[Long])
   private val bucketMapDescriptor = new MapStateDescriptor[Long, Bucket]("buckets", classOf[Long], classOf[Bucket])
   private val lastActivityDescriptor = new ValueStateDescriptor("lastActivity", classOf[Long])
   private val windowEndDescriptor = new ValueStateDescriptor("windowEnd", classOf[Long])
@@ -49,7 +47,6 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
     bucketMapDescriptor.enableTimeToLive(ttlConfig)
     lastActivityDescriptor.enableTimeToLive(ttlConfig)
     windowEndDescriptor.enableTimeToLive(ttlConfig)
-    personMapDescriptor.enableTimeToLive(ttlConfig)
   }
 
   override def onTimer(timestamp: Long,
@@ -67,7 +64,6 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
       bucketMapState.clear()
       windowEndState.clear()
       lastActivityState.clear()
-      personMapState.clear()
     }
     else {
       LOG.info(s"- last activity inside of window")
@@ -77,42 +73,63 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
       var commentCount = 0
       var replyCount = 0
       var likeCount = 0
+      var postCreatedInWindow = false
 
-      bucketMapState.iterator().asScala.foreach(
+      val buckets = bucketMapState.iterator().asScala
+      val bucketList = buckets.toList
+
+      var futureBucketCount = 0
+
+      val activeUserSet = mutable.Set[Long]()
+
+      bucketList.foreach(
         entry => {
           val bucketTimestamp = entry.getKey
 
-          if (bucketTimestamp > timestamp) {} // future bucket, ignore
+          if (bucketTimestamp > timestamp) {
+            futureBucketCount += 1 // future bucket, ignore (count for later assertion)
+          }
           else if (bucketTimestamp <= timestamp - windowSize) bucketsToDrop += bucketTimestamp // to be evicted
-          else { // bucket within window
+          else {
+            // bucket within window
             val bucket = entry.getValue
+
             commentCount += bucket.commentCount
             replyCount += bucket.replyCount
             likeCount += bucket.likeCount
+            if (bucket.originalPost) {
+              postCreatedInWindow = true
+            }
+
+            // alternative (originally considered in design document):
+            // MapState personId -> last activity date
+            // however: events within watermark must be distinguished
+            // -> more complex than id set per bucket
+            // -> sets cost a bit more in terms of size and time (union)
+            //    but: separate flink MapState (with unclear cost) can be avoided
+            activeUserSet ++= bucket.persons
           }
         })
 
-      bucketsToDrop.foreach(bucketMapState.remove)
+      if (postCreatedInWindow || (commentCount + replyCount + likeCount > 0)) {
+        assert(activeUserSet.nonEmpty)
 
-      // distinct user counts
-      val activeUserSet = mutable.Set[Long]()
-      val personIdsToDrop = mutable.MutableList[Long]()
-
-      personMapState.iterator().asScala.foreach(
-        entry => {
-          val lastPersonActivity = entry.getValue
-
-          if (lastPersonActivity > timestamp) {} // future activity, ignore
-          else if (lastPersonActivity <= timestamp - windowSize) personIdsToDrop += entry.getKey // to be evicted
-          else activeUserSet.add(entry.getKey) // bucket within window
-        }
-      )
-
-      out.collect(PostStatistics(ctx.getCurrentKey, timestamp, commentCount, replyCount, likeCount, activeUserSet.size))
+        out.collect(
+          PostStatistics(
+            ctx.getCurrentKey, timestamp,
+            commentCount, replyCount, likeCount,
+            activeUserSet.size, postCreatedInWindow))
+      }
+      else {
+        assert(futureBucketCount > 0)
+      }
 
       LOG.info(s"registering FOLLOWING timer for $timestamp + $slide (current watermark: ${ctx.timerService.currentWatermark()})")
 
       registerWindowEndTimer(ctx.timerService, timestamp + slide)
+
+      // evict state
+      bucketsToDrop.foreach(bucketMapState.remove)
     }
   }
 
@@ -128,16 +145,15 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
     // register last activity for post
     lastActivityState.update(value.timestamp)
 
-    // register last activity per person id
-    personMapState.put(value.personId, value.timestamp)
-
     val windowEnd = windowEndState.value
     val bucketTimestamp = PostStatisticsFunction.getBucketForTimestamp(value.timestamp, windowEnd, slide)
 
     value.eventType match {
-      case EventType.Comment => updateBucket(bucketTimestamp, _.commentCount += 1)
-      case EventType.Reply => updateBucket(bucketTimestamp, _.replyCount += 1)
-      case EventType.Like => updateBucket(bucketTimestamp, _.likeCount += 1)
+      case EventType.Comment => updateBucket(bucketTimestamp, _.addComment(value.personId))
+      case EventType.Reply => updateBucket(bucketTimestamp, _.addReply(value.personId))
+      case EventType.Like => updateBucket(bucketTimestamp, _.addReply(value.personId))
+      case EventType.Post => updateBucket(bucketTimestamp, _.registerPost(value.personId))
+
       case _ => // do nothing with posts and likes
     }
 
@@ -173,6 +189,32 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
     }
   }
 
-  case class Bucket(var commentCount: Int = 0, var replyCount: Int = 0, var likeCount: Int = 0)
+  case class Bucket() {
+    val persons: mutable.Set[Long] = mutable.Set()
+    var commentCount: Int = 0
+    var replyCount: Int = 0
+    var likeCount: Int = 0
+    var originalPost: Boolean = false
+
+    def registerPost(personId: Long): Unit = {
+      originalPost = true
+      persons += personId
+    }
+
+    def addReply(personId: Long): Unit = {
+      replyCount += 1
+      persons += personId
+    }
+
+    def addLike(personId: Long): Unit = {
+      likeCount += 1
+      persons += personId
+    }
+
+    def addComment(personId: Long): Unit = {
+      commentCount += 1
+      persons += personId
+    }
+  }
 
 }

@@ -42,8 +42,8 @@ object ActivePostStatistics extends App {
   val postsSource = utils.createKafkaConsumer("posts", createTypeInformation[PostEvent], props)
   val likesSource = utils.createKafkaConsumer("likes", createTypeInformation[LikeEvent], props)
 
-  val speedupFactor = 0; // 10000000000L
-  val randomDelay = 0 // TODO input or scaled time? --> probably input time
+  val speedupFactor = 0; // 100000000L
+  val randomDelay = 0 // event time
   val maxOutOfOrderness = Time.milliseconds(randomDelay)
 
   val commentsStream: DataStream[CommentEvent] = env
@@ -58,22 +58,21 @@ object ActivePostStatistics extends App {
     .addSource(likesSource)
     .process(new ScaledReplayFunction[LikeEvent](_.timeStamp, speedupFactor, randomDelay))
 
-  val stats = statistics(
+  val statsStream = statisticsStream(
     commentsStream, postsStream, likesStream,
     Time.hours(12).toMilliseconds,
     Time.minutes(30).toMilliseconds)
 
-  // stats.print
-  stats.addSink(new StatisticsSinkFunction(elasticSearchUri, indexName, typeName))
+  statsStream.addSink(new StatisticsSinkFunction(elasticSearchUri, indexName, typeName))
 
   env.execute("post statistics")
 
   //noinspection ConvertibleToMethodValue
-  def statistics(commentsStream: DataStream[CommentEvent],
-                 postsStream: DataStream[PostEvent],
-                 likesStream: DataStream[LikeEvent],
-                 windowSize: Long,
-                 slide: Long): DataStream[PostStatistics] = {
+  def statisticsStream(commentsStream: DataStream[CommentEvent],
+                       postsStream: DataStream[PostEvent],
+                       likesStream: DataStream[LikeEvent],
+                       windowSize: Long,
+                       slide: Long): DataStream[PostStatistics] = {
     val comments: KeyedStream[Event, Long] = commentsStream
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](maxOutOfOrderness, _.timeStamp))
       .map(createEvent(_))
@@ -118,6 +117,7 @@ object ActivePostStatistics extends App {
           intField("likeCount"),
           intField("commentCount"),
           intField("distinctUserCount"),
+          booleanField("newPost"),
           dateField("timestamp")
         )
       )
@@ -156,7 +156,8 @@ class StatisticsSinkFunction(uri: String, indexName: String, typeName: String) e
           "replyCount" -> record.replyCount,
           "commentCount" -> record.commentCount,
           "likeCount" -> record.likeCount,
-          "distinctUserCount" -> record.distinctUsersCount,
+          "distinctUserCount" -> record.distinctUserCount,
+          "newPost" -> record.newPost,
           "timestamp" -> record.time)
     }.await
   }

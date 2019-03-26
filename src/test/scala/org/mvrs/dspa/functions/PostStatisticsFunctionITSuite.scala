@@ -130,7 +130,7 @@ class PostStatisticsFunctionITSuite extends AbstractTestBase {
     // check the distinct users; must group by post to avoid double-counting
     events.groupBy(_.postId).foreach {
       case (postId, eventsForPost) =>
-        assertResult(eventsForPost.map(_.personId).toSet.size)(statistics.filter(_.postId == postId).map(_.distinctUsersCount).sum)
+        assertResult(eventsForPost.map(_.personId).toSet.size)(statistics.filter(_.postId == postId).map(_.distinctUserCount).sum)
     }
   }
 }
