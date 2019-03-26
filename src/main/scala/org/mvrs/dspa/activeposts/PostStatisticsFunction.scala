@@ -41,7 +41,7 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
     .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
     .build
 
-  private val LOG = LoggerFactory.getLogger(classOf[PostStatistics])
+  private val LOG = LoggerFactory.getLogger(classOf[PostStatisticsFunction])
 
   override def open(parameters: Configuration): Unit = {
     bucketMapDescriptor.enableTimeToLive(ttlConfig)
@@ -56,17 +56,17 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
 
     val lastActivity = lastActivityState.value()
 
-    LOG.info(s"onTimer: $timestamp for key: ${ctx.getCurrentKey} (last activity: $lastActivity window size: $windowSize")
+    LOG.debug(s"onTimer: $timestamp for key: ${ctx.getCurrentKey} (last activity: $lastActivity window size: $windowSize")
 
     if (lastActivity < timestamp - windowSize) {
       // nothing to report, now new timer to register
-      LOG.info(s"- last activity outside of window - go to sleep until next event arrives")
+      LOG.debug(s"- last activity outside of window - go to sleep until next event arrives")
       bucketMapState.clear()
       windowEndState.clear()
       lastActivityState.clear()
     }
     else {
-      LOG.info(s"- last activity inside of window")
+      LOG.debug(s"- last activity inside of window")
 
       // event counts
       val bucketsToDrop = mutable.MutableList[Long]()
@@ -124,7 +124,7 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
         assert(futureBucketCount > 0)
       }
 
-      LOG.info(s"registering FOLLOWING timer for $timestamp + $slide (current watermark: ${ctx.timerService.currentWatermark()})")
+      LOG.debug(s"registering FOLLOWING timer for $timestamp + $slide (current watermark: ${ctx.timerService.currentWatermark()})")
 
       registerWindowEndTimer(ctx.timerService, timestamp + slide)
 
@@ -138,7 +138,7 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
                               out: Collector[PostStatistics]): Unit = {
     if (windowEndState.value == 0) {
       // no window yet: register timer at event timestamp + slide
-      LOG.info(s"registering NEW timer for ${value.timestamp} + $slide (current watermark: ${ctx.timerService.currentWatermark()})")
+      LOG.debug(s"registering NEW timer for ${value.timestamp} + $slide (current watermark: ${ctx.timerService.currentWatermark()})")
       registerWindowEndTimer(ctx.timerService, value.timestamp + slide)
     }
 
@@ -158,13 +158,13 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
     }
 
     if (value.timestamp > windowEnd) {
-      LOG.warn(s"Early event, to future bucket: $value (current window: $windowEnd)")
+      LOG.debug(s"Early event, to future bucket: $value (current window: $windowEnd)")
     }
     else if (value.timestamp < windowEnd - windowSize) {
-      LOG.warn(s"Late event, to past bucket: $value (current window: $windowEnd)")
+      LOG.debug(s"Late event, to past bucket: $value (current window: $windowEnd)")
     }
     else {
-      LOG.info(s"Regular event, to current bucket: $value")
+      LOG.debug(s"Regular event, to current bucket: $value")
     }
   }
 
