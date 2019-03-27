@@ -55,26 +55,19 @@ object LoadCommentEvents extends App {
     override def processElement(value: String,
                                 ctx: KeyedProcessFunction[Int, String, CommentEvent]#Context,
                                 out: Collector[CommentEvent]): Unit = {
-      Try(CommentEvent.parse(value)) match {
-        case Success(comment) =>
-          if (comment.replyToPostId.isEmpty) {
-            if (comment.replyToCommentId.isEmpty) {
-              ctx.output(outputTag, ParseError("missing parent reference", value))
-            }
-            else {
-              val replyToCommentId = comment.replyToCommentId.get
-
-              if (!postForComment.contains(replyToCommentId))
-                ctx.output(outputTag, ParseError(s"unknown comment: $replyToCommentId", value))
-              else
-                out.collect(comment.copy(replyToPostId = Some(postForComment.get(replyToCommentId))))
-            }
-          }
-          else {
-            postForComment.put(comment.id, comment.replyToPostId.get)
-            out.collect(comment)
-          }
-        case Failure(exception) => ctx.output(outputTag, ParseError(exception.getMessage, value))
+      Try(CommentEvent.parse(value)).flatMap(
+        c =>
+          if (c.replyToPostId.isEmpty && c.replyToCommentId.isEmpty) Failure(new Exception("missing parent reference"))
+          else if (c.replyToPostId.isEmpty) {
+            val replyToCommentId = c.replyToCommentId.get
+            if (!postForComment.contains(replyToCommentId)) Failure(new Exception(s"unknown comment: $replyToCommentId"))
+            else Success(c.copy(replyToPostId = Some(postForComment.get(replyToCommentId))))
+          } else {
+            postForComment.put(c.id, c.replyToPostId.get)
+            Success(c)
+          }) match {
+        case Success(c) => out.collect(c)
+        case Failure(e) => ctx.output(outputTag, ParseError(e.getMessage, value))
       }
     }
   }
