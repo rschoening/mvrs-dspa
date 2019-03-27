@@ -36,7 +36,9 @@ object WriteActivePostStatisticsToElasticSearch extends App {
 
   val source = utils.createKafkaConsumer("poststatistics", createTypeInformation[PostStatistics], props)
 
-  val stream = env.addSource(source).addSink(new ElasticSearchStatisticsSinkFunction(elasticSearchUri, indexName, typeName))
+  val stream = env
+    .addSource(source)
+    .addSink(new ElasticSearchStatisticsSinkFunction(elasticSearchUri, indexName, typeName))
 
   // execute program
   env.execute("Move post statistics from Kafka to ElasticSearch")

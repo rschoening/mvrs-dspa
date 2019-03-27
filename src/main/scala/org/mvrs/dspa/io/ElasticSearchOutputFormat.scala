@@ -1,4 +1,4 @@
-package org.mvrs.dspa.trials
+package org.mvrs.dspa.io
 
 import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
 import org.apache.flink.api.common.io.OutputFormat

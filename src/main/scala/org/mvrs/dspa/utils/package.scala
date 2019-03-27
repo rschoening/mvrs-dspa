@@ -11,7 +11,7 @@ import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
 import org.apache.flink.streaming.api.functions.AssignerWithPeriodicWatermarks
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor
 import org.apache.flink.streaming.api.windowing.time.Time
-import org.mvrs.dspa.trials.ElasticSearchOutputFormat
+import org.mvrs.dspa.io.ElasticSearchOutputFormat
 
 import scala.reflect.ClassTag
 //import org.apache.avro.{Schema, SchemaBuilder}
@@ -27,6 +27,9 @@ import org.apache.kafka.clients.producer.ProducerConfig
 package object utils {
 
   val kafkaBrokers = "localhost:9092"
+
+  def getMinHashSignature(features: Seq[String], minHasher: MinHasher32): MinHashSignature =
+    minHasher.combineAll(features.map(minHasher.init))
 
   def decodeMinHashSignature(base64: String) = MinHashSignature(Base64.getDecoder.decode(base64))
 
@@ -129,4 +132,5 @@ package object utils {
       //      }
     }
   }
+
 }

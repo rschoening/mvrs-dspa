@@ -1,4 +1,4 @@
-package org.mvrs.dspa.trials
+package org.mvrs.dspa.recommendations
 
 import java.lang
 import java.nio.file.Paths
@@ -8,9 +8,9 @@ import com.sksamuel.elastic4s.http.get.GetResponse
 import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
 import com.twitter.algebird.{MinHashSignature, MinHasher32}
 import org.apache.flink.api.common.functions.GroupReduceFunction
-import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
-import org.apache.flink.streaming.api.scala._
+import org.apache.flink.api.scala._
 import org.apache.flink.util.Collector
+import org.mvrs.dspa.io.ElasticSearchOutputFormat
 import org.mvrs.dspa.utils
 
 import scala.collection.JavaConverters._
@@ -18,6 +18,8 @@ import scala.collection.JavaConverters._
 object LoadRecommendationFeaturesBatch extends App {
   implicit val env: ExecutionEnvironment = ExecutionEnvironment.getExecutionEnvironment
   env.setParallelism(1)
+
+  // TODO determine how to manage settings
 
   val rootPath = raw"C:\\data\\dspa\\project\\1k-users-sorted\\tables"
   val hasInterestCsv = Paths.get(rootPath, "person_hasInterest_tag.csv").toString
@@ -48,6 +50,8 @@ object LoadRecommendationFeaturesBatch extends App {
   val personInterests = utils.readCsv[(Long, Long)](hasInterestCsv).map(toFeature(_, "I"))
   val personWork = utils.readCsv[(Long, Long)](worksAtCsv).map(toFeature(_, "W"))
   val personStudy = utils.readCsv[(Long, Long)](studyAtCsv).map(toFeature(_, "S"))
+
+  // TODO load known users
 
   // TODO do example for hierarchy (place, tag structure) --> flatten over all levels
   val personFeatures: DataSet[(Long, Seq[String])] =
@@ -136,7 +140,9 @@ object LoadRecommendationFeaturesBatch extends App {
 
   }
 
-  class GroupByBucketFunction extends GroupReduceFunction[(Long, (Long, MinHashSignature)), (Long, Seq[(Long, MinHashSignature)])] {
+  class GroupByBucketFunction
+    extends GroupReduceFunction[(Long, (Long, MinHashSignature)), (Long, Seq[(Long, MinHashSignature)])] {
+
     override def reduce(values: lang.Iterable[(Long, (Long, MinHashSignature))], out: Collector[(Long, Seq[(Long, MinHashSignature)])]): Unit = {
       val bucket = values.asScala.foldLeft((0L, List[(Long, MinHashSignature)]()))((z, t: (Long, (Long, MinHashSignature))) => (t._1, t._2 :: z._2))
 
@@ -149,8 +155,6 @@ object LoadRecommendationFeaturesBatch extends App {
 
     import com.sksamuel.elastic4s.http.ElasticDsl._
 
-    //    import scala.concurrent.ExecutionContext.Implicits.global
-
     override def process(record: (Long, Seq[(Long, MinHashSignature)]), client: ElasticClient): Unit = {
       // NOTE: connections are "unexpectedly closed" when using onComplete on the future - need to await
       client.execute {
@@ -162,10 +166,6 @@ object LoadRecommendationFeaturesBatch extends App {
               "minhash" -> Base64.getEncoder.encodeToString(t._2.bytes))),
             "lastUpdate" -> System.currentTimeMillis())
       }.await
-      //        .onComplete {
-      //        case Failure(exception) => println(exception)
-      //        case _ =>
-      //      }
     }
   }
 
@@ -173,8 +173,6 @@ object LoadRecommendationFeaturesBatch extends App {
     extends ElasticSearchOutputFormat[(Long, Seq[String])](uri) {
 
     import com.sksamuel.elastic4s.http.ElasticDsl._
-
-    //    import scala.concurrent.ExecutionContext.Implicits.global
 
     override def process(record: (Long, Seq[String]), client: ElasticClient): Unit = {
       client.execute {
@@ -184,17 +182,7 @@ object LoadRecommendationFeaturesBatch extends App {
             "features" -> record._2,
             "lastUpdate" -> System.currentTimeMillis())
       }.await
-
-      //          .onComplete {
-      //          case Failure(exception) => println(exception)
-      //          case _ =>
-      //        }
     }
   }
 
 }
-
-
-
-
-

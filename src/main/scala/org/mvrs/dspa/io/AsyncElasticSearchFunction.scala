@@ -1,4 +1,4 @@
-package org.mvrs.dspa.functions
+package org.mvrs.dspa.io
 
 import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
 import org.apache.flink.configuration.Configuration

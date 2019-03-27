@@ -39,9 +39,6 @@ object ElasticTrial extends App {
     update("some_id").in("artists/modern").docAsUpsert(
       "name" -> "Lowry 2"
     )
-    update("another_id").in("artists/modern").docAsUpsert(
-      "name" -> "XYz1"
-    )
   }.await
 
 
