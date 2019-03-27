@@ -4,7 +4,7 @@ import java.util.{Base64, Optional, Properties}
 
 import com.sksamuel.elastic4s.http.index.admin.DeleteIndexResponse
 import com.sksamuel.elastic4s.http.{ElasticClient, Response}
-import com.twitter.algebird.MinHashSignature
+import com.twitter.algebird.{MinHashSignature, MinHasher, MinHasher32}
 import org.apache.flink.api.common.serialization.TypeInformationSerializationSchema
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
@@ -25,6 +25,13 @@ import org.apache.kafka.clients.producer.ProducerConfig
 
 
 package object utils {
+
+  val kafkaBrokers = "localhost:9092"
+
+  def decodeMinHashSignature(base64: String) = MinHashSignature(Base64.getDecoder.decode(base64))
+
+  def createMinHasher(numHashes: Int = 100, targetThreshold: Double = 0.2): MinHasher32 =
+    new MinHasher32(numHashes, MinHasher.pickBands(targetThreshold, numHashes))
 
   def dropIndex(client: ElasticClient, indexName: String): Response[DeleteIndexResponse] = {
     // we must import the dsl

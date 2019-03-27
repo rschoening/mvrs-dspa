@@ -1,14 +1,19 @@
 package org.mvrs.dspa.trials
 
+import java.lang
 import java.nio.file.Paths
 import java.util.Base64
 
 import com.sksamuel.elastic4s.http.get.GetResponse
 import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
-import com.twitter.algebird.{MinHashSignature, MinHasher, MinHasher32}
+import com.twitter.algebird.{MinHashSignature, MinHasher32}
+import org.apache.flink.api.common.functions.GroupReduceFunction
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
 import org.apache.flink.streaming.api.scala._
+import org.apache.flink.util.Collector
 import org.mvrs.dspa.utils
+
+import scala.collection.JavaConverters._
 
 object LoadRecommendationFeaturesBatch extends App {
   implicit val env: ExecutionEnvironment = ExecutionEnvironment.getExecutionEnvironment
@@ -53,7 +58,7 @@ object LoadRecommendationFeaturesBatch extends App {
       .reduceGroup(ts => (ts.collectFirst { case t => t._1 }.get,
         ts.map(_._2).toSeq.sorted))
 
-  val minHasher: MinHasher32 = createMinHasher()
+  val minHasher: MinHasher32 = utils.createMinHasher()
 
   val personMinHashes: DataSet[(Long, MinHashSignature)] =
     personFeatures.map(t => (t._1, minHasher.combineAll(t._2.map(minHasher.init))))
@@ -64,17 +69,17 @@ object LoadRecommendationFeaturesBatch extends App {
       t._2, // minhash
       minHasher.buckets(t._2)))
 
-  val buckets: DataSet[(Long, Seq[(Long, MinHashSignature)])] =
-    personMinHashBuckets
-      .flatMap((t: (Long, MinHashSignature, List[Long])) => t._3.map(bucket => (bucket, (t._1, t._2))))
-      .groupBy(_._1) // group by bucket id
-      .reduceGroup(ts => (ts.collectFirst { case (bucket, _) => bucket }.get, ts.map(_._2).toSeq.sortBy(_._1))) // TODO revise: why are some sets empty
-      .filter(_._2.nonEmpty)
-
-  buckets.first(10).print()
+  val buckets: DataSet[(Long, Seq[(Long, MinHashSignature)])] = personMinHashBuckets
+    .flatMap((t: (Long, MinHashSignature, List[Long])) => t._3.map(bucket => (bucket, (t._1, t._2))))
+    .groupBy(_._1) // group by bucket id
+    .reduceGroup(new GroupByBucketFunction())
 
   personFeatures.output(new FeaturesOutputFormat(elasticSearchUri, featuresIndex, personFeaturesTypeName))
   buckets.output(new BucketsOutputFormat(elasticSearchUri, bucketsIndex, bucketTypeName))
+
+  println("users: " + buckets.flatMap(b => b._2).map(_._1).distinct().count())
+  println("minhashes: " + buckets.flatMap(b => b._2).map(_._2).distinct().count())
+  println("buckets: " + buckets.count())
 
   env.execute("import features and buckets")
 
@@ -94,13 +99,8 @@ object LoadRecommendationFeaturesBatch extends App {
     // TODO define/use HitReader type class
     val users = result.source("users").asInstanceOf[List[Map[String, Any]]]
 
-    users.map(m => (m("uid").toString.toLong, decodeMinHashSignature(m("minhash").asInstanceOf[String])))
+    users.map(m => (m("uid").toString.toLong, utils.decodeMinHashSignature(m("minhash").asInstanceOf[String])))
   }
-
-  private def decodeMinHashSignature(base64: String) = MinHashSignature(Base64.getDecoder.decode(base64))
-
-  private def createMinHasher(numHashes: Int = 100, targetThreshold: Double = 0.2): MinHasher32 =
-    new MinHasher32(numHashes, MinHasher.pickBands(targetThreshold, numHashes))
 
   private def toFeature(input: (Long, Long), prefix: String): (Long, String) = (input._1, s"$prefix${input._2}")
 
@@ -134,6 +134,14 @@ object LoadRecommendationFeaturesBatch extends App {
       )
     }.await
 
+  }
+
+  class GroupByBucketFunction extends GroupReduceFunction[(Long, (Long, MinHashSignature)), (Long, Seq[(Long, MinHashSignature)])] {
+    override def reduce(values: lang.Iterable[(Long, (Long, MinHashSignature))], out: Collector[(Long, Seq[(Long, MinHashSignature)])]): Unit = {
+      val bucket = values.asScala.foldLeft((0L, List[(Long, MinHashSignature)]()))((z, t: (Long, (Long, MinHashSignature))) => (t._1, t._2 :: z._2))
+
+      out.collect(bucket)
+    }
   }
 
   class BucketsOutputFormat(uri: String, indexName: String, typeName: String)

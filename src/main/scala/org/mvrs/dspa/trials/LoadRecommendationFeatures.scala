@@ -10,7 +10,7 @@ import org.apache.flink.streaming.api.functions.sink.{RichSinkFunction, SinkFunc
 import org.apache.flink.streaming.api.functions.source.SourceFunction.SourceContext
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.api.windowing.time.Time
-import org.mvrs.dspa.recommendations.Recommendations.GroupInterestsProcessFunction
+import RecommendationsFirstTrial.GroupInterestsProcessFunction
 
 
 object LoadRecommendationFeatures extends App {
