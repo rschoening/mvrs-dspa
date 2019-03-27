@@ -17,7 +17,7 @@ object WriteActivePostStatisticsToElasticSearch extends App {
 
   val client = ElasticClient(ElasticProperties(elasticSearchUri))
   try {
-    utils.dropIndex(client, indexName)
+    utils.dropIndex(client, indexName) // testing: recreate the index
     createStatisticsIndex(client, indexName, typeName)
   }
   finally {
@@ -34,7 +34,7 @@ object WriteActivePostStatisticsToElasticSearch extends App {
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
   env.setParallelism(3)
 
-  val source = utils.createKafkaConsumer("post_statistics", createTypeInformation[PostStatistics], props)
+  val source = utils.createKafkaConsumer("poststatistics", createTypeInformation[PostStatistics], props)
 
   val stream = env.addSource(source).addSink(new ElasticSearchStatisticsSinkFunction(elasticSearchUri, indexName, typeName))
 

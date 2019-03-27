@@ -27,9 +27,9 @@ object ActivePostStatistics extends App {
   val postsSource = utils.createKafkaConsumer("posts", createTypeInformation[PostEvent], props)
   val likesSource = utils.createKafkaConsumer("likes", createTypeInformation[LikeEvent], props)
 
-  val speedupFactor = 0; // 100000000L
+  val speedupFactor = 0; // 0 --> read as fast as can
   val randomDelay = 0 // event time
-  val maxOutOfOrderness = Time.milliseconds(randomDelay)
+  val maxOutOfOrderness = Time.milliseconds(if (speedupFactor == 0) randomDelay else randomDelay / speedupFactor)
 
   val commentsStream: DataStream[CommentEvent] = env
     .addSource(commentsSource)
@@ -50,7 +50,7 @@ object ActivePostStatistics extends App {
 
   statsStream
     .keyBy(_.postId)
-    .addSink(utils.createKafkaProducer("post_statistics", kafkaBrokers, createTypeInformation[PostStatistics]))
+    .addSink(utils.createKafkaProducer("poststatistics", kafkaBrokers, createTypeInformation[PostStatistics]))
 
   env.execute("write post statistics to elastic search")
 
