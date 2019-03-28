@@ -51,11 +51,11 @@ object WriteActivePostStatisticsToElasticSearch extends App {
       createIndex(indexName).mappings(
         mapping(typeName).fields(
           longField("postId"),
-          intField("replyCount"),
-          intField("likeCount"),
-          intField("commentCount"),
-          intField("distinctUserCount"),
-          booleanField("newPost"),
+          intField("replyCount").index(false),
+          intField("likeCount").index(false),
+          intField("commentCount").index(false),
+          intField("distinctUserCount").index(false),
+          booleanField("newPost").index(false),
           dateField("timestamp")
         )
       )

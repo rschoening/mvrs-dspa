@@ -19,7 +19,7 @@ class AsyncMinHashLookup(elasticSearchUri: String, minHasher: MinHasher32)
 
   override def asyncInvoke(client: ElasticClient, input: ForumEvent, resultFuture: ResultFuture[(Long, MinHashSignature)]): Unit = {
     client.execute {
-      get(input.personId.toString).from("recommendation_features" / "personFeatures")
+      get(input.personId.toString).from("recommendation_person_features" / "recommendation_person_features_type")
     }.onComplete {
       case Success(response) => resultFuture.complete(unpackResponse(input, response).asJava)
       case Failure(exception) => resultFuture.completeExceptionally(exception)

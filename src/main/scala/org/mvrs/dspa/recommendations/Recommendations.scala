@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
 import org.apache.flink.streaming.api.TimeCharacteristic
-import org.apache.flink.streaming.api.datastream.{AsyncDataStream, SingleOutputStreamOperator}
+import org.apache.flink.streaming.api.datastream.AsyncDataStream
 import org.apache.flink.streaming.api.functions.sink.SinkFunction
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.events.ForumEvent
@@ -16,7 +16,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 object Recommendations extends App {
   val elasticSearchUri = "http://localhost:9200"
   val indexName = "recommendations"
-  val typeName = "recommendedUsers"
+  val typeName = "recommendations_type"
+
   val client = ElasticClient(ElasticProperties(elasticSearchUri))
   try {
     utils.dropIndex(client, indexName) // testing: recreate the index
@@ -60,16 +61,30 @@ object Recommendations extends App {
     2000L, TimeUnit.MILLISECONDS,
     5)
 
-  // TODO exclude known users and inactive users
+  // TODO exclude inactive users - keep last activity in this operator? would have to be broadcast to all operators
+  //      alternative: keep last activity timestamp in db (both approaches might miss the most recent new activity)
   // TODO allow unit testing with mock function
-  val recommendations: SingleOutputStreamOperator[(Long, Seq[(Long, Double)])] = AsyncDataStream.unorderedWait(
+  val candidates = AsyncDataStream.unorderedWait(
     minHashes,
-    new AsyncSimilarUsersLookup(elasticSearchUri, minHasher),
+    new AsyncCandidateUsersLookup(elasticSearchUri, minHasher),
     2000L, TimeUnit.MILLISECONDS,
     5)
 
-  recommendations.addSink(new RecommendationsSinkFunction(elasticSearchUri, indexName, typeName))
+  val filteredCandidates = AsyncDataStream.unorderedWait(
+    candidates,
+    new AsyncFilterCandidates(elasticSearchUri),
+    2000L, TimeUnit.MILLISECONDS,
+    5)
 
+  val recommendations = AsyncDataStream.unorderedWait(
+    filteredCandidates,
+    new AsyncRecommendUsers(elasticSearchUri, minHasher),
+    2000L, TimeUnit.MILLISECONDS,
+    5
+  )
+
+  // recommendations.addSink(new RecommendationsSinkFunction(elasticSearchUri, indexName, typeName))
+  filteredCandidates.print()
   env.execute("recommendations")
 
   private def createRecommendationIndex(client: ElasticClient, indexName: String, typeName: String): Unit = {

@@ -2,7 +2,6 @@ package org.mvrs.dspa.recommendations.staticData
 
 import java.nio.file.Paths
 
-import com.sksamuel.elastic4s.http.get.GetResponse
 import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
 import com.twitter.algebird.{MinHashSignature, MinHasher32}
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
@@ -42,9 +41,9 @@ object LoadStaticData extends App {
     utils.dropIndex(client, personMinHashIndex)
 
     createFeaturesIndex(client, personFeaturesIndex, personFeaturesTypeName)
-    createBucketIndex(client, bucketsIndex, bucketTypeName)
     createKnownPersonsIndex(client, knownPersonsIndex, knownPersonsTypeName)
     createMinHashIndex(client, personMinHashIndex, personMinHashIndexType)
+    createBucketIndex(client, bucketsIndex, bucketTypeName)
   }
   finally {
     client.close()
@@ -73,44 +72,25 @@ object LoadStaticData extends App {
       t._2, // minhash
       minHasher.buckets(t._2)))
 
-  val buckets: DataSet[(Long, Seq[(Long, MinHashSignature)])] = personMinHashBuckets
-    .flatMap((t: (Long, MinHashSignature, List[Long])) => t._3.map(bucket => (bucket, (t._1, t._2))))
+  val buckets: DataSet[(Long, List[Long])] = personMinHashBuckets
+    .flatMap((t: (Long, MinHashSignature, List[Long])) => t._3.map(bucket => (bucket, t._1)))
     .groupBy(_._1) // group by bucket id
-    .reduceGroup(_.foldLeft[(Long, List[(Long, MinHashSignature)])]((0L, Nil))((z, t) => (t._1, t._2 :: z._2)))
+    .reduceGroup(_.foldLeft[(Long, List[Long])]((0L, Nil))((z, t) => (t._1, t._2 :: z._2)))
 
   val knownPersons = utils.readCsv[(Long, Long)](knownPersonsCsv)
     .groupBy(_._1)
     .reduceGroup(sortedValues[Long] _)
 
   personFeatures.output(new FeaturesOutputFormat(elasticSearchUri, personFeaturesIndex, personFeaturesTypeName))
-  buckets.output(new BucketsOutputFormat(elasticSearchUri, bucketsIndex, bucketTypeName))
-  knownPersons.output(new KnownUsersOutputFormat(elasticSearchUri, knownPersonsIndex, knownPersonsTypeName))
   personMinHashes.output(new MinHashOutputFormat(elasticSearchUri, personMinHashIndex, personMinHashIndexType))
+  buckets.output(new BucketsOutputFormat2(elasticSearchUri, bucketsIndex, bucketTypeName))
+  knownPersons.output(new KnownUsersOutputFormat(elasticSearchUri, knownPersonsIndex, knownPersonsTypeName))
 
   env.execute("import static data for recommendations")
-
-  // trial read (will eventually get users/signatures based on list of bucket ids, union the users, compare with current (event) user, order on similarity, take(n))
-  println(readUsersForBucketTrial(-8940471233175404919L))
 
   private def sortedValues[V: Ordering](x: Iterator[(Long, V)]): (Long, List[V]) = {
     val t = x.foldLeft[(Long, List[V])]((0L, Nil))((z, t) => (t._1, t._2 :: z._2))
     (t._1, t._2.sorted)
-  }
-
-  private def readUsersForBucketTrial(bucketId: Long): List[(Long, MinHashSignature)] = {
-    import com.sksamuel.elastic4s.http.ElasticDsl._
-
-    val client2 = ElasticClient(ElasticProperties("http://localhost:9200"))
-
-    val result: GetResponse = client2.execute {
-      get(bucketId.toString).from(bucketsIndex / bucketTypeName)
-    }.await.result
-    client2.close()
-
-    // TODO define/use HitReader type class
-    val users = result.source("users").asInstanceOf[List[Map[String, Any]]]
-
-    users.map(m => (m("uid").toString.toLong, utils.decodeMinHashSignature(m("minhash").asInstanceOf[String])))
   }
 
   private def toFeature(input: (Long, Long), prefix: String): (Long, String) = (input._1, s"$prefix${input._2}")
@@ -121,7 +101,7 @@ object LoadStaticData extends App {
     client.execute {
       createIndex(indexName).mappings(
         mapping(typeName).fields(
-          longField("knownUsers"),
+          longField("knownUsers").index(false),
           dateField("lastUpdate")
         )
       )
@@ -129,16 +109,13 @@ object LoadStaticData extends App {
 
   }
 
-
   private def createBucketIndex(client: ElasticClient, indexName: String, typeName: String): Unit = {
     import com.sksamuel.elastic4s.http.ElasticDsl._
 
     client.execute {
       createIndex(indexName).mappings(
         mapping(typeName).fields(
-          nestedField("users").fields(
-            longField("uid"),
-            binaryField("minhash")),
+          longField("uid").index(false),
           dateField("lastUpdate")
         )
       )
@@ -152,7 +129,7 @@ object LoadStaticData extends App {
     client.execute {
       createIndex(indexName).mappings(
         mapping(typeName).fields(
-          binaryField("minhash"),
+          binaryField("minhash").index(false),
           dateField("lastUpdate")
         )
       )
@@ -166,7 +143,7 @@ object LoadStaticData extends App {
     client.execute {
       createIndex(indexName).mappings(
         mapping(typeName).fields(
-          textField("features"),
+          textField("features").index(false),
           dateField("lastUpdate")
         )
       )
