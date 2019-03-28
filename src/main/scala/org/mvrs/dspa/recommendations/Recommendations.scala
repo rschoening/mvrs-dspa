@@ -5,10 +5,8 @@ import java.util.concurrent.TimeUnit
 import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.datastream.AsyncDataStream
-import org.apache.flink.streaming.api.functions.sink.SinkFunction
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.events.ForumEvent
-import org.mvrs.dspa.io.ElasticSearchSinkFunction
 import org.mvrs.dspa.{streams, utils}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -83,8 +81,9 @@ object Recommendations extends App {
     5
   )
 
-  // recommendations.addSink(new RecommendationsSinkFunction(elasticSearchUri, indexName, typeName))
-  filteredCandidates.print()
+
+  recommendations.addSink(new RecommendationsSinkFunction(elasticSearchUri, indexName, typeName))
+
   env.execute("recommendations")
 
   private def createRecommendationIndex(client: ElasticClient, indexName: String, typeName: String): Unit = {
@@ -94,38 +93,20 @@ object Recommendations extends App {
       createIndex(indexName).mappings(
         mapping(typeName).fields(
           nestedField("users").fields(
-            longField("uid"),
-            doubleField("similarity")),
+            longField("uid").index(false),
+            doubleField("similarity").index(false)
+          ),
           dateField("lastUpdate")
         )
       )
     }.await
   }
 
-  class RecommendationsSinkFunction(uri: String, indexName: String, typeName: String)
-    extends ElasticSearchSinkFunction[(Long, Seq[(Long, Double)])](uri, indexName, typeName) {
-
-    import com.sksamuel.elastic4s.http.ElasticDsl._
-
-    override def process(record: (Long, Seq[(Long, Double)]),
-                         client: ElasticClient,
-                         context: SinkFunction.Context[_]): Unit = {
-      // NOTE: connections are "unexpectedly closed" when using onComplete on the future - need to await
-      // TODO: find out how to properly batch and/or do async inserts
-
-      // as upsert
-      client.execute {
-        update(record._1.toString).in(indexName / typeName).docAsUpsert(
-          "users" -> record._2.map(t => Map(
-            "uid" -> t._1,
-            "similarity" -> t._2)),
-          "lastUpdate" -> System.currentTimeMillis()
-        )
-      }.await
-    }
-  }
 
 }
+
+
+
 
 
 

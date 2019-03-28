@@ -18,10 +18,11 @@ class AsyncRecommendUsers(elasticSearchUri: String, minHasher: MinHasher32)
   override def asyncInvoke(client: ElasticClient, input: (Long, MinHashSignature, Set[Long]), resultFuture: ResultFuture[(Long, Seq[(Long, Double)])]): Unit = {
     import scala.collection.JavaConverters._
 
-    // println(s"buckets for ${input._1}: $buckets")
+    val personIds: Set[Long] = input._3
+
     client.execute {
-      search("recommendation_person_minhash").query {
-        idsQuery(input._2)
+      search("recommendation_person_minhash") query {
+        idsQuery(personIds)
       }
     }.onComplete {
       case Success(response) => resultFuture.complete(unpackResponse(input, response).asJava)
