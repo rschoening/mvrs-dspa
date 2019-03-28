@@ -7,8 +7,8 @@ import org.apache.flink.streaming.api.functions.async.ResultFuture
 import org.mvrs.dspa.io.AsyncElasticSearchFunction
 import org.mvrs.dspa.utils
 
-import scala.util.{Failure, Success}
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.{Failure, Success}
 
 class AsyncSimilarUsersLookup(elasticSearchUri: String, minHasher: MinHasher32)
   extends AsyncElasticSearchFunction[(Long, MinHashSignature), (Long, Seq[(Long, Double)])](elasticSearchUri) {
@@ -43,7 +43,6 @@ class AsyncSimilarUsersLookup(elasticSearchUri: String, minHasher: MinHasher32)
     client.execute {
       search("recommendation_lsh_buckets").query {
         idsQuery(buckets.map(_.toString)) // TODO exclude personId from results (indiv. items, lists that only contain that id)
-        //          termsQuery("_id", buckets.map(_.toString))
       }
     }.onComplete {
       case Success(response) => resultFuture.complete(unpackResponse(input, response).asJava)
@@ -81,8 +80,6 @@ class AsyncSimilarUsersLookup(elasticSearchUri: String, minHasher: MinHasher32)
   }
 
   private def unpackHit(hit: SearchHit) = {
-    val list = hit.sourceAsMap("users").asInstanceOf[List[Map[String, (Long, String)]]]
-
     val result = hit.sourceAsMap("users").asInstanceOf[List[Map[String, Any]]]
     result.map(t => (t("uid").asInstanceOf[Int].toLong, utils.decodeMinHashSignature(t("minhash").asInstanceOf[String])))
   }
