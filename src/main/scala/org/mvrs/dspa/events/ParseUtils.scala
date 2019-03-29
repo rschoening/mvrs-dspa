@@ -16,6 +16,8 @@ object ParseUtils {
       .toSet
   }
 
+  def toEpochMillis(str: String): Long = ZonedDateTime.parse(str, formatter).toInstant.toEpochMilli
+
   def toDate(str: String): ZonedDateTime = ZonedDateTime.parse(str, formatter)
 
   def toOptionalString(str: String): Option[String] = str match {

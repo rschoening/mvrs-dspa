@@ -346,17 +346,17 @@ object Streams {
 
     val commentsStream = env
       .addSource(commentsSource) // TODO speedup/out-of-ordering
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](maxOutOfOrderness, _.timeStamp))
+      .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](maxOutOfOrderness, _.creationDate))
       .keyBy(_.replyToPostId.get)
 
     val postsStream = env
       .addSource(postsSource) // TODO speedup/out-of-ordering
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[PostEvent](maxOutOfOrderness, _.timeStamp))
+      .assignTimestampsAndWatermarks(utils.timeStampExtractor[PostEvent](maxOutOfOrderness, _.creationDate))
       .keyBy(_.id)
 
     val likesStream = env
       .addSource(likesSource) // TODO speedup/out-of-ordering
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[LikeEvent](maxOutOfOrderness, _.timeStamp))
+      .assignTimestampsAndWatermarks(utils.timeStampExtractor[LikeEvent](maxOutOfOrderness, _.creationDate))
       .keyBy(_.postId)
 
     commentsStream

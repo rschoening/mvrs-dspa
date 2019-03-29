@@ -1,6 +1,5 @@
 package org.mvrs.dspa.preparation
 
-import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 
 import org.mvrs.dspa.events.CommentEvent
@@ -13,7 +12,7 @@ object PreprocessComments extends App {
 
   val filePath: String = args(0)
 
-  val dict = mutable.Map[Long, ZonedDateTime]()
+  val dict = mutable.Map[Long, Long]()
 
   // first pass: build dictionary comment id -> creation date
   using(io.Source.fromFile(filePath))(source => {
@@ -43,7 +42,7 @@ object PreprocessComments extends App {
           println(s"comment ${c.id} replies to unknown comment $parentId")
         }
         else {
-          val difference: Long = unit.between(parentCreationDate.get, childCreationDate)
+          val difference: Long = childCreationDate - parentCreationDate.get
 
           if (difference < minDifference) {
             minDifferenceComment = Some(c)

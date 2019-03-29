@@ -1,29 +1,24 @@
 package org.mvrs.dspa.events
 
-import java.time.ZonedDateTime
-
 import scala.collection.Set
 
 case class PostStatistics(postId: Long, time: Long, commentCount: Int, replyCount: Int, likeCount: Int, distinctUserCount: Int, newPost: Boolean)
 
 trait ForumEvent {
   val personId: Long
-  val creationDate: ZonedDateTime
-
-  def timeStamp: Long
+  val creationDate: Long
 
   def postId: Long
 }
 
 final case class LikeEvent(personId: Long,
-                           creationDate: ZonedDateTime,
+                           creationDate: Long,
                            postId: Long) extends ForumEvent {
-  def timeStamp: Long = creationDate.toInstant.toEpochMilli
 }
 
 final case class CommentEvent(id: Long,
                               personId: Long,
-                              creationDate: ZonedDateTime,
+                              creationDate: Long,
                               locationIP: Option[String],
                               browserUsed: Option[String],
                               content: Option[String],
@@ -31,14 +26,13 @@ final case class CommentEvent(id: Long,
                               replyToCommentId: Option[Long],
                               placeId: Int) extends ForumEvent {
   // TODO add learning test for zoneddatetime to (comparable) epoch timestamp: are these timestamps comparable when from different zones?
-  def timeStamp: Long = creationDate.toInstant.toEpochMilli
 
   def postId: Long = replyToPostId.get
 }
 
 final case class PostEvent(id: Long,
                            personId: Long,
-                           creationDate: ZonedDateTime,
+                           creationDate: Long,
                            imageFile: Option[String],
                            locationIP: Option[String],
                            browserUsed: Option[String],
@@ -47,7 +41,6 @@ final case class PostEvent(id: Long,
                            tags: Set[Int],
                            forumId: Long,
                            placeId: Int) extends ForumEvent {
-  def timeStamp: Long = creationDate.toInstant.toEpochMilli
 
   def postId: Long = id
 }
@@ -62,7 +55,7 @@ object CommentEvent {
     CommentEvent(
       id = tokens(0).toLong,
       personId = tokens(1).toLong,
-      creationDate = ParseUtils.toDate(tokens(2).trim),
+      creationDate = ParseUtils.toEpochMillis(tokens(2).trim),
       locationIP = ParseUtils.toOptionalString(tokens(3)),
       browserUsed = ParseUtils.toOptionalString(tokens(4)),
       content = ParseUtils.toOptionalString(tokens(5)),
@@ -82,7 +75,7 @@ object LikeEvent {
     LikeEvent(
       personId = tokens(0).toLong,
       postId = tokens(1).toLong,
-      creationDate = ParseUtils.toDate(tokens(2).trim))
+      creationDate = ParseUtils.toEpochMillis(tokens(2).trim))
   }
 }
 
@@ -96,7 +89,7 @@ object PostEvent {
     PostEvent(
       id = tokens(0).toLong,
       personId = tokens(1).toLong,
-      creationDate = ParseUtils.toDate(tokens(2).trim),
+      creationDate = ParseUtils.toEpochMillis(tokens(2).trim),
       imageFile = ParseUtils.toOptionalString(tokens(3)),
       locationIP = ParseUtils.toOptionalString(tokens(4)),
       browserUsed = ParseUtils.toOptionalString(tokens(5)),

@@ -17,8 +17,8 @@ package object streams {
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
 
     env.addSource(commentsSource)
-      .process(new ScaledReplayFunction[CommentEvent](_.timeStamp, speedupFactor, randomDelay))
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](maxOutOfOrderness, _.timeStamp))
+      .process(new ScaledReplayFunction[CommentEvent](_.creationDate, speedupFactor, randomDelay))
+      .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](maxOutOfOrderness, _.creationDate))
   }
 
   def posts(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[PostEvent] = {
@@ -28,8 +28,8 @@ package object streams {
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
 
     env.addSource(postsSource)
-      .process(new ScaledReplayFunction[PostEvent](_.timeStamp, speedupFactor, randomDelay))
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[PostEvent](maxOutOfOrderness, _.timeStamp))
+      .process(new ScaledReplayFunction[PostEvent](_.creationDate, speedupFactor, randomDelay))
+      .assignTimestampsAndWatermarks(utils.timeStampExtractor[PostEvent](maxOutOfOrderness, _.creationDate))
   }
 
   def likes(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
@@ -39,8 +39,8 @@ package object streams {
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
 
     env.addSource(likesSource)
-      .process(new ScaledReplayFunction[LikeEvent](_.timeStamp, speedupFactor, randomDelay))
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[LikeEvent](maxOutOfOrderness, _.timeStamp))
+      .process(new ScaledReplayFunction[LikeEvent](_.creationDate, speedupFactor, randomDelay))
+      .assignTimestampsAndWatermarks(utils.timeStampExtractor[LikeEvent](maxOutOfOrderness, _.creationDate))
   }
 
   private def getKafkaConsumerProperties(consumerGroup: String) = {

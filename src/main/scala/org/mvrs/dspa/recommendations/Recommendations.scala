@@ -27,7 +27,7 @@ object Recommendations extends App {
 
   implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
-  env.setParallelism(3)
+  env.setParallelism(5)
 
   val consumerGroup = "recommendations"
   val speedupFactor = 0 // 0 --> read as fast as can
@@ -81,7 +81,6 @@ object Recommendations extends App {
     5
   )
 
-
   recommendations.addSink(new RecommendationsSinkFunction(elasticSearchUri, indexName, typeName))
 
   env.execute("recommendations")
@@ -101,8 +100,6 @@ object Recommendations extends App {
       )
     }.await
   }
-
-
 }
 
 
