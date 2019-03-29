@@ -52,7 +52,6 @@ object Recommendations extends App {
   // - either: store post -> tags in elastic
   // - or: broadcast post events to all recommendation operators -> they maintain this mapping
 
-
   val minHashes = AsyncDataStream.unorderedWait(
     eventStream.javaStream,
     new AsyncMinHashLookup(elasticSearchUri, minHasher),

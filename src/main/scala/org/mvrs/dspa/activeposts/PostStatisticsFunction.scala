@@ -133,6 +133,11 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
     }
   }
 
+  private def registerWindowEndTimer(timerService: TimerService, endTime: Long): Unit = {
+    windowEndState.update(endTime)
+    timerService.registerEventTimeTimer(endTime)
+  }
+
   override def processElement(value: Event,
                               ctx: KeyedProcessFunction[Long, Event, PostStatistics]#Context,
                               out: Collector[PostStatistics]): Unit = {
@@ -166,11 +171,6 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
     else {
       LOG.debug(s"Regular event, to current bucket: $value")
     }
-  }
-
-  private def registerWindowEndTimer(timerService: TimerService, endTime: Long): Unit = {
-    windowEndState.update(endTime)
-    timerService.registerEventTimeTimer(endTime)
   }
 
   private def updateBucket(bucketTimestamp: Long, f: Bucket => Unit): Unit = {

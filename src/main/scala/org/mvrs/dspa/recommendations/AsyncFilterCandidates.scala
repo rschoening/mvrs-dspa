@@ -27,7 +27,7 @@ class AsyncFilterCandidates(elasticSearchUri: String)
 
   private def unpackResponse(input: (Long, MinHashSignature, Set[Long]), response: Response[GetResponse]) = {
     if (response.result.found)
-      List((input._1, input._2, input._3 -- unpackKnownUsers(response)))
+      List((input._1, input._2, input._3 -- unpackKnownUsers(response))) // TODO do this outside for testability?
     else Nil
   }
 

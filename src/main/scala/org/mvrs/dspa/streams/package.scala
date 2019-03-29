@@ -32,17 +32,6 @@ package object streams {
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[PostEvent](maxOutOfOrderness, _.creationDate))
   }
 
-  def likes(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
-    val likesSource = utils.createKafkaConsumer("likes", createTypeInformation[LikeEvent],
-      getKafkaConsumerProperties(consumerGroup))
-
-    val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
-
-    env.addSource(likesSource)
-      .process(new ScaledReplayFunction[LikeEvent](_.creationDate, speedupFactor, randomDelay))
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[LikeEvent](maxOutOfOrderness, _.creationDate))
-  }
-
   private def getKafkaConsumerProperties(consumerGroup: String) = {
 
     val props = new Properties()
@@ -54,4 +43,15 @@ package object streams {
   }
 
   private def getMaxOutOfOrderness(speedupFactor: Int, randomDelay: Int) = Time.milliseconds(if (speedupFactor == 0) randomDelay else randomDelay / speedupFactor)
+
+  def likes(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
+    val likesSource = utils.createKafkaConsumer("likes", createTypeInformation[LikeEvent],
+      getKafkaConsumerProperties(consumerGroup))
+
+    val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
+
+    env.addSource(likesSource)
+      .process(new ScaledReplayFunction[LikeEvent](_.creationDate, speedupFactor, randomDelay))
+      .assignTimestampsAndWatermarks(utils.timeStampExtractor[LikeEvent](maxOutOfOrderness, _.creationDate))
+  }
 }

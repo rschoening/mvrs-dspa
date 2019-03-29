@@ -10,7 +10,7 @@ import org.apache.flink.streaming.api.functions.sink.{RichSinkFunction, SinkFunc
 import org.apache.flink.streaming.api.functions.source.SourceFunction.SourceContext
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.api.windowing.time.Time
-import RecommendationsFirstTrial.GroupInterestsProcessFunction
+import org.mvrs.dspa.trials.RecommendationsFirstTrial.GroupInterestsProcessFunction
 
 
 object LoadRecommendationFeatures extends App {
@@ -68,7 +68,7 @@ object LoadRecommendationFeatures extends App {
       .keyBy(_._1) // (*uid*, Set[interest])
 
   groupedInterestsStream.addSink(new InterestsSinkFunction)
-//  groupedInterestsStream.print
+  //  groupedInterestsStream.print
 
   env.execute("Import recommendations")
 

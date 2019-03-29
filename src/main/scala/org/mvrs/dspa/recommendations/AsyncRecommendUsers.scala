@@ -36,6 +36,7 @@ class AsyncRecommendUsers(elasticSearchUri: String, minHasher: MinHasher32)
     List((input._1, getTopN(input._2, candidates, 5, 0.2)))
   }
 
+  // TODO do this outside for testability
   private def getTopN(minHashSignature: MinHashSignature,
                       candidates: Seq[(Long, MinHashSignature)],
                       n: Int,
