@@ -11,7 +11,7 @@ import org.mvrs.dspa.utils
 import scala.util.{Failure, Success, Try}
 
 
-object LoadCommentEvents extends App {
+object LoadCommentEventsJob extends App {
   require(args.length == 1, "full path to csv file expected")
 
   val filePath: String = args(0)

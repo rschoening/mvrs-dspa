@@ -9,8 +9,12 @@ import org.mvrs.dspa.events.PostStatistics
 import org.mvrs.dspa.utils
 
 
-object WriteActivePostStatisticsToElasticSearch extends App {
-  val elasticSearchUri = "http://localhost:9200"
+object WriteActivePostStatisticsToElasticSearchJob extends App {
+
+  val elasticHostName = "localhost"
+  val elasticPort = 9200
+  val elasticScheme = "http"
+  val elasticSearchUri = s"$elasticScheme://$elasticHostName:$elasticPort"
   val indexName = "statistics"
   val typeName = "postStatistics"
   val kafkaBrokers = "localhost:9092"
@@ -18,7 +22,7 @@ object WriteActivePostStatisticsToElasticSearch extends App {
   val client = ElasticClient(ElasticProperties(elasticSearchUri))
   try {
     utils.dropIndex(client, indexName) // testing: recreate the index
-    createStatisticsIndex(client, indexName, typeName)
+    ActivePostStatisticsIndex.create(client, indexName, typeName)
   }
   finally {
     client.close()
@@ -38,28 +42,8 @@ object WriteActivePostStatisticsToElasticSearch extends App {
 
   val stream = env
     .addSource(source)
-    .addSink(new ElasticSearchStatisticsSinkFunction(elasticSearchUri, indexName, typeName))
+    .addSink(ActivePostStatisticsIndex.createSink(elasticHostName, elasticPort, elasticScheme, indexName, typeName))
 
   // execute program
   env.execute("Move post statistics from Kafka to ElasticSearch")
-
-  private def createStatisticsIndex(client: ElasticClient, indexName: String, typeName: String): Unit = {
-    import com.sksamuel.elastic4s.http.ElasticDsl._
-
-    // NOTE: apparently noop if index already exists
-    client.execute {
-      createIndex(indexName).mappings(
-        mapping(typeName).fields(
-          longField("postId"),
-          intField("replyCount").index(false),
-          intField("likeCount").index(false),
-          intField("commentCount").index(false),
-          intField("distinctUserCount").index(false),
-          booleanField("newPost").index(false),
-          dateField("timestamp")
-        )
-      )
-    }.await
-
-  }
 }

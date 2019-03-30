@@ -5,7 +5,7 @@ import org.mvrs.dspa.events.LikeEvent
 import org.mvrs.dspa.utils
 
 
-object LoadLikeEvents extends App {
+object LoadLikeEventsJob extends App {
   require(args.length == 1, "full path to csv file expected")
 
   val filePath: String = args(0)

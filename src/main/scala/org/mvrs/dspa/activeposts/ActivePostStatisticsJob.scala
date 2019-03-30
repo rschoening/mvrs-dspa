@@ -7,7 +7,7 @@ import org.mvrs.dspa.activeposts.EventType.EventType
 import org.mvrs.dspa.events.{CommentEvent, LikeEvent, PostEvent, PostStatistics}
 import org.mvrs.dspa.{streams, utils}
 
-object ActivePostStatistics extends App {
+object ActivePostStatisticsJob extends App {
 
   implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)

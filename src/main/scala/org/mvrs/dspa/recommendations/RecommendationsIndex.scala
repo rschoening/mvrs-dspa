@@ -13,7 +13,7 @@ import org.elasticsearch.action.update.UpdateRequest
 import scala.collection.JavaConverters._
 
 // TODO refactor:
-// extract base class ElasticSearchIndex(hostName, port, scheme, indexName, typeName)  // more general: endpoints
+// extract base class ElasticSearchIndex(hostName, port, scheme, indexName, typeName)  // more general: n endpoints
 
 object RecommendationsIndex {
   def createSink(hostname: String, port: Int, scheme: String,

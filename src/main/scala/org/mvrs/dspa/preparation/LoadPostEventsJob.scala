@@ -5,7 +5,7 @@ import org.mvrs.dspa.events.PostEvent
 import org.mvrs.dspa.utils
 
 
-object LoadPostEvents extends App {
+object LoadPostEventsJob extends App {
   require(args.length == 1, "full path to csv file expected")
 
   val filePath: String = args(0)

@@ -11,7 +11,7 @@ import org.mvrs.dspa.{streams, utils}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object Recommendations extends App {
+object RecommendationsJob extends App {
   val elasticHostName = "localhost"
   val elasticPort = 9200
   val elasticScheme = "http"

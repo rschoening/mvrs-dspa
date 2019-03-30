@@ -8,7 +8,7 @@ import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.utils
 
-object LoadStaticData extends App {
+object LoadStaticDataJob extends App {
   implicit val env: ExecutionEnvironment = ExecutionEnvironment.getExecutionEnvironment
   env.setParallelism(5)
 
