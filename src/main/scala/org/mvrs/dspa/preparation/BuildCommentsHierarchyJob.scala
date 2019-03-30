@@ -22,29 +22,80 @@ object BuildCommentsHierarchyJob extends App {
   env.setParallelism(5)
 
   val outputTag = new OutputTag[ParseError]("comment parsing errors")
-
   val allComments = env
     .readTextFile(filePath)
     .filter(!_.startsWith("id|")) // TODO better way to skip the header line?
+    .filter(_ => {
+    i = i + 1;
+    i < 5000
+  })
     .map(CommentEvent.parse _)
-
   val postComments = allComments
     .filter(_.replyToPostId.isDefined)
     .keyBy(_.postId)
-  val repliesBroadcast = allComments.filter(_.replyToPostId.isEmpty).broadcast()
-
+  val repliesBroadcast = allComments
+    .filter(_.replyToPostId.isEmpty)
+    .broadcast()
   val hierarchyBuilder = postComments.connect(repliesBroadcast)
-
-  val rootedComments = hierarchyBuilder.process(new BuildHierarchyProcessFunction)
+  val rootedComments = hierarchyBuilder.process(new LearningFunction)
+  val plan = env.getExecutionPlan
 
   rootedComments.print
-
-  val plan = env.getExecutionPlan
+  var i = 0
 
   env.execute()
 
   println(plan)
 }
+
+class LearningFunction extends KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent] {
+
+  // actually the set of comment ids that refer to a post is sufficient, could do with ValueState[Set[Long]] - however MapState may be more efficient for checkpoints etc.?
+  private lazy val postForComment: MapState[Long, Long] = getRuntimeContext.getMapState(postForCommentState)
+  private val postForCommentState = new MapStateDescriptor[Long, Long](
+    "postForComment",
+    createTypeInformation[Long],
+    createTypeInformation[Long])
+
+  override def processElement(value: CommentEvent,
+                              ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]#ReadOnlyContext,
+                              out: Collector[CommentEvent]): Unit = {
+    // this state is unbounded, replies may refer to arbitrarily old comments
+    // consider storing it in ElasticSearch, with a LRU cache maintained in the operator
+    postForComment.put(value.id, value.postId)
+    // println(s"${value.id} -> ${value.postId}")
+  }
+
+  override def processBroadcastElement(value: CommentEvent,
+                                       ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]#Context,
+                                       out: Collector[CommentEvent]): Unit = {
+    val parentCommentId = value.replyToCommentId.get
+
+    // TODO need to set a timer to do this evaluation (in processElement)
+
+    var postId: Option[Long] = lookupPostId(parentCommentId, ctx)
+
+    if (postId.isDefined) {
+      println(s"FOUND: ${value.id} -> $parentCommentId -> ${postId.get}")
+    }
+  }
+
+  private def lookupPostId(parentCommentId: Long,
+                           ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]#Context): Option[Long] = {
+    var postId: Option[Long] = None
+    ctx.applyToKeyedState(postForCommentState, (key: Long, state: MapState[Long, Long]) =>
+      if (postId.isEmpty && state.contains(parentCommentId)) postId = Some(key))
+    postId
+  }
+
+  private def mapPostId(parentCommentId: Long,
+                        postId: Long,
+                        ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]#Context): Unit = {
+    ctx.applyToKeyedState(postForCommentState, (key: Long, state: MapState[Long, Long]) =>
+      if (key == postId) state.put(parentCommentId, postId))
+  }
+}
+
 
 class BuildHierarchyProcessFunction extends KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent] {
   private lazy val postForComment: MapState[Long, Long] = getRuntimeContext.getMapState(postForCommentState)
@@ -96,8 +147,7 @@ class BuildHierarchyProcessFunction extends KeyedBroadcastProcessFunction[Long, 
 
     // TODO need to set a timer to do this evaluation (in processElement)
 
-    ???
-    // ctx.applyToKeyedState()
+    ctx.applyToKeyedState(postForCommentState, (key: Long, state: MapState[Long, Long]) => ())
 
     // TODO does not work yet, as the keyed state is not accessible from broadcast
     if (postForComment.contains(parentCommentId)) {

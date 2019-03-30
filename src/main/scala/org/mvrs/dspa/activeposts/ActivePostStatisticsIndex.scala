@@ -51,8 +51,8 @@ object ActivePostStatisticsIndex {
       }
     )
 
-    // configuration for the bulk requests; this instructs the sink to emit after every element, otherwise they would be buffered
-    esSinkBuilder.setBulkFlushMaxActions(5)
+    // buffering has a huge influence on performance
+    esSinkBuilder.setBulkFlushMaxActions(200)
 
     //    // provide a RestClientFactory for custom configuration on the internally created REST client
     //    //    esSinkBuilder.setRestClientFactory(
