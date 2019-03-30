@@ -12,14 +12,17 @@ import org.mvrs.dspa.{streams, utils}
 import scala.concurrent.ExecutionContext.Implicits.global
 
 object Recommendations extends App {
-  val elasticSearchUri = "http://localhost:9200"
+  val elasticHostName = "localhost"
+  val elasticPort = 9200
+  val elasticScheme = "http"
   val indexName = "recommendations"
   val typeName = "recommendations_type"
+  val elasticSearchUri = s"$elasticScheme://$elasticHostName:$elasticPort"
 
   val client = ElasticClient(ElasticProperties(elasticSearchUri))
   try {
     utils.dropIndex(client, indexName) // testing: recreate the index
-    createRecommendationIndex(client, indexName, typeName)
+    RecommendationsIndex.create(client, indexName, typeName)
   }
   finally {
     client.close()
@@ -80,25 +83,11 @@ object Recommendations extends App {
     5
   )
 
-  recommendations.addSink(new RecommendationsSinkFunction(elasticSearchUri, indexName, typeName))
+  recommendations.addSink(RecommendationsIndex.createSink(elasticHostName, elasticPort, elasticScheme, indexName, typeName))
 
   env.execute("recommendations")
 
-  private def createRecommendationIndex(client: ElasticClient, indexName: String, typeName: String): Unit = {
-    import com.sksamuel.elastic4s.http.ElasticDsl._
 
-    client.execute {
-      createIndex(indexName).mappings(
-        mapping(typeName).fields(
-          nestedField("users").fields(
-            longField("uid").index(false),
-            doubleField("similarity").index(false)
-          ),
-          dateField("lastUpdate")
-        )
-      )
-    }.await
-  }
 }
 
 

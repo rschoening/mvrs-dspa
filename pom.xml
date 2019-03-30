@@ -83,6 +83,13 @@ under the License.
             <version>${flink.version}</version>
         </dependency>
 
+        <!-- https://mvnrepository.com/artifact/org.apache.flink/flink-connector-elasticsearch6 -->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-connector-elasticsearch6_${scala.binary.version}</artifactId>
+            <version>${flink.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-avro</artifactId>
@@ -100,13 +107,15 @@ under the License.
         <dependency>
             <groupId>com.sksamuel.elastic4s</groupId>
             <artifactId>elastic4s-core_${scala.binary.version}</artifactId>
-            <version>6.5.0</version>
+<!--            <version>6.5.1</version>-->
+            <version>6.3.8</version> <!-- NOTE this must be fixed at 6.3.8 to match elastic client dependency of flinks ES connector -->
         </dependency>
 
         <dependency>
             <groupId>com.sksamuel.elastic4s</groupId>
             <artifactId>elastic4s-http_${scala.binary.version}</artifactId>
-            <version>6.5.0</version>
+            <!--            <version>6.5.1</version>-->
+            <version>6.3.8</version> <!-- NOTE this must be fixed at 6.3.8 to match elastic client dependency of flinks ES connector -->
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/com.thoughtworks.paranamer/paranamer -->
