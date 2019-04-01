@@ -23,7 +23,6 @@ import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartiti
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer, FlinkKafkaProducer}
 import org.apache.kafka.clients.producer.ProducerConfig
 
-
 package object utils {
 
   val kafkaBrokers = "localhost:9092"
@@ -104,7 +103,7 @@ package object utils {
 
   def timeStampExtractor[T](maxOutOfOrderness: Time, extract: T => Long): AssignerWithPeriodicWatermarks[T] = {
     new BoundedOutOfOrdernessTimestampExtractor[T](maxOutOfOrderness) {
-      override def extractTimestamp(c: T): Long = extract(c)
+      override def extractTimestamp(element: T): Long = extract(element)
     }
   }
 
@@ -112,8 +111,6 @@ package object utils {
     extends ElasticSearchOutputFormat[(Long, Seq[(Long, MinHashSignature)])](uri) {
 
     import com.sksamuel.elastic4s.http.ElasticDsl._
-
-    //    import scala.concurrent.ExecutionContext.Implicits.global
 
     override def process(record: (Long, Seq[(Long, MinHashSignature)]), client: ElasticClient): Unit = {
       // NOTE: connections are "unexpectedly closed" when using onComplete on the future - need to await
@@ -125,11 +122,7 @@ package object utils {
               "uid" -> t._1,
               "minhash" -> Base64.getEncoder.encodeToString(t._2.bytes))),
             "lastUpdate" -> System.currentTimeMillis())
-      }.await
-      //        .onComplete {
-      //        case Failure(exception) => println(exception)
-      //        case _ =>
-      //      }
+      }.await // synchronous per-record round trip --> slow but sufficient for loading static data
     }
   }
 
