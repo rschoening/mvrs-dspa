@@ -28,16 +28,16 @@ object BuildCommentsHierarchyJob extends App {
   implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
   env.setParallelism(4)
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
-  env.getConfig.setAutoWatermarkInterval(100L) // NOTE this is REQUIRED for timers to fire, apparently
+  env.getConfig.setAutoWatermarkInterval(10L) // NOTE this is REQUIRED for timers to fire, apparently
 
-  val outputTag = new OutputTag[ParseError]("comment parsing errors")
+  val outputTagParsingErrors = new OutputTag[ParseError]("comment parsing errors")
 
   val allComments = env
     .readTextFile(filePath)
     .filter(!_.startsWith("id|")) // TODO better way to skip the header line? use table api csv source and convert to datastream?
-    .map(CommentEvent.parse _)
-    .process(new ScaledReplayFunction[CommentEvent](_.creationDate, 0, 0))
-    .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](Time.seconds(5), _.creationDate))
+    .map(CommentEvent.parse _) // TODO use parser process function with side output for errors
+    .process(new ScaledReplayFunction[CommentEvent](_.creationDate, 10000, 0))
+    .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](Time.milliseconds(1), _.creationDate))
 
   val postComments = allComments
     .filter(_.replyToPostId.isDefined)
@@ -47,19 +47,35 @@ object BuildCommentsHierarchyJob extends App {
     .filter(_.replyToPostId.isEmpty)
     .broadcast()
 
+  val outputTagDroppedReplies = new OutputTag[CommentEvent]("dropped replies")
+
   val hierarchyBuilder = postComments.connect(repliesBroadcast)
-  val rootedComments = hierarchyBuilder.process(new BuildHierarchyProcessFunction)
+  val rootedComments = hierarchyBuilder.process(new BuildReplyTreeProcessFunction(outputTagDroppedReplies))
+
+  // val droppedReplies = rootedComments.getSideOutput(outputTagDroppedReplies)
 
   val plan = env.getExecutionPlan
+
+  //  var allCount = 0
+  //  allComments.map(_ => allCount += 1)
+  //
+  //  var droppedCount = 0
+  //  droppedReplies.map(_ => droppedCount += 1)
+
+  //  var rootedCount = 0
+  //  rootedComments.map(_ => rootedCount += 1)
 
   // rootedComments.print
 
   env.execute()
 
+  //  println(s"All comments: $allCount")
+  //  println(s"Rooted comments: $rootedCount")
+  //  println(s"Dropped replies: $droppedCount")
   println(plan)
 }
 
-class BuildHierarchyProcessFunction
+class BuildReplyTreeProcessFunction(outputTagDroppedEvents: OutputTag[CommentEvent])
   extends KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]
     with CheckpointedFunction {
 
@@ -77,29 +93,26 @@ class BuildHierarchyProcessFunction
   override def processElement(firstLevelComment: CommentEvent,
                               ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]#ReadOnlyContext,
                               out: Collector[CommentEvent]): Unit = {
+    val postId = firstLevelComment.postId
+    assert(ctx.getCurrentKey == postId)
+
     // this state is unbounded, replies may refer to arbitrarily old comments
     // consider storing it in ElasticSearch, with a LRU cache maintained in the operator
-    postForComment.put(firstLevelComment.id, firstLevelComment.postId)
+    // TODO consider using unkeyed operator state? simplifies operator-scoped lookup
+    // TODO on the other hand, using keyed state would allow keeping simply a Set of comment ids instead of the mapping
+    postForComment.put(firstLevelComment.id, postId)
 
     // process all replies that were waiting for this comment (recursively)
     if (danglingReplies.contains(firstLevelComment.id)) {
-      val children = danglingReplies(firstLevelComment.id)
-      danglingReplies.remove(firstLevelComment.id)
 
-      val postId = firstLevelComment.postId
-
-      // TODO refactor recursion
-      val resolved = collectChildren(children.map(c => c.copy(replyToPostId = Some(postId))))(
-        children.toSet,
+      val resolved = resolveDanglingReplies(Set())(
+        danglingReplies(firstLevelComment.id),
         postId,
-        parent => danglingReplies.getOrElse(parent.id, mutable.Set()))
+        reply => danglingReplies.getOrElse(reply.id, mutable.Set()))
 
-      println(s"resolved: ${resolved.size}")
+      resolved.foreach(c => danglingReplies.remove(c.id)) // remove resolved replies from operator state
 
-      // NOTE this has to be put into keyed state of OTHER keys! does not work like this
-      resolved.foreach(c => postForComment.put(c.id, c.postId)) // store mapping commend id -> post id in keyed state
-      resolved.foreach(c => danglingReplies.remove(c.id)) // remove resolved reply
-
+      // emit the resolved replies
       resolved.foreach(out.collect)
     }
   }
@@ -108,11 +121,14 @@ class BuildHierarchyProcessFunction
                                        ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]#Context,
                                        out: Collector[CommentEvent]): Unit = {
     val parentCommentId = reply.replyToCommentId.get
-    val postId = lookupPostId(parentCommentId, ctx)
+
+    // NOTE this is VERY slow - switch to operator state (list state resolving to unioned comment_id -> post_id)
+
+    val postId = lookupPostId(parentCommentId, ctx) // this checks all keyed states in this operator
 
     if (postId.isDefined) out.collect(reply.copy(replyToPostId = postId))
     else {
-      // cache for later evaluation
+      // cache for later evaluation, globally in this operator
       if (danglingReplies.contains(parentCommentId)) danglingReplies(parentCommentId) += reply
       else danglingReplies.put(parentCommentId, mutable.Set(reply))
     }
@@ -120,17 +136,20 @@ class BuildHierarchyProcessFunction
     // evict all dangling replies older than the watermark
     val watermark = ctx.currentWatermark()
 
+    println(s"${getRuntimeContext.getIndexOfThisSubtask}: watermark: ${utils.formatTimestamp(watermark)} - reply: ${utils.formatTimestamp(reply.creationDate)} - diff: ${(reply.creationDate - watermark) / (1000f * 60f)} min")
+
+    // this is also slow, since danglingReplies grows (to be investigated)
     for {replies <- danglingReplies} {
       val lostReplies = replies._2.filter(_.creationDate <= watermark) // parent will probably no longer arrive
-      // val newer = replies._2.filter(_.creationDate > watermark)
+
       if (lostReplies.nonEmpty) {
-        // println(s"lost replies: $lostReplies")
-        replies._2 --= lostReplies
+        replies._2 --= lostReplies // remove from mutable set
+        lostReplies.foreach(ctx.output(outputTagDroppedEvents, _)) // emit dropped replies to side output
       }
     }
 
     danglingReplies.retain((_, v) => v.nonEmpty)
-    println(s"remaining operator state size: ${danglingReplies.size}")
+    println(s"  remaining operator state size: ${danglingReplies.size}")
   }
 
   private def lookupPostId(parentCommentId: Long,
@@ -169,21 +188,15 @@ class BuildHierarchyProcessFunction
   }
 
   @tailrec
-  private def collectChildren(acc: mutable.Set[CommentEvent])(parents: Set[CommentEvent],
-                                                              postId: Long,
-                                                              getChildren: CommentEvent => mutable.Set[CommentEvent]): mutable.Set[CommentEvent] =
-    if (parents.isEmpty) acc // base case
+  private def resolveDanglingReplies(acc: Set[CommentEvent])(replies: Iterable[CommentEvent],
+                                                             postId: Long,
+                                                             getChildren: CommentEvent => mutable.Set[CommentEvent]): Set[CommentEvent] = {
+    if (replies.isEmpty) acc
     else {
-      val resolved = parents.flatMap(getChildren(_).map(_.copy(replyToPostId = Some(postId))))
+      val resolvedReplies = replies.map(_.copy(replyToPostId = Some(postId)))
 
-      collectChildren(acc ++= resolved)(resolved, postId, getChildren)
+      resolveDanglingReplies(acc ++ resolvedReplies)(resolvedReplies.flatMap(getChildren(_)), postId, getChildren)
     }
-
-  private def mapPostId(parentCommentId: Long,
-                        postId: Long,
-                        ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]#Context): Unit = {
-    ctx.applyToKeyedState(postForCommentState, (key: Long, state: MapState[Long, Long]) =>
-      if (key == postId) state.put(parentCommentId, postId))
   }
 }
 
