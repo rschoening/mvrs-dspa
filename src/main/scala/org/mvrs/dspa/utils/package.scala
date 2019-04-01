@@ -18,6 +18,9 @@ import scala.reflect.ClassTag
 //import org.apache.flink.formats.avro.typeutils.AvroSerializer
 //import org.apache.flink.formats.avro.{AvroDeserializationSchema, AvroRowSerializationSchema}
 //import org.apache.flink.types.Row
+import java.text.SimpleDateFormat
+import java.util.Date
+
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer, FlinkKafkaProducer}
@@ -26,6 +29,12 @@ import org.apache.kafka.clients.producer.ProducerConfig
 package object utils {
 
   val kafkaBrokers = "localhost:9092"
+
+  private val dateFormat = ThreadLocal.withInitial[SimpleDateFormat](() => new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
+
+  def formatTimestamp(timestamp: Long): String = try { dateFormat.get.format(new Date(timestamp)) } catch {
+    case e@_ => e.getMessage
+  }
 
   def getMinHashSignature(features: Seq[String], minHasher: MinHasher32): MinHashSignature =
     minHasher.combineAll(features.map(minHasher.init))
