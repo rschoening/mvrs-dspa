@@ -7,7 +7,6 @@ import org.apache.flink.streaming.api.functions.co.KeyedBroadcastProcessFunction
 import org.apache.flink.streaming.api.scala.{OutputTag, createTypeInformation}
 import org.apache.flink.util.Collector
 import org.mvrs.dspa.events.CommentEvent
-import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
@@ -20,7 +19,6 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
   // checkpointed operator state
   private val danglingReplies: mutable.Map[Long, (Long, mutable.Set[CommentEvent])] = mutable.Map[Long, (Long, mutable.Set[CommentEvent])]()
   private val postForComment: mutable.Map[Long, Long] = mutable.Map()
-  private val LOG = LoggerFactory.getLogger(classOf[BuildReplyTreeProcessFunction])
   @transient private var danglingRepliesListState: ListState[Map[Long, Set[CommentEvent]]] = _
   @transient private var postForCommentListState: ListState[Map[Long, Long]] = _
   private var commentWatermark: Long = Long.MinValue
@@ -28,7 +26,6 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
   override def processElement(firstLevelComment: CommentEvent,
                               ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]#ReadOnlyContext,
                               out: Collector[CommentEvent]): Unit = {
-    // println(s"processElement: ${firstLevelComment}")
     val postId = firstLevelComment.postId
     assert(ctx.getCurrentKey == postId)
 
@@ -55,11 +52,10 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
     ctx.timerService().registerEventTimeTimer(firstLevelComment.creationDate)
   }
 
-
   override def onTimer(timestamp: Long,
                        ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]#OnTimerContext,
                        out: Collector[CommentEvent]): Unit = {
-    // check among all dangling replies
+    // check among *all* dangling replies
     for {(parentCommentId, (maxTimestamp, replies)) <- danglingReplies} {
 
       if (maxTimestamp <= timestamp) {
@@ -81,7 +77,9 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
           // post id unknown for referenced comment, and past watermark -> drop replies
           val unresolved = BuildReplyTreeProcessFunction.getDanglingReplies(replies, getDanglingReplies)
 
+          // NOTE with multiple workers, the unresolved replies are emitted for each worker!
           unresolved.foreach(ctx.output(outputTagDroppedReplies, _))
+
           unresolved.foreach(r => danglingReplies.remove(r.id)) // remove resolved replies from operator state
           danglingReplies.remove(parentCommentId)
         }
@@ -95,55 +93,16 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
   override def processBroadcastElement(reply: CommentEvent,
                                        ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]#Context,
                                        out: Collector[CommentEvent]): Unit = {
-    // println(s"processBroadcastElement: $reply")
-    val parentCommentId = reply.replyToCommentId.get
-
-    val postId = postForComment.get(parentCommentId)
-
+    val postId = postForComment.get(reply.replyToCommentId.get)
     if (postId.isDefined) {
-      // println(s"- found mapping to $postId, collect $reply")
       postForComment(reply.id) = postId.get // remember our new friend
-      out.collect(reply.copy(replyToPostId = postId))
+      out.collect(reply.copy(replyToPostId = postId)) // ... and immediately emit the rooted reply
     }
-    else {
-      // cache for later evaluation, globally in this operator
-      saveDanglingReply(reply)
-      //      val newValue =
-      //        danglingReplies
-      //          .get(parentCommentId)
-      //          .map { case (ts, replies) => (math.max(ts, reply.creationDate), replies += reply) }
-      //          .getOrElse((reply.creationDate, mutable.Set(reply)))
-      //
-      //      danglingReplies.put(parentCommentId, newValue)
-    }
-
-    // NOTE evict purely based on timer for comments
-    return
-    // evict all dangling replies older than the watermark
-    // println(utils.formatDuration(commentWatermark - ctx.currentWatermark()))
-    val watermark = math.max(commentWatermark, ctx.currentWatermark())
-
-    // TODO shouldn't we evict based on watermark of first-level comments?
-    val droppedReplies = danglingReplies.filter { case (_, (maxTimestamp, _)) => maxTimestamp <= watermark }
-
-    if (droppedReplies.nonEmpty) {
-      // emit dropped replies to side output
-      droppedReplies.foreach { case (_, (_, replies)) => replies.foreach(reply => ctx.output(outputTagDroppedReplies, reply)) }
-
-      val beforeDrop = if (LOG.isDebugEnabled()) danglingReplyCount() else 0
-
-      danglingReplies --= droppedReplies.keys
-
-      if (LOG.isDebugEnabled()) {
-        val afterDrop = danglingReplyCount()
-        LOG.debug(s"[${getRuntimeContext.getIndexOfThisSubtask} / ${getRuntimeContext.getNumberOfParallelSubtasks}] " +
-          s"dropped: ${beforeDrop - afterDrop} - remaining: $afterDrop")
-      }
-    }
+    else rememberDanglingReply(reply) // cache for later evaluation, globally in this operator
   }
 
-  private def saveDanglingReply(reply: CommentEvent): Unit = {
-    val parentCommentId = reply.replyToCommentId.get
+  private def rememberDanglingReply(reply: CommentEvent): Unit = {
+    val parentCommentId = reply.replyToCommentId.get // must not be None
 
     val newValue =
       danglingReplies
@@ -153,8 +112,6 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
 
     danglingReplies.put(parentCommentId, newValue)
   }
-
-  private def danglingReplyCount(): Int = danglingReplies.map { case (_, (_, replies)) => replies.size }.sum
 
   override def snapshotState(context: FunctionSnapshotContext): Unit = {
     danglingRepliesListState.clear()
@@ -193,6 +150,8 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
       postForCommentListState.get.asScala.foreach(postForComment ++= _)
     }
   }
+
+  private def danglingReplyCount(): Int = danglingReplies.map { case (_, (_, replies)) => replies.size }.sum
 
 }
 

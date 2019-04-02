@@ -42,8 +42,7 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
 
     env.execute()
 
-    // Note: this must be called *after* execute()
-    // Note: apparently works for one stream only (collecting side output stream results in java.io.IOException: Cannot connect to the client to send back the stream)
+    // Note: this must be called *instead of* execute(), once for each stream
     val rooted = DataStreamUtils.collect(rootedStream.javaStream).asScala.toList
 
     println("rooted:")
@@ -75,9 +74,7 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
 
     val (rootedStream, _) = BuildCommentsHierarchyJob.resolveReplyTree(stream)
 
-    env.execute()
-
-    // Note: this must be called *after* execute()
+    // Note: this must be called *instead of* execute()
     val rooted = DataStreamUtils.collect(rootedStream.javaStream).asScala.toList
 
     println("rooted:")
@@ -93,8 +90,10 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.getConfig.setTaskCancellationTimeout(0) // deactivate the watch dog to allow stress-free debugging
-    env.setParallelism(1)
+    env.setParallelism(4)
 
+    // NOTE it seems that events are broadcasted *more* than once per worker, at least in this test context
+    //      (maybe an influence of collect() method below?)
     val postId = 999
     val personId = 1
     val rawComments: List[CommentEvent] = List(
@@ -110,9 +109,7 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
 
     val (_, droppedStream) = BuildCommentsHierarchyJob.resolveReplyTree(stream)
 
-    env.execute()
-
-    // Note: this must be called *after* execute()
+    // Note: this must be called *instead of* execute()
     val dropped = DataStreamUtils.collect(droppedStream.javaStream).asScala.toList
 
     println("dropped:")
