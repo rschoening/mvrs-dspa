@@ -21,15 +21,12 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
   private val postForComment: mutable.Map[Long, Long] = mutable.Map()
   @transient private var danglingRepliesListState: ListState[Map[Long, Set[CommentEvent]]] = _
   @transient private var postForCommentListState: ListState[Map[Long, Long]] = _
-  private var commentWatermark: Long = Long.MinValue
 
   override def processElement(firstLevelComment: CommentEvent,
                               ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]#ReadOnlyContext,
                               out: Collector[CommentEvent]): Unit = {
     val postId = firstLevelComment.postId
     assert(ctx.getCurrentKey == postId)
-
-    commentWatermark = ctx.currentWatermark()
 
     // this state is unbounded, replies may refer to arbitrarily old comments
     // consider storing it in ElasticSearch, with a LRU cache maintained in the operator
@@ -43,12 +40,12 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
       val resolved = BuildReplyTreeProcessFunction.resolveDanglingReplies(
         danglingReplies(firstLevelComment.id)._2, postId, getDanglingReplies)
 
-      resolved.foreach(c => danglingReplies.remove(c.id)) // remove resolved replies from operator state
       danglingReplies.remove(firstLevelComment.id)
-
+      resolved.foreach(c => danglingReplies.remove(c.id)) // remove resolved replies from operator state
       resolved.foreach(out.collect) // emit the resolved replies
     }
 
+    // register a timer (will call back at watermark for the creationDate)
     ctx.timerService().registerEventTimeTimer(firstLevelComment.creationDate)
   }
 
@@ -57,11 +54,8 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
                        out: Collector[CommentEvent]): Unit = {
     // check among *all* dangling replies
     for {(parentCommentId, (maxTimestamp, replies)) <- danglingReplies} {
-
-      if (maxTimestamp <= timestamp) {
-        // past the watermark
-
-        // check if the post id is now known
+      if (maxTimestamp <= timestamp) { // past the watermark
+        // check if the post id for the parent comment id is now known
         val postId = postForComment.get(parentCommentId)
 
         if (postId.isDefined && postId.contains(ctx.getCurrentKey)) {
@@ -150,18 +144,13 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
       postForCommentListState.get.asScala.foreach(postForComment ++= _)
     }
   }
-
-  private def danglingReplyCount(): Int = danglingReplies.map { case (_, (_, replies)) => replies.size }.sum
-
 }
 
 object BuildReplyTreeProcessFunction {
   def resolveDanglingReplies(replies: Iterable[CommentEvent],
                              postId: Long,
-                             getChildren: CommentEvent => Iterable[CommentEvent]): Set[CommentEvent] = {
-
+                             getChildren: CommentEvent => Iterable[CommentEvent]): Set[CommentEvent] =
     getDanglingReplies(replies, getChildren).map(r => r.copy(replyToPostId = Some(postId)))
-  }
 
   def getDanglingReplies(replies: Iterable[CommentEvent],
                          getChildren: CommentEvent => Iterable[CommentEvent]): Set[CommentEvent] = {
