@@ -17,9 +17,9 @@ object BuildCommentsHierarchyJob extends App {
 
   // set up the streaming execution environment
   implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
-  env.setParallelism(1) // NOTE with multiple workers, the comments AND broadcast stream watermarks lag VERY much behind
+  env.setParallelism(4) // NOTE with multiple workers, the comments AND broadcast stream watermarks lag VERY much behind
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
-  env.getConfig.setAutoWatermarkInterval(10L) // NOTE this is REQUIRED for timers to fire, apparently
+  env.getConfig.setAutoWatermarkInterval(100L) // NOTE this is REQUIRED for timers to fire, apparently
 
   val outputTagParsingErrors = new OutputTag[ParseError]("comment parsing errors")
 
@@ -33,12 +33,12 @@ object BuildCommentsHierarchyJob extends App {
     .filter(!_.startsWith("id|")) // TODO better way to skip the header line? use table api csv source and convert to datastream?
     .map(CommentEvent.parse _) // TODO use parser process function with side output for errors
     .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](Time.milliseconds(1), _.creationDate))
-    .process(new ScaledReplayFunction[CommentEvent](_.creationDate, 100000, 0))
+    .process(new ScaledReplayFunction[CommentEvent](_.creationDate, 0, 0))
 
   val (rootedComments, droppedReplies) = resolveReplyTree(allComments)
 
-  rootedComments.process(new ProgressMonitorFunction[CommentEvent]("TREE", 1000)).name("tree_monitor")
-  droppedReplies.process(new ProgressMonitorFunction[CommentEvent]("DROPPED", 1000))
+  rootedComments.process(new ProgressMonitorFunction[CommentEvent]("TREE", 10000)).name("tree_monitor")
+  droppedReplies.process(new ProgressMonitorFunction[CommentEvent]("DROP", 10000)).name("drop_monitor")
 
   println(env.getExecutionPlan)
   env.execute()

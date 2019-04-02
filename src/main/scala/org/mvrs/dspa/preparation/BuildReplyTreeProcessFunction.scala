@@ -28,6 +28,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
   override def processElement(firstLevelComment: CommentEvent,
                               ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]#ReadOnlyContext,
                               out: Collector[CommentEvent]): Unit = {
+    // println(s"processElement: ${firstLevelComment}")
     val postId = firstLevelComment.postId
     assert(ctx.getCurrentKey == postId)
 
@@ -37,40 +38,87 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
     // consider storing it in ElasticSearch, with a LRU cache maintained in the operator
     postForComment.put(firstLevelComment.id, postId)
 
+    out.collect(firstLevelComment)
+
     // process all replies that were waiting for this comment (recursively)
     if (danglingReplies.contains(firstLevelComment.id)) {
 
-      val resolved = resolveDanglingReplies(Set())(
-        danglingReplies(firstLevelComment.id)._2,
-        postId,
-        reply => danglingReplies.getOrElse(reply.id, (Long.MinValue, mutable.Set[CommentEvent]()))._2)
+      val resolved = BuildReplyTreeProcessFunction.resolveDanglingReplies(
+        danglingReplies(firstLevelComment.id)._2, postId, getDanglingReplies)
 
       resolved.foreach(c => danglingReplies.remove(c.id)) // remove resolved replies from operator state
+      danglingReplies.remove(firstLevelComment.id)
 
-      // emit the resolved replies
-      resolved.foreach(out.collect)
+      resolved.foreach(out.collect) // emit the resolved replies
+    }
+
+    ctx.timerService().registerEventTimeTimer(firstLevelComment.creationDate)
+  }
+
+
+  override def onTimer(timestamp: Long,
+                       ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]#OnTimerContext,
+                       out: Collector[CommentEvent]): Unit = {
+    // check among all dangling replies
+    for {(parentCommentId, (maxTimestamp, replies)) <- danglingReplies} {
+
+      if (maxTimestamp <= timestamp) {
+        // past the watermark
+
+        // check if the post id is now known
+        val postId = postForComment.get(parentCommentId)
+
+        if (postId.isDefined && postId.contains(ctx.getCurrentKey)) {
+          // the post id was found -> point all dangling children to it
+          val resolved = BuildReplyTreeProcessFunction.resolveDanglingReplies(
+            replies, postId.get, getDanglingReplies)
+
+          resolved.foreach(r => postForComment(r.id) = r.postId) // remember comment -> post mapping
+          resolved.foreach(r => danglingReplies.remove(r.id)) // remove resolved replies from operator state
+          resolved.foreach(out.collect) // emit the resolved replies
+        }
+        else {
+          // post id unknown for referenced comment, and past watermark -> drop replies
+          val unresolved = BuildReplyTreeProcessFunction.getDanglingReplies(replies, getDanglingReplies)
+
+          unresolved.foreach(ctx.output(outputTagDroppedReplies, _))
+          unresolved.foreach(r => danglingReplies.remove(r.id)) // remove resolved replies from operator state
+          danglingReplies.remove(parentCommentId)
+        }
+      }
     }
   }
+
+  private def getDanglingReplies(event: CommentEvent) =
+    danglingReplies.getOrElse(event.id, (Long.MinValue, mutable.Set[CommentEvent]()))._2
 
   override def processBroadcastElement(reply: CommentEvent,
                                        ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]#Context,
                                        out: Collector[CommentEvent]): Unit = {
+    // println(s"processBroadcastElement: $reply")
     val parentCommentId = reply.replyToCommentId.get
 
     val postId = postForComment.get(parentCommentId)
 
-    if (postId.isDefined) out.collect(reply.copy(replyToPostId = postId))
+    if (postId.isDefined) {
+      // println(s"- found mapping to $postId, collect $reply")
+      postForComment(reply.id) = postId.get // remember our new friend
+      out.collect(reply.copy(replyToPostId = postId))
+    }
     else {
       // cache for later evaluation, globally in this operator
-      val newValue =
-        danglingReplies
-          .get(parentCommentId)
-          .map { case (ts, replies) => (math.max(ts, reply.creationDate), replies += reply) }
-          .getOrElse((reply.creationDate, mutable.Set(reply)))
-
-      danglingReplies.put(parentCommentId, newValue)
+      saveDanglingReply(reply)
+      //      val newValue =
+      //        danglingReplies
+      //          .get(parentCommentId)
+      //          .map { case (ts, replies) => (math.max(ts, reply.creationDate), replies += reply) }
+      //          .getOrElse((reply.creationDate, mutable.Set(reply)))
+      //
+      //      danglingReplies.put(parentCommentId, newValue)
     }
 
+    // NOTE evict purely based on timer for comments
+    return
     // evict all dangling replies older than the watermark
     // println(utils.formatDuration(commentWatermark - ctx.currentWatermark()))
     val watermark = math.max(commentWatermark, ctx.currentWatermark())
@@ -92,6 +140,18 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
           s"dropped: ${beforeDrop - afterDrop} - remaining: $afterDrop")
       }
     }
+  }
+
+  private def saveDanglingReply(reply: CommentEvent): Unit = {
+    val parentCommentId = reply.replyToCommentId.get
+
+    val newValue =
+      danglingReplies
+        .get(parentCommentId)
+        .map { case (ts, replies) => (math.max(ts, reply.creationDate), replies += reply) }
+        .getOrElse((reply.creationDate, mutable.Set(reply)))
+
+    danglingReplies.put(parentCommentId, newValue)
   }
 
   private def danglingReplyCount(): Int = danglingReplies.map { case (_, (_, replies)) => replies.size }.sum
@@ -134,15 +194,26 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
     }
   }
 
-  @tailrec
-  final def resolveDanglingReplies(acc: Set[CommentEvent])(replies: Iterable[CommentEvent],
-                                                           postId: Long,
-                                                           getChildren: CommentEvent => mutable.Set[CommentEvent]): Set[CommentEvent] = {
-    if (replies.isEmpty) acc // base case
-    else {
-      val resolvedReplies = replies.map(_.copy(replyToPostId = Some(postId)))
+}
 
-      resolveDanglingReplies(acc ++ resolvedReplies)(resolvedReplies.flatMap(getChildren(_)), postId, getChildren)
-    }
+object BuildReplyTreeProcessFunction {
+  def resolveDanglingReplies(replies: Iterable[CommentEvent],
+                             postId: Long,
+                             getChildren: CommentEvent => Iterable[CommentEvent]): Set[CommentEvent] = {
+
+    getDanglingReplies(replies, getChildren).map(r => r.copy(replyToPostId = Some(postId)))
   }
+
+  def getDanglingReplies(replies: Iterable[CommentEvent],
+                         getChildren: CommentEvent => Iterable[CommentEvent]): Set[CommentEvent] = {
+    @tailrec
+    def loop(acc: Set[CommentEvent])(replies: Iterable[CommentEvent],
+                                     getChildren: CommentEvent => Iterable[CommentEvent]): Set[CommentEvent] = {
+      if (replies.isEmpty) acc // base case
+      else loop(acc ++ replies)(replies.flatMap(getChildren(_)), getChildren)
+    }
+
+    loop(Set())(replies, getChildren)
+  }
+
 }
