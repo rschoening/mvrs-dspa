@@ -8,6 +8,7 @@ import com.twitter.algebird.{MinHashSignature, MinHasher, MinHasher32}
 import org.apache.flink.api.common.serialization.TypeInformationSerializationSchema
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
+import org.apache.flink.configuration.{ConfigConstants, Configuration}
 import org.apache.flink.streaming.api.functions.AssignerWithPeriodicWatermarks
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor
 import org.apache.flink.streaming.api.windowing.time.Time
@@ -27,11 +28,24 @@ import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartiti
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer, FlinkKafkaProducer}
 import org.apache.kafka.clients.producer.ProducerConfig
 
+// NOTE this will be refactored, currently a mixed bag
 package object utils {
 
   val kafkaBrokers = "localhost:9092"
-
   private val dateFormat = ThreadLocal.withInitial[SimpleDateFormat](() => new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
+
+  def createStreamExecutionEnvironment(localWithUI: Boolean = false): StreamExecutionEnvironment = {
+    // TODO include metrics always? or rely on flink config when running in cluster?
+    if (localWithUI) {
+      val config = new Configuration
+      config.setBoolean(ConfigConstants.LOCAL_START_WEBSERVER, true)
+      config.setString("metrics.reporters", "prometheus")
+      config.setString("metrics.reporter.prometheus.class", "org.apache.flink.metrics.prometheus.PrometheusReporter")
+
+      StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(config)
+    }
+    else StreamExecutionEnvironment.getExecutionEnvironment
+  }
 
   def formatTimestamp(timestamp: Long): String = dateFormat.get.format(new Date(timestamp))
 
