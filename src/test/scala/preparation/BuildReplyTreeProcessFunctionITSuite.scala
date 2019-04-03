@@ -15,11 +15,14 @@ import scala.collection.mutable
 
 /**
   * Integration test suite for [[org.mvrs.dspa.preparation.BuildReplyTreeProcessFunction]]
+  *
+  * since the execution is not deterministic with parallelism > 1, the tests are repeated
   */
 class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
 
+  private val repetitions = 20
   @Test
-  def testOrderedInput(): Unit = for (_ <- 0 to 10) {
+  def testOrderedInput(): Unit = for (_ <- 0 until repetitions) {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.getConfig.setTaskCancellationTimeout(0) // deactivate the watch dog to allow stress-free debugging
@@ -63,7 +66,7 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
   }
 
   @Test
-  def testUnorderedInput(): Unit = for (_ <- 0 to 10) {
+  def testUnorderedInput(): Unit = for (_ <- 0 until repetitions) {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.getConfig.setTaskCancellationTimeout(0) // deactivate the watch dog to allow stress-free debugging
@@ -107,7 +110,7 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
 
 
   @Test
-  def dropDanglingReplies(): Unit = for (_ <- 0 to 10) {
+  def dropDanglingReplies(): Unit = for (_ <- 0 until repetitions) {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.getConfig.setTaskCancellationTimeout(0) // deactivate the watch dog to allow stress-free debugging
