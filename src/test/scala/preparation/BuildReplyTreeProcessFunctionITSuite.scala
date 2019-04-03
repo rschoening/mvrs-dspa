@@ -1,7 +1,6 @@
 package preparation
 
 import org.apache.flink.streaming.api.TimeCharacteristic
-import org.apache.flink.streaming.api.datastream.DataStreamUtils
 import org.apache.flink.streaming.api.functions.sink.SinkFunction
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
 import org.apache.flink.streaming.api.windowing.time.Time
@@ -12,7 +11,6 @@ import org.mvrs.dspa.preparation.BuildCommentsHierarchyJob
 import org.mvrs.dspa.utils
 import org.scalatest.Assertions.assertResult
 
-import scala.collection.JavaConverters._
 import scala.collection.mutable
 
 /**
@@ -21,11 +19,12 @@ import scala.collection.mutable
 class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
 
   @Test
-  def testOrderedInput(): Unit = {
+  def testOrderedInput(): Unit = for (_ <- 0 to 10) {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.getConfig.setTaskCancellationTimeout(0) // deactivate the watch dog to allow stress-free debugging
-    env.setParallelism(1)
+    env.getConfig.setAutoWatermarkInterval(10L) // required for watermarks and correct timers
+    env.setParallelism(4)
 
     val postId = 999
     val personId = 1
@@ -40,7 +39,7 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     val stream = env.fromCollection(rawComments)
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](Time.milliseconds(100), _.creationDate))
 
-    val (rootedStream, droppedStream) = BuildCommentsHierarchyJob.resolveReplyTree(stream)
+    val (rootedStream, droppedStream) = BuildCommentsHierarchyJob.resolveReplyTree(stream, droppedRepliesStream = true)
 
     RootedSink.values.clear()
     DroppedSink.values.clear()
@@ -64,11 +63,12 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
   }
 
   @Test
-  def testUnorderedInput(): Unit = {
+  def testUnorderedInput(): Unit = for (_ <- 0 to 10) {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.getConfig.setTaskCancellationTimeout(0) // deactivate the watch dog to allow stress-free debugging
-    env.setParallelism(1)
+    env.getConfig.setAutoWatermarkInterval(10L) // required for watermarks and correct timers
+    env.setParallelism(4)
 
     val postId = 999
     val personId = 1
@@ -83,7 +83,7 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     val stream = env.fromCollection(rawComments)
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](Time.milliseconds(100), _.creationDate))
 
-    val (rootedStream, droppedStream) = BuildCommentsHierarchyJob.resolveReplyTree(stream)
+    val (rootedStream, droppedStream) = BuildCommentsHierarchyJob.resolveReplyTree(stream, droppedRepliesStream = true)
 
     RootedSink.values.clear()
     DroppedSink.values.clear()
@@ -107,10 +107,11 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
 
 
   @Test
-  def dropDanglingReplies(): Unit = {
+  def dropDanglingReplies(): Unit = for (_ <- 0 to 10) {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.getConfig.setTaskCancellationTimeout(0) // deactivate the watch dog to allow stress-free debugging
+    env.getConfig.setAutoWatermarkInterval(10L) // required for watermarks and correct timers
     env.setParallelism(4)
 
     // NOTE it seems that events are broadcasted *more* than once per worker, at least in this test context
@@ -128,7 +129,7 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     val stream = env.fromCollection(rawComments)
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](Time.milliseconds(100), _.creationDate))
 
-    val (rootedStream, droppedStream) = BuildCommentsHierarchyJob.resolveReplyTree(stream)
+    val (rootedStream, droppedStream) = BuildCommentsHierarchyJob.resolveReplyTree(stream, droppedRepliesStream = true)
 
     RootedSink.values.clear()
     DroppedSink.values.clear()
