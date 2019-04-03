@@ -77,9 +77,7 @@ class PostStatisticsFunctionITSuite extends AbstractTestBase {
       .keyBy(_.postId)
       .process(new PostStatisticsFunction(20, 20))
 
-    env.execute()
-
-    // Note: this must be called *after* execute()
+    // Note: this must be called *instead of* execute()
     val statistics = DataStreamUtils.collect(stream.javaStream).asScala.toList
 
     statistics.foreach(println(_))

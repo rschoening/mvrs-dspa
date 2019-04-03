@@ -158,7 +158,7 @@ object BuildReplyTreeProcessFunction {
     def loop(acc: Set[CommentEvent])(replies: Iterable[CommentEvent],
                                      getChildren: CommentEvent => Iterable[CommentEvent]): Set[CommentEvent] = {
       if (replies.isEmpty) acc // base case
-      else loop(acc ++ replies)(replies.flatMap(getChildren(_)), getChildren)
+      else loop(acc ++ replies)(replies.flatMap(getChildren), getChildren)
     }
 
     loop(Set())(replies, getChildren)

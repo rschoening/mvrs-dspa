@@ -40,8 +40,6 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
 
     val (rootedStream, _) = BuildCommentsHierarchyJob.resolveReplyTree(stream)
 
-    env.execute()
-
     // Note: this must be called *instead of* execute(), once for each stream
     val rooted = DataStreamUtils.collect(rootedStream.javaStream).asScala.toList
 

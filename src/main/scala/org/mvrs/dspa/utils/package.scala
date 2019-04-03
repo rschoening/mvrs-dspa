@@ -1,6 +1,5 @@
 package org.mvrs.dspa
 
-import java.util.concurrent.TimeUnit
 import java.util.{Base64, Optional, Properties}
 
 import com.sksamuel.elastic4s.http.index.admin.DeleteIndexResponse
@@ -22,11 +21,11 @@ import scala.reflect.ClassTag
 import java.text.SimpleDateFormat
 import java.util.Date
 
+import org.apache.commons.lang3.time.DurationFormatUtils
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer, FlinkKafkaProducer}
 import org.apache.kafka.clients.producer.ProducerConfig
-import org.apache.commons.lang3.time.DurationFormatUtils
 
 package object utils {
 
