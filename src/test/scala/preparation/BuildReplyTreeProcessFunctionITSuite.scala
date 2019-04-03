@@ -2,6 +2,7 @@ package preparation
 
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.datastream.DataStreamUtils
+import org.apache.flink.streaming.api.functions.sink.SinkFunction
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.test.util.AbstractTestBase
@@ -12,6 +13,7 @@ import org.mvrs.dspa.utils
 import org.scalatest.Assertions.assertResult
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 
 /**
   * Integration test suite for [[org.mvrs.dspa.preparation.BuildReplyTreeProcessFunction]]
@@ -38,14 +40,25 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     val stream = env.fromCollection(rawComments)
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](Time.milliseconds(100), _.creationDate))
 
-    val (rootedStream, _) = BuildCommentsHierarchyJob.resolveReplyTree(stream)
+    val (rootedStream, droppedStream) = BuildCommentsHierarchyJob.resolveReplyTree(stream)
 
-    // Note: this must be called *instead of* execute(), once for each stream
-    val rooted = DataStreamUtils.collect(rootedStream.javaStream).asScala.toList
+    RootedSink.values.clear()
+    DroppedSink.values.clear()
+    rootedStream.addSink(new RootedSink)
+    droppedStream.addSink(new DroppedSink)
+
+    env.execute()
+
+    val rooted = RootedSink.values
+    val dropped = DroppedSink.values
 
     println("rooted:")
     println(rooted.mkString("\n"))
 
+    println("dropped:")
+    println(dropped.mkString("\n"))
+
+    assertResult(0)(dropped.length)
     assertResult(rawComments.length)(rooted.length)
     assert(rooted.forall(_.postId == postId))
   }
@@ -70,13 +83,23 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     val stream = env.fromCollection(rawComments)
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](Time.milliseconds(100), _.creationDate))
 
-    val (rootedStream, _) = BuildCommentsHierarchyJob.resolveReplyTree(stream)
+    val (rootedStream, droppedStream) = BuildCommentsHierarchyJob.resolveReplyTree(stream)
 
-    // Note: this must be called *instead of* execute()
-    val rooted = DataStreamUtils.collect(rootedStream.javaStream).asScala.toList
+    RootedSink.values.clear()
+    DroppedSink.values.clear()
+    rootedStream.addSink(new RootedSink)
+    droppedStream.addSink(new DroppedSink)
+
+    env.execute()
+
+    val rooted = RootedSink.values
+    val dropped = DroppedSink.values
 
     println("rooted:")
     println(rooted.mkString("\n"))
+
+    println("dropped:")
+    println(dropped.mkString("\n"))
 
     assertResult(rawComments.length)(rooted.length)
     assert(rooted.forall(_.postId == postId))
@@ -105,17 +128,54 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     val stream = env.fromCollection(rawComments)
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](Time.milliseconds(100), _.creationDate))
 
-    val (_, droppedStream) = BuildCommentsHierarchyJob.resolveReplyTree(stream)
+    val (rootedStream, droppedStream) = BuildCommentsHierarchyJob.resolveReplyTree(stream)
 
-    // Note: this must be called *instead of* execute()
-    val dropped = DataStreamUtils.collect(droppedStream.javaStream).asScala.toList
+    RootedSink.values.clear()
+    DroppedSink.values.clear()
+    rootedStream.addSink(new RootedSink)
+    droppedStream.addSink(new DroppedSink)
+
+    env.execute()
+
+    val rooted = RootedSink.values
+    val dropped = DroppedSink.values
+
+    println("rooted:")
+    println(rooted.mkString("\n"))
 
     println("dropped:")
     println(dropped.mkString("\n"))
 
+    assertResult(3)(rooted.length)
     val danglingIds = List(113, 115)
     assertResult(2)(dropped.length)
     assert(dropped.forall(_.replyToPostId.isEmpty))
     assert(dropped.forall(r => danglingIds.contains(r.id)))
   }
+
+}
+
+// sinks: see https://ci.apache.org/projects/flink/flink-docs-stable/dev/stream/testing.html
+// NOTE: these classes must not be nested in the test class, otherwise they are not serializable
+
+class RootedSink extends SinkFunction[CommentEvent] {
+  override def invoke(value: CommentEvent): Unit =
+    synchronized {
+      RootedSink.values += value
+    }
+}
+
+object RootedSink {
+  val values: mutable.MutableList[CommentEvent] = mutable.MutableList[CommentEvent]() // must be static
+}
+
+class DroppedSink extends SinkFunction[CommentEvent] {
+  override def invoke(value: CommentEvent): Unit =
+    synchronized {
+      DroppedSink.values += value
+    }
+}
+
+object DroppedSink {
+  val values: mutable.MutableList[CommentEvent] = mutable.MutableList[CommentEvent]() // must be static
 }

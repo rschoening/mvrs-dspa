@@ -96,6 +96,11 @@ under the License.
             <version>${flink.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-runtime-web_${scala.binary.version}</artifactId>
+            <version>${flink.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>com.twitter</groupId>
@@ -118,8 +123,23 @@ under the License.
             <version>6.3.8</version> <!-- NOTE this must be fixed at 6.3.8 to match elastic client dependency of flinks ES connector -->
         </dependency>
 
+        <!-- metric implementations (meter, histogram) see https://ci.apache.org/projects/flink/flink-docs-release-1.7/monitoring/metrics.html#list-of-all-variables -->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-metrics-dropwizard</artifactId>
+            <version>${flink.version}</version>
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.apache.flink/flink-metrics-prometheus -->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-metrics-prometheus_${scala.binary.version}</artifactId>
+            <version>${flink.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- https://mvnrepository.com/artifact/com.thoughtworks.paranamer/paranamer -->
-        <!-- need to fix version to 2.8 so that elastic4s works -->
+        <!-- need to fix version to 2.8 so that elastic4s works (lower versions have a bug affecting elastic4s) -->
         <dependency>
             <groupId>com.thoughtworks.paranamer</groupId>
             <artifactId>paranamer</artifactId>
@@ -169,7 +189,7 @@ under the License.
 			<version>1.2.17</version>
 			<scope>runtime</scope>
 		</dependency>
-	</dependencies>
+    </dependencies>
 
 	<build>
 		<plugins>
