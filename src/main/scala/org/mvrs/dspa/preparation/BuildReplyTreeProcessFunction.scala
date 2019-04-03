@@ -1,6 +1,9 @@
 package org.mvrs.dspa.preparation
 
 import org.apache.flink.api.common.state.{ListState, ListStateDescriptor}
+import org.apache.flink.configuration.Configuration
+import org.apache.flink.dropwizard.metrics.DropwizardMeterWrapper
+import org.apache.flink.metrics.{Counter, Meter}
 import org.apache.flink.runtime.state.{FunctionInitializationContext, FunctionSnapshotContext}
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction
 import org.apache.flink.streaming.api.functions.co.KeyedBroadcastProcessFunction
@@ -22,17 +25,37 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
   @transient private var danglingRepliesListState: ListState[Map[Long, Set[CommentEvent]]] = _
   @transient private var postForCommentListState: ListState[Map[Long, Long]] = _
 
+  // metrics
+  @transient private var firstLevelCommentCounter: Counter = _
+  @transient private var replyCounter: Counter = _
+  @transient private var resolvedReplyCount: Counter = _
+  @transient private var droppedReplyCounter: Counter = _
+  @transient private var throughputMeter: Meter = _
+
+  override def open(parameters: Configuration): Unit = {
+    val group = getRuntimeContext.getMetricGroup
+
+    firstLevelCommentCounter = group.counter("firstlevelcomment-counter")
+    replyCounter = group.counter("reply-counter")
+    resolvedReplyCount = group.counter("rootedreply-counter")
+    droppedReplyCounter = group.counter("droppedreply-counter")
+    throughputMeter = group.meter("throughput-meter", new DropwizardMeterWrapper(new com.codahale.metrics.Meter()))
+  }
+
   override def processElement(firstLevelComment: CommentEvent,
                               ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]#ReadOnlyContext,
                               out: Collector[CommentEvent]): Unit = {
+    firstLevelCommentCounter.inc()
+
     val postId = firstLevelComment.postId
-    assert(ctx.getCurrentKey == postId)
+    assert(ctx.getCurrentKey == postId) // must be keyed by post id
 
     // this state is unbounded, replies may refer to arbitrarily old comments
     // consider storing it in ElasticSearch, with a LRU cache maintained in the operator
     postForComment.put(firstLevelComment.id, postId)
 
     out.collect(firstLevelComment)
+    throughputMeter.markEvent()
 
     // process all replies that were waiting for this comment (recursively)
     if (danglingReplies.contains(firstLevelComment.id)) {
@@ -40,12 +63,13 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
       val resolved = BuildReplyTreeProcessFunction.resolveDanglingReplies(
         danglingReplies(firstLevelComment.id)._2, postId, getDanglingReplies)
 
+      emitResolvedReplies(resolved, out)
+
       danglingReplies.remove(firstLevelComment.id)
-      resolved.foreach(c => danglingReplies.remove(c.id)) // remove resolved replies from operator state
-      resolved.foreach(out.collect) // emit the resolved replies
     }
 
     // register a timer (will call back at watermark for the creationDate)
+    // NOTE actually the timer should be based on arriving unresolved replies
     ctx.timerService().registerEventTimeTimer(firstLevelComment.creationDate)
   }
 
@@ -63,22 +87,42 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
           val resolved = BuildReplyTreeProcessFunction.resolveDanglingReplies(
             replies, postId.get, getDanglingReplies)
 
-          resolved.foreach(r => postForComment(r.id) = r.postId) // remember comment -> post mapping
-          resolved.foreach(r => danglingReplies.remove(r.id)) // remove resolved replies from operator state
-          resolved.foreach(out.collect) // emit the resolved replies
+          emitResolvedReplies(resolved, out)
         }
         else {
           // post id unknown for referenced comment, and past watermark -> drop replies
           val unresolved = BuildReplyTreeProcessFunction.getDanglingReplies(replies, getDanglingReplies)
 
           // NOTE with multiple workers, the unresolved replies are emitted for each worker!
-          unresolved.foreach(ctx.output(outputTagDroppedReplies, _))
+          unresolved.foreach(r => {
+            danglingReplies.remove(r.id) // remove resolved replies from operator state
 
-          unresolved.foreach(r => danglingReplies.remove(r.id)) // remove resolved replies from operator state
-          danglingReplies.remove(parentCommentId)
+            ctx.output(outputTagDroppedReplies, r)
+
+            droppedReplyCounter.inc()
+          })
         }
+
+        // either way we can forget about the referenced comment also
+        danglingReplies.remove(parentCommentId)
       }
     }
+  }
+
+  private def emitResolvedReplies(resolved: Iterable[CommentEvent], out: Collector[CommentEvent]): Unit = {
+    val count = resolved.size
+    require(count > 0, "empty replies iterable")
+
+    resolved.foreach(
+      r => {
+        postForComment(r.id) = r.postId // remember comment -> post mapping
+        danglingReplies.remove(r.id) // remove resolved replies from operator state
+        out.collect(r) // emit the resolved replies
+      })
+
+    // metrics
+    throughputMeter.markEvent(count)
+    resolvedReplyCount.inc(count)
   }
 
   private def getDanglingReplies(event: CommentEvent) =
@@ -87,6 +131,8 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: OutputTag[CommentEv
   override def processBroadcastElement(reply: CommentEvent,
                                        ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]#Context,
                                        out: Collector[CommentEvent]): Unit = {
+    replyCounter.inc() // will count per parallel worker
+
     val postId = postForComment.get(reply.replyToCommentId.get)
     if (postId.isDefined) {
       postForComment(reply.id) = postId.get // remember our new friend
