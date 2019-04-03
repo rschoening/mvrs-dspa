@@ -10,6 +10,7 @@ import org.apache.flink.streaming.api.functions.co.KeyedBroadcastProcessFunction
 import org.apache.flink.streaming.api.scala.{OutputTag, createTypeInformation}
 import org.apache.flink.util.Collector
 import org.mvrs.dspa.events.CommentEvent
+import org.mvrs.dspa.utils
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
@@ -21,6 +22,9 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
 
   // checkpointed operator state
   private val danglingReplies: mutable.Map[Long, (Long, mutable.Set[CommentEvent])] = mutable.Map[Long, (Long, mutable.Set[CommentEvent])]()
+  // TODO use a separate data structure for the parent keys and maximum timestamps, to quickly identify those that can be dropped (priority queue of (parent-id, timestamp)?)
+  // TODO create class for danglingreplies, with merge operation when reading from list state, and with unit tests
+
   private val postForComment: mutable.Map[Long, Long] = mutable.Map()
   @transient private var danglingRepliesListState: ListState[Map[Long, Set[CommentEvent]]] = _
   @transient private var postForCommentListState: ListState[Map[Long, Long]] = _
@@ -33,6 +37,9 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
   @transient private var throughputMeter: Meter = _
 
   private var maximumReplyTimestamp: Long = Long.MinValue
+  private var currentCommentWatermark: Long = Long.MinValue
+  private var currentBroadcastWatermark: Long = Long.MinValue
+  private var currentMinimumWatermark: Long = Long.MinValue
 
   override def open(parameters: Configuration): Unit = {
     val group = getRuntimeContext.getMetricGroup
@@ -70,31 +77,25 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
       danglingReplies.remove(firstLevelComment.id)
     }
 
+    if (ctx.currentWatermark() > currentCommentWatermark) {
+      val newMinimum = math.min(ctx.currentWatermark(), currentCommentWatermark)
+      val msg = s"Comment WM ${utils.formatTimestamp(currentCommentWatermark)} -> ${utils.formatTimestamp(ctx.currentWatermark())}"
+      if (newMinimum > currentMinimumWatermark) {
+        println(s"$msg >> minimum + ${utils.formatDuration(newMinimum - currentMinimumWatermark)} *********************")
+        currentMinimumWatermark = newMinimum
+
+        processDanglingReplies(currentMinimumWatermark, out, _ => ()) // TODO
+      }
+      else println(msg)
+      currentCommentWatermark = ctx.currentWatermark()
+    }
+
     // register a timer (will call back at watermark for the creationDate)
     // NOTE actually the timer should be based on arriving unresolved replies, however the timer can only be registered
     //      in the keyed context of the first-level comments.
-    // ctx.timerService().registerEventTimeTimer(maximumReplyTimestamp)
+    // NOTE without this timer, the unit tests all fail
     ctx.timerService().registerEventTimeTimer(firstLevelComment.creationDate)
   }
-
-  private def emitResolvedReplies(resolved: Iterable[CommentEvent], out: Collector[CommentEvent]): Unit = {
-    val count = resolved.size
-    require(count > 0, "empty replies iterable")
-
-    resolved.foreach(
-      r => {
-        postForComment(r.id) = r.postId // remember comment -> post mapping
-        danglingReplies.remove(r.id) // remove resolved replies from operator state
-        out.collect(r) // emit the resolved replies
-      })
-
-    // metrics
-    throughputMeter.markEvent(count)
-    resolvedReplyCount.inc(count)
-  }
-
-  private def getDanglingReplies(event: CommentEvent) =
-    danglingReplies.getOrElse(event.id, (Long.MinValue, mutable.Set[CommentEvent]()))._2
 
   override def onTimer(timestamp: Long,
                        ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]#OnTimerContext,
@@ -103,15 +104,10 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
       .map(t => (r: CommentEvent) => ctx.output(t, r))
       .getOrElse((_: CommentEvent) => ())
 
-    processDanglingReplies(timestamp, ctx.getCurrentKey, out, reportDropped)
-
-    // TODO revise this
-    if (maximumReplyTimestamp > timestamp) {
-      ctx.timerService().registerEventTimeTimer(maximumReplyTimestamp)
-    }
+    processDanglingReplies(timestamp, out, reportDropped)
   }
 
-  private def processDanglingReplies(timestamp: Long, pid: Long, out: Collector[CommentEvent], reportDroppedReply: CommentEvent => Unit): Unit = {
+  private def processDanglingReplies(timestamp: Long, out: Collector[CommentEvent], reportDroppedReply: CommentEvent => Unit): Unit = {
     // first, let all known parents resolve their children
     for {(parentCommentId, (_, replies)) <- danglingReplies} {
       // check if the post id for the parent comment id is now known
@@ -133,10 +129,10 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
       assert(postForComment.get(parentCommentId).isEmpty) // assert it's really dangling
 
       if (maxTimestamp <= timestamp) {
-        // all dangling children are past the watermark, parent is no longer expected -> drop replies
+        // all dangling children are past the watermark -> parent is no longer expected -> drop replies
         val unresolved = BuildReplyTreeProcessFunction.getDanglingReplies(replies, getDanglingReplies)
 
-        // NOTE with multiple workers, the unresolved replies are emitted for each worker!
+        // NOTE with multiple workers, the unresolved replies are emitted for each worker! in the end it might be better to drop that side output, as it can be confusing. better gather metrics on size of state
         unresolved.foreach(r => {
           danglingReplies.remove(r.id) // remove resolved replies from operator state
 
@@ -149,7 +145,27 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
         danglingReplies.remove(parentCommentId)
       }
     }
+    println(s"${danglingReplies.size}")
   }
+
+  private def emitResolvedReplies(resolved: Iterable[CommentEvent], out: Collector[CommentEvent]): Unit = {
+    val count = resolved.size
+    require(count > 0, "empty replies iterable")
+
+    resolved.foreach(
+      r => {
+        postForComment(r.id) = r.postId // remember comment -> post mapping
+        danglingReplies.remove(r.id) // remove resolved replies from operator state
+        out.collect(r) // emit the resolved replies
+      })
+
+    // metrics
+    throughputMeter.markEvent(count)
+    resolvedReplyCount.inc(count)
+  }
+
+  private def getDanglingReplies(event: CommentEvent) =
+    danglingReplies.getOrElse(event.id, (Long.MinValue, mutable.Set[CommentEvent]()))._2
 
   override def processBroadcastElement(reply: CommentEvent,
                                        ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, CommentEvent, CommentEvent]#Context,
@@ -165,6 +181,19 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
       out.collect(reply.copy(replyToPostId = postId)) // ... and immediately emit the rooted reply
     }
     else rememberDanglingReply(reply) // cache for later evaluation, globally in this operator/worker
+
+    if (ctx.currentWatermark() > currentBroadcastWatermark) {
+      val newMinimum = math.min(ctx.currentWatermark(), currentBroadcastWatermark)
+      val msg = s"Broadcast WM ${utils.formatTimestamp(currentBroadcastWatermark)} -> ${utils.formatTimestamp(ctx.currentWatermark())}"
+      if (newMinimum > currentMinimumWatermark) {
+        println(s"$msg >> minimum + ${utils.formatDuration(newMinimum - currentMinimumWatermark)}")
+        currentMinimumWatermark = newMinimum
+        processDanglingReplies(currentMinimumWatermark, out, _ => ())
+      }
+      else println(msg)
+      currentBroadcastWatermark = ctx.currentWatermark()
+    }
+
   }
 
   private def rememberDanglingReply(reply: CommentEvent): Unit = {
