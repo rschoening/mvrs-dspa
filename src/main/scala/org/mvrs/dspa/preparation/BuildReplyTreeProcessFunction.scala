@@ -145,7 +145,9 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
         danglingReplies.remove(parentCommentId)
       }
     }
-    println(s"${danglingReplies.size}")
+
+    // TODO define metric for size of state collections
+    // println(s"${danglingReplies.size}")
   }
 
   private def emitResolvedReplies(resolved: Iterable[CommentEvent], out: Collector[CommentEvent]): Unit = {

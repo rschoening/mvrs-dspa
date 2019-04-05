@@ -4,7 +4,7 @@ import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.mvrs.dspa.events.CommentEvent
-import org.mvrs.dspa.functions.{ScaledReplayFunction, TestingFileSinkFunction}
+import org.mvrs.dspa.functions.{ProgressMonitorFunction, ScaledReplayFunction, SimpleTextFileSinkFunction}
 import org.mvrs.dspa.preparation.LoadCommentEventsJob.ParseError
 import org.mvrs.dspa.utils
 
@@ -39,10 +39,11 @@ object BuildCommentsHierarchyJob extends App {
 
   val rootedComments = resolveReplyTree(allComments)
 
-  // rootedComments.process(new ProgressMonitorFunction[CommentEvent]("TREE", 10000)).name("tree_monitor")
+  rootedComments.process(new ProgressMonitorFunction[CommentEvent]("TREE", 10000)).name("tree_monitor")
   // droppedReplies.process(new ProgressMonitorFunction[CommentEvent]("DROP", 10000)).name("drop_monitor")
 
-  rootedComments.map(c => s"${c.id};-1;${c.postId};${utils.formatTimestamp(c.creationDate)}").addSink(new TestingFileSinkFunction("c:\\temp\\dspa_rooted"))
+  rootedComments.map(c => s"${c.id};-1;${c.postId};${utils.formatTimestamp(c.creationDate)}")
+    .addSink(new SimpleTextFileSinkFunction("c:\\temp\\dspa_rooted"))
   //  droppedReplies.map(c => s"${c.id};${c.replyToCommentId.get};-1;${utils.formatTimestamp(c.creationDate)}").addSink(new TestingFileSinkFunction("c:\\temp\\dspa_dropped"))
 
   println(env.getExecutionPlan) // NOTE this is the same json as env.getStreamGraph.dumpStreamingPlanAsJSON()
