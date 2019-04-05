@@ -17,7 +17,8 @@ package object streams {
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
 
     env.addSource(commentsSource)
-      .process(new ScaledReplayFunction[CommentEvent](_.creationDate, speedupFactor, randomDelay))
+      .keyBy(_.id) // only for scaled replay function (timer)
+      .process(new ScaledReplayFunction[Long, CommentEvent](_.creationDate, speedupFactor, randomDelay))
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](maxOutOfOrderness, _.creationDate))
   }
 
@@ -28,7 +29,8 @@ package object streams {
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
 
     env.addSource(postsSource)
-      .process(new ScaledReplayFunction[PostEvent](_.creationDate, speedupFactor, randomDelay))
+      .keyBy(_.id) // only for scaled replay function (timer)
+      .process(new ScaledReplayFunction[Long, PostEvent](_.creationDate, speedupFactor, randomDelay))
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[PostEvent](maxOutOfOrderness, _.creationDate))
   }
 
@@ -51,7 +53,8 @@ package object streams {
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
 
     env.addSource(likesSource)
-      .process(new ScaledReplayFunction[LikeEvent](_.creationDate, speedupFactor, randomDelay))
+      .keyBy(_.postId) // only for scaled replay function (timer)
+      .process(new ScaledReplayFunction[Long, LikeEvent](_.creationDate, speedupFactor, randomDelay))
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[LikeEvent](maxOutOfOrderness, _.creationDate))
   }
 }

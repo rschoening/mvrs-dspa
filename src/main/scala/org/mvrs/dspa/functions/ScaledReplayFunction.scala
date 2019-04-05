@@ -3,14 +3,14 @@ package org.mvrs.dspa.functions
 import java.util.Random
 
 import org.apache.flink.streaming.api.TimerService
-import org.apache.flink.streaming.api.functions.ProcessFunction
+import org.apache.flink.streaming.api.functions.KeyedProcessFunction
 import org.apache.flink.util.Collector
 import org.mvrs.dspa.functions.ScaledReplayFunction._
 
 import scala.collection.mutable
 
 
-class ScaledReplayFunction[I](extractEventTime: I => Long, speedupFactor: Double, maximumDelayMillis: Long, delay: I => Long) extends ProcessFunction[I, I] {
+class ScaledReplayFunction[K, I](extractEventTime: I => Long, speedupFactor: Double, maximumDelayMillis: Long, delay: I => Long) extends KeyedProcessFunction[K, I, I] {
   private lazy val replayStartTime: Long = System.currentTimeMillis
   private val queue = mutable.PriorityQueue.empty[DelayedEvent[I]](Ordering.by((_: DelayedEvent[I]).delayedEventTime).reverse)
   private val timers: mutable.Set[Long] = mutable.Set()
@@ -32,7 +32,7 @@ class ScaledReplayFunction[I](extractEventTime: I => Long, speedupFactor: Double
   // 4. event at 103, to be delayed by 1 --> 104
   // --> replay order: 2. 3. 4. 1.
   // at 1: add to queue
-  override def processElement(value: I, ctx: ProcessFunction[I, I]#Context, out: Collector[I]): Unit = {
+  override def processElement(value: I, ctx: KeyedProcessFunction[K, I, I]#Context, out: Collector[I]): Unit = {
     val eventTime: Long = extractEventTime(value)
     assert(eventTime != Long.MinValue, s"invalid event time: $eventTime")
     assert(eventTime >= maximumEventTime, s"event time $eventTime < maximum event time $maximumEventTime")
@@ -49,12 +49,13 @@ class ScaledReplayFunction[I](extractEventTime: I => Long, speedupFactor: Double
     processQueue(out, ctx.timerService())
 
     // NOPE does not work, timers only supported on keyed streams
-   // if (queue.nonEmpty) registerTimer(queue.head.delayedEventTime, ctx.timerService())
+    // if (queue.nonEmpty) registerTimer(queue.head.delayedEventTime, ctx.timerService())
   }
 
-  private def registerTimer(time: Long, timerService: TimerService): Unit = {
-    timers += time
-    timerService.registerEventTimeTimer(time)
+  override def onTimer(timestamp: Long, ctx: KeyedProcessFunction[K, I, I]#OnTimerContext, out: Collector[I]): Unit = {
+    timers -= timestamp
+    maximumEventTime = math.max(maximumEventTime, timestamp)
+    processQueue(out, ctx.timerService())
   }
 
   private def processQueue(out: Collector[I], timerService: TimerService): Unit = {
@@ -76,17 +77,16 @@ class ScaledReplayFunction[I](extractEventTime: I => Long, speedupFactor: Double
 
   }
 
+  private def registerTimer(time: Long, timerService: TimerService): Unit = {
+    timers += time
+    timerService.registerEventTimeTimer(time)
+  }
+
   private def deleteTimer(time: Long, timerService: TimerService): Unit = {
     if (timers.contains(time)) {
       timerService.deleteEventTimeTimer(time)
       timers -= time
     }
-  }
-
-  override def onTimer(timestamp: Long, ctx: ProcessFunction[I, I]#OnTimerContext, out: Collector[I]): Unit = {
-    timers -= timestamp
-    maximumEventTime = math.max(maximumEventTime, timestamp)
-    processQueue(out, ctx.timerService())
   }
 
 }

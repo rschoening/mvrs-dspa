@@ -34,7 +34,8 @@ object BuildCommentsHierarchyJob extends App {
     .readTextFile(filePath).setParallelism(1) // NOTE: read the csv in a single worker, and distribute from there onwards to avoid watermarks lagging very much behind (due to splits)
     .filter(!_.startsWith("id|")) // TODO better way to skip the header line? use table api csv source and convert to datastream?
     .map(CommentEvent.parse _) // TODO use parser process function with side output for errors
-    .process(new ScaledReplayFunction[CommentEvent](_.creationDate, 0, 0))
+    .keyBy(_ => 0L)
+    .process(new ScaledReplayFunction[Long, CommentEvent](_.creationDate, 0, 0))
     .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](Time.milliseconds(1000), _.creationDate))
 
   val rootedComments = resolveReplyTree(allComments)
