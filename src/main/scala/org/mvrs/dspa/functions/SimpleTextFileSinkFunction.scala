@@ -4,17 +4,16 @@ import java.io.{BufferedWriter, File, FileWriter, Writer}
 
 import org.apache.flink.streaming.api.functions.sink.{RichSinkFunction, SinkFunction}
 
-import scala.collection.mutable
-
-class TestingFileSinkFunction(pathPrefix: String) extends RichSinkFunction[String] {
-  private val filesByIndex: mutable.Map[Int, Writer] = mutable.Map()
+class SimpleTextFileSinkFunction(pathPrefix: String) extends RichSinkFunction[String] {
+  private var writer: Option[Writer] = None
 
   override def invoke(value: String, context: SinkFunction.Context[_]): Unit = {
     val index: Int = getRuntimeContext.getIndexOfThisSubtask
 
-    val writer = filesByIndex.getOrElseUpdate(index, createWriter(pathPrefix, index))
-    assert(filesByIndex.size == 1) // expect instance per subtask
-    writer.write(s"$value\n")
+    if (writer.isEmpty) {
+      writer = Some(createWriter(pathPrefix, index))
+    }
+    writer.foreach(_.write(s"$value\n"))
   }
 
   private def createWriter(path: String, index: Int): BufferedWriter = {
@@ -23,5 +22,8 @@ class TestingFileSinkFunction(pathPrefix: String) extends RichSinkFunction[Strin
   }
 
   // note: flush happens only when stream ends
-  override def close(): Unit = filesByIndex.values.foreach(_.close())
+  override def close(): Unit = {
+    writer.foreach(_.close())
+    writer = None
+  }
 }
