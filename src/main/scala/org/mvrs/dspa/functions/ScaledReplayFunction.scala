@@ -6,6 +6,7 @@ import org.apache.flink.streaming.api.TimerService
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction
 import org.apache.flink.util.Collector
 import org.mvrs.dspa.functions.ScaledReplayFunction._
+import org.mvrs.dspa.utils
 
 import scala.collection.mutable
 
@@ -20,7 +21,8 @@ class ScaledReplayFunction[K, I](extractEventTime: I => Long, speedupFactor: Dou
   def this(extractEventTime: I => Long, speedupFactor: Double) = this(extractEventTime, speedupFactor, 0, (_: I) => 0)
 
   def this(extractEventTime: I => Long, speedupFactor: Double, maximumDelayMilliseconds: Long) =
-    this(extractEventTime, speedupFactor, maximumDelayMilliseconds, (_: I) => getNormalDelayMillis(rand, maximumDelayMilliseconds))
+    this(extractEventTime, speedupFactor, maximumDelayMilliseconds,
+      (_: I) => utils.getNormalDelayMillis(rand, maximumDelayMilliseconds))
 
   // assumes monotonically increasing input event times
 
@@ -97,15 +99,6 @@ object ScaledReplayFunction {
   def toReplayTime(replayStartTime: Long, firstEventTime: Long, eventTime: Long, speedupFactor: Double): Long = {
     val eventTimeSinceStart = eventTime - firstEventTime
     replayStartTime + (eventTimeSinceStart / speedupFactor).toLong
-  }
-
-  def getNormalDelayMillis(rand: Random, maximumDelayMilliseconds: Long): Long = {
-    var delay = -1L
-    val x = maximumDelayMilliseconds / 2
-    while (delay < 0 || delay > maximumDelayMilliseconds) {
-      delay = (rand.nextGaussian * x).toLong + x
-    }
-    delay
   }
 
   private case class DelayedEvent[I](delayedEventTime: Long, event: I)

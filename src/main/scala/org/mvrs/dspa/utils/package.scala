@@ -1,6 +1,6 @@
 package org.mvrs.dspa
 
-import java.util.{Base64, Optional, Properties}
+import java.util.{Base64, Optional, Properties, Random}
 
 import com.sksamuel.elastic4s.http.index.admin.DeleteIndexResponse
 import com.sksamuel.elastic4s.http.{ElasticClient, Response}
@@ -33,6 +33,15 @@ package object utils {
 
   val kafkaBrokers = "localhost:9092"
   private val dateFormat = ThreadLocal.withInitial[SimpleDateFormat](() => new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
+
+  def getNormalDelayMillis(rand: Random, maximumDelayMilliseconds: Long): Long = {
+    var delay = -1L
+    val x = maximumDelayMilliseconds / 2
+    while (delay < 0 || delay > maximumDelayMilliseconds) {
+      delay = (rand.nextGaussian * x).toLong + x
+    }
+    delay
+  }
 
   def createStreamExecutionEnvironment(localWithUI: Boolean = false): StreamExecutionEnvironment = {
     // TODO include metrics always? or rely on flink config when running in cluster?
