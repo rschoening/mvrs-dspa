@@ -26,7 +26,7 @@ class ReplayedSourceFunctionITSuite extends AbstractTestBase {
 
     val stream: DataStream[(Long, Long)] =
       env
-        .addSource(new ReplaySequenceSourceFunction[Long](eventTimes, identity[Long], 1, 0))
+        .addSource(new ReplayedSequenceSourceFunction[Long](eventTimes, identity[Long], 1, 0))
         .map((_, System.currentTimeMillis))
 
     val list = DataStreamUtils.collect(stream.javaStream).asScala.toList
@@ -60,7 +60,7 @@ class ReplayedSourceFunctionITSuite extends AbstractTestBase {
     val startTime = System.currentTimeMillis()
 
     val stream: DataStream[(Long, Long)] =
-      env.addSource(new ReplaySequenceSourceFunction[Long](eventTimes, identity, 1, 2200, {
+      env.addSource(new ReplayedSequenceSourceFunction[Long](eventTimes, identity, 1, 2200, {
         case 1000L => 2200
         case 2000L => 1300
         case 3000L => 100
@@ -98,7 +98,7 @@ class ReplayedSourceFunctionITSuite extends AbstractTestBase {
 
     val stream: DataStream[(Long, Long)] =
       env
-        .addSource(new ReplaySequenceSourceFunction[Long](eventTimes, identity, 1, 100))
+        .addSource(new ReplayedSequenceSourceFunction[Long](eventTimes, identity, 1, 100))
         .map((_, System.currentTimeMillis))
 
     val list = DataStreamUtils.collect(stream.javaStream).asScala.toList

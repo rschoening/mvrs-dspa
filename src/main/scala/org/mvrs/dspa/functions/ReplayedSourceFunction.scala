@@ -1,9 +1,11 @@
 package org.mvrs.dspa.functions
 
 import org.apache.flink.streaming.api.functions.source.{RichSourceFunction, SourceFunction}
+import org.apache.flink.streaming.api.watermark.Watermark
 import org.mvrs.dspa.functions.ReplayedSourceFunction._
 import org.mvrs.dspa.functions.ScaledReplayFunction.toReplayTime
 import org.mvrs.dspa.utils
+import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
 import scala.util.Random
@@ -11,21 +13,25 @@ import scala.util.Random
 abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
                                                extractEventTime: OUT => Long,
                                                speedupFactor: Double,
-                                               maximumDelayMillis: Long,
+                                               maximumDelayMillis: Int,
                                                delay: OUT => Long) extends RichSourceFunction[OUT] {
 
   private lazy val replayStartTime: Long = System.currentTimeMillis
-  private val queue = mutable.PriorityQueue.empty[DelayedEvent[OUT]](Ordering.by((_: DelayedEvent[OUT]).delayedEventTime).reverse)
+  private val queue = mutable.PriorityQueue.empty[(Long, Either[OUT, Watermark])](Ordering.by((_: (Long, Either[OUT, Watermark]))._1).reverse)
 
   private var firstEventTime = Long.MinValue
   private var maximumEventTime = Long.MinValue
+  private val minimumWatermarkInterval = 1000
+  private val watermarkIntervalMillis = math.max(minimumWatermarkInterval, maximumDelayMillis)
 
   @volatile private var isRunning = true
+
+  private val LOG = LoggerFactory.getLogger(classOf[ReplayedSourceFunction[IN, OUT]])
 
   protected def this(parse: IN => OUT,
                      extractEventTime: OUT => Long,
                      speedupFactor: Double = 0,
-                     maximumDelayMilliseconds: Long = 0) =
+                     maximumDelayMilliseconds: Int = 0) =
     this(parse, extractEventTime, speedupFactor, maximumDelayMilliseconds,
       if (maximumDelayMilliseconds <= 0) (_: OUT) => 0L
       else (_: OUT) => utils.getNormalDelayMillis(rand, maximumDelayMilliseconds))
@@ -43,9 +49,13 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
       val delayMillis = delay(event)
       assert(delayMillis <= maximumDelayMillis, s"delay $delayMillis exceeds maximum $maximumDelayMillis")
 
-      queue += DelayedEvent(eventTime + delayMillis, event)
+      if (firstEventTime == Long.MinValue) {
+        firstEventTime = eventTime
 
-      if (firstEventTime == Long.MinValue) firstEventTime = eventTime
+        scheduleWatermark(firstEventTime) // schedule first watermark
+      }
+
+      queue += ((eventTime + delayMillis, Left(event))) // schedule the event
 
       processQueue(ctx)
     }
@@ -56,17 +66,30 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
   protected def inputIterator: Iterator[IN]
 
   private def processQueue(ctx: SourceFunction.SourceContext[OUT], flush: Boolean = false): Unit = {
-    while (queue.nonEmpty && (flush || queue.head.delayedEventTime <= maximumEventTime)) {
+    while (queue.nonEmpty && (flush || queue.head._1 <= maximumEventTime)) {
       val head = queue.dequeue()
+      val delayedEventTime = head._1
 
-      val replayTime = toReplayTime(replayStartTime, firstEventTime, head.delayedEventTime, speedupFactor)
+      val replayTime = toReplayTime(replayStartTime, firstEventTime, delayedEventTime, speedupFactor)
       val waitTime = replayTime - System.currentTimeMillis()
-      println(s"replay time: $replayTime - delayed event time: ${head.delayedEventTime} - wait time: $waitTime - event: ${head.event}")
+
+      LOG.info(s"replay time: $replayTime - delayed event time: $delayedEventTime - wait time: $waitTime - item: ${head._2}")
+
       Thread.sleep(if (waitTime > 0) waitTime else 0)
 
-      // TODO emit watermark also?
-      ctx.collectWithTimestamp(head.event, extractEventTime(head.event))
+      head._2 match {
+        case Left(event) => ctx.collectWithTimestamp(event, extractEventTime(event))
+        case Right(watermark) =>
+          ctx.emitWatermark(watermark)
+          if (isRunning && queue.nonEmpty) scheduleWatermark(delayedEventTime) // schedule next watermark
+      }
     }
+  }
+
+  private def scheduleWatermark(delayedEventTime: Long): Unit = {
+    val watermarkTime = delayedEventTime + watermarkIntervalMillis
+    val nextWatermark = new Watermark(watermarkTime - maximumDelayMillis - 1)
+    queue += ((watermarkTime, Right(nextWatermark)))
   }
 
   override def cancel(): Unit = {
@@ -81,6 +104,8 @@ object ReplayedSourceFunction {
     val eventTimeSinceStart = eventTime - firstEventTime
     replayStartTime + (eventTimeSinceStart / speedupFactor).toLong
   }
+
+  private case class DelayedWatermark(delayedEventTime: Long)
 
   private case class DelayedEvent[I](delayedEventTime: Long, event: I)
 
