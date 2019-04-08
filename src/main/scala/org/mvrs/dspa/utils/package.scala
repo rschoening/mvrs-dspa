@@ -1,5 +1,6 @@
 package org.mvrs.dspa
 
+import java.nio.file.Paths
 import java.util.{Base64, Optional, Properties}
 
 import com.sksamuel.elastic4s.http.index.admin.DeleteIndexResponse
@@ -33,6 +34,10 @@ package object utils {
 
   val kafkaBrokers = "localhost:9092"
   private val dateFormat = ThreadLocal.withInitial[SimpleDateFormat](() => new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
+
+  /** @return The filesystem path of the given resource */
+  def fsPath(resource: String): String =
+    Paths.get(getClass.getResource(resource).toURI).toString
 
   def getNormalDelayMillis(rand: scala.util.Random, maximumDelayMilliseconds: Long): Long = {
     var delay = -1L
