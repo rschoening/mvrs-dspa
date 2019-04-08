@@ -21,7 +21,6 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
 
   private var firstEventTime = Long.MinValue
   private var maximumEventTime = Long.MinValue
-  //  private val minimumWatermarkInterval = 1000
   private val watermarkIntervalMillis = math.max(watermarkInterval, maximumDelayMillis)
 
   @volatile private var isRunning = true
@@ -49,7 +48,7 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
 
       maximumEventTime = eventTime
 
-      val delayMillis = delay(event)
+      val delayMillis = delay(event)  // TODO treat this as pre-scaled duration -> divide by speedupFactor?
       assert(delayMillis <= maximumDelayMillis, s"delay $delayMillis exceeds maximum $maximumDelayMillis")
 
       if (firstEventTime == Long.MinValue) {
@@ -80,7 +79,7 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
       val replayTime = if (speedupFactor == 0) now else toReplayTime(replayStartTime, firstEventTime, delayedEventTime, speedupFactor)
       val waitTime = replayTime - now
 
-      LOG.info(s"replay time: $replayTime - delayed event time: $delayedEventTime - wait time: $waitTime - item: ${head._2}")
+      LOG.debug(s"replay time: $replayTime - delayed event time: $delayedEventTime - wait time: $waitTime - item: ${head._2}")
 
       Thread.sleep(if (waitTime > 0) waitTime else 0)
 

@@ -42,7 +42,6 @@ class TextFileSourceFunction[OUT](filePath: String,
 
   override def close(): Unit = {
     source.close()
-    super.close()
   }
 
   override protected def inputIterator: Iterator[String] = if (skipFirstLine) source.getLines().drop(1) else source.getLines()
