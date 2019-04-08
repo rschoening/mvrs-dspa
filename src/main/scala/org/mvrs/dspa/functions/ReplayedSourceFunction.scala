@@ -65,7 +65,7 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
       Thread.sleep(if (waitTime > 0) waitTime else 0)
 
       // TODO emit watermark also?
-      ctx.collectWithTimestamp(head.event, head.delayedEventTime)
+      ctx.collectWithTimestamp(head.event, extractEventTime(head.event))
     }
   }
 
