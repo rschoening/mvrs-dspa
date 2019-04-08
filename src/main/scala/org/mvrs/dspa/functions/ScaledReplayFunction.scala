@@ -66,8 +66,10 @@ class ScaledReplayFunction[K, I](extractEventTime: I => Long, speedupFactor: Dou
 
       deleteTimer(head.delayedEventTime, timerService)
 
-      val replayTime = toReplayTime(replayStartTime, firstEventTime, head.delayedEventTime, speedupFactor)
-      val waitTime = replayTime - System.currentTimeMillis()
+      val now = System.currentTimeMillis()
+      val replayTime = if (speedupFactor == 0) now else toReplayTime(replayStartTime, firstEventTime, head.delayedEventTime, speedupFactor)
+      val waitTime = replayTime - now
+
       println(s"replay time: $replayTime - delayed event time: ${head.delayedEventTime} - wait time: $waitTime - event: ${head.event}")
       Thread.sleep(if (waitTime > 0) waitTime else 0)
 
