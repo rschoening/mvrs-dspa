@@ -13,8 +13,9 @@ class TextFileSourceFunction[OUT](filePath: String,
                                   extractEventTime: OUT => Long,
                                   speedupFactor: Double,
                                   maximumDelayMillis: Int,
-                                  delay: OUT => Long)
-  extends ReplayedSourceFunction[String, OUT](parse, extractEventTime, speedupFactor, maximumDelayMillis, delay) {
+                                  delay: OUT => Long,
+                                  watermarkInterval: Long)
+  extends ReplayedSourceFunction[String, OUT](parse, extractEventTime, speedupFactor, maximumDelayMillis, delay, watermarkInterval) {
 
   @volatile private var source: BufferedSource = _
 
@@ -23,10 +24,12 @@ class TextFileSourceFunction[OUT](filePath: String,
            parse: String => OUT,
            extractEventTime: OUT => Long,
            speedupFactor: Double = 0,
-           maximumDelayMilliseconds: Int = 0) =
+           maximumDelayMilliseconds: Int = 0,
+           watermarkInterval: Long = 1000) =
     this(filePath, skipFirstLine, parse, extractEventTime, speedupFactor, maximumDelayMilliseconds,
       if (maximumDelayMilliseconds <= 0) (_: OUT) => 0L
-      else (_: OUT) => utils.getNormalDelayMillis(rand, maximumDelayMilliseconds))
+      else (_: OUT) => utils.getNormalDelayMillis(rand, maximumDelayMilliseconds),
+      watermarkInterval)
 
   override def open(parameters: Configuration): Unit = {
     source = Source.fromFile(filePath)
@@ -37,7 +40,10 @@ class TextFileSourceFunction[OUT](filePath: String,
     // this would support reading in parallel from splits, which we don't want here
   }
 
-  override def close(): Unit = source.close()
+  override def close(): Unit = {
+    source.close()
+    super.close()
+  }
 
   override protected def inputIterator: Iterator[String] = if (skipFirstLine) source.getLines().drop(1) else source.getLines()
 }

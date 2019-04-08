@@ -64,7 +64,7 @@ class ReplayedSourceFunctionITSuite extends AbstractTestBase {
         case 1000L => 2200
         case 2000L => 1300
         case 3000L => 100
-      }))
+      }, watermarkInterval = 1000))
         .map((_, System.currentTimeMillis))
 
     val list = DataStreamUtils.collect(stream.javaStream).asScala.toList
