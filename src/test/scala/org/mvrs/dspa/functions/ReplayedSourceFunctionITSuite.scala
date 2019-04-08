@@ -9,7 +9,7 @@ import org.scalatest.Assertions._
 
 import scala.collection.JavaConverters._
 
-class ScaledReplayFunctionSuite extends AbstractTestBase {
+class ReplayedSourceFunctionITSuite extends AbstractTestBase {
 
   @Test
   def testScaledReplay(): Unit = {
@@ -24,10 +24,10 @@ class ScaledReplayFunctionSuite extends AbstractTestBase {
     // create a stream of custom elements and apply transformations
     val eventTimes = List(1000L, 2000L, 3000L)
 
-    val stream: DataStream[(Long, Long)] = env.fromCollection(eventTimes)
-      .keyBy(_ => 0L)
-      .process(new ScaledReplayFunction[Long, Long](identity, 1, 0))
-      .map((_, System.currentTimeMillis))
+    val stream: DataStream[(Long, Long)] =
+      env
+        .addSource(new ReplaySequenceSourceFunction[Long](eventTimes, identity[Long], 1, 0))
+        .map((_, System.currentTimeMillis))
 
     val list = DataStreamUtils.collect(stream.javaStream).asScala.toList
     list.map(t => (t._1, t._2 - startTime)).foreach(println(_))
@@ -59,14 +59,13 @@ class ScaledReplayFunctionSuite extends AbstractTestBase {
 
     val startTime = System.currentTimeMillis()
 
-    val stream: DataStream[(Long, Long)] = env.fromCollection(eventTimes)
-      .keyBy(_ => 0L)
-      .process(new ScaledReplayFunction[Long, Long](identity, 1, 2200, {
+    val stream: DataStream[(Long, Long)] =
+      env.addSource(new ReplaySequenceSourceFunction[Long](eventTimes, identity, 1, 2200, {
         case 1000L => 2200
         case 2000L => 1300
         case 3000L => 100
       }))
-      .map((_, System.currentTimeMillis))
+        .map((_, System.currentTimeMillis))
 
     val list = DataStreamUtils.collect(stream.javaStream).asScala.toList
     list.map(t => (t._1, t._2 - startTime)).foreach(println(_))
@@ -97,10 +96,10 @@ class ScaledReplayFunctionSuite extends AbstractTestBase {
 
     val startTime = System.currentTimeMillis()
 
-    val stream: DataStream[(Long, Long)] = env.fromCollection(eventTimes)
-      .keyBy(_ => 0L)
-      .process(new ScaledReplayFunction[Long, Long](identity, 1, 100))
-      .map((_, System.currentTimeMillis))
+    val stream: DataStream[(Long, Long)] =
+      env
+        .addSource(new ReplaySequenceSourceFunction[Long](eventTimes, identity, 1, 100))
+        .map((_, System.currentTimeMillis))
 
     val list = DataStreamUtils.collect(stream.javaStream).asScala.toList
 
