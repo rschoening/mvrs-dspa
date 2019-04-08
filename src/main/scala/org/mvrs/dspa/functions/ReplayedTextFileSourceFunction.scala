@@ -1,6 +1,7 @@
 package org.mvrs.dspa.functions
 
 import org.apache.flink.configuration.Configuration
+import org.apache.flink.streaming.api.functions.source.SourceFunction
 import org.mvrs.dspa.functions.ReplayedSourceFunction._
 import org.mvrs.dspa.utils
 
@@ -17,7 +18,7 @@ class ReplayedTextFileSourceFunction[OUT](filePath: String,
                                           watermarkInterval: Long)
   extends ReplayedSourceFunction[String, OUT](parse, extractEventTime, speedupFactor, maximumDelayMillis, delay, watermarkInterval) {
 
-  @volatile private var source: BufferedSource = _
+  @volatile private var source: Option[BufferedSource] = None
 
   def this(filePath: String,
            skipFirstLine: Boolean,
@@ -32,7 +33,7 @@ class ReplayedTextFileSourceFunction[OUT](filePath: String,
       watermarkInterval)
 
   override def open(parameters: Configuration): Unit = {
-    source = Source.fromFile(filePath)
+    source = Some(Source.fromFile(filePath))
 
     // consider using org.apache.flink.api.java.io.CsvInputFormat
     // var format = new org.apache.flink.api.java.io.TupleCsvInputFormat[OUT](filePath)
@@ -40,10 +41,24 @@ class ReplayedTextFileSourceFunction[OUT](filePath: String,
     // this would support reading in parallel from splits, which we don't want here
   }
 
-  override def close(): Unit = {
-    source.close()
+
+  override def run(ctx: SourceFunction.SourceContext[OUT]): Unit = {
+    try super.run(ctx)
+    finally closeSource()
   }
 
-  override protected def inputIterator: Iterator[String] = if (skipFirstLine) source.getLines().drop(1) else source.getLines()
+  override def cancel(): Unit = {
+    super.cancel()
+    closeSource()
+  }
+
+  override def close(): Unit = closeSource()
+
+  private def closeSource(): Unit = {
+    source.foreach(_.close())
+    source = None
+  }
+
+  override protected def inputIterator: Iterator[String] = source.map(s => if (skipFirstLine) s.getLines().drop(1) else s.getLines()).get
 }
 
