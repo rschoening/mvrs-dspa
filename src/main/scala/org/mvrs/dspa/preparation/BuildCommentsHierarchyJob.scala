@@ -3,7 +3,7 @@ package org.mvrs.dspa.preparation
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.events.CommentEvent
-import org.mvrs.dspa.functions.{ProgressMonitorFunction, SimpleTextFileSinkFunction, ReplayedTextFileSourceFunction}
+import org.mvrs.dspa.functions.{ReplayedTextFileSourceFunction, SimpleTextFileSinkFunction}
 import org.mvrs.dspa.preparation.LoadCommentEventsJob.ParseError
 import org.mvrs.dspa.utils
 
@@ -36,7 +36,7 @@ object BuildCommentsHierarchyJob extends App {
         true,
         CommentEvent.parse,
         _.creationDate,
-        speedupFactor =  10000,
+        speedupFactor = 10000,
         maximumDelayMilliseconds = 100,
         watermarkInterval = 100))
 

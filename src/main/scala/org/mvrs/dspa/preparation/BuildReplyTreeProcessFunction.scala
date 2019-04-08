@@ -117,7 +117,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
     processDanglingReplies(timestamp, out, reportDropped(_, (t, r) => ctx.output(t, r)))
   }
 
-  private def reportDropped(reply: CommentEvent, output: (OutputTag[CommentEvent], CommentEvent) => ()): Unit =
+  private def reportDropped(reply: CommentEvent, output: (OutputTag[CommentEvent], CommentEvent) => Unit): Unit =
     outputTagDroppedReplies.foreach(output(_, reply))
 
   private def processDanglingReplies(timestamp: Long, out: Collector[CommentEvent], reportDroppedReply: CommentEvent => Unit): Unit = {
