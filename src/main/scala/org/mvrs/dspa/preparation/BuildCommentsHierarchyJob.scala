@@ -55,7 +55,7 @@ object BuildCommentsHierarchyJob extends App {
   }
 
   def resolveReplyTree(rawComments: DataStream[CommentEvent], droppedRepliesStream: Boolean): (DataStream[CommentEvent], DataStream[CommentEvent]) = {
-    val postComments = rawComments
+    val firstLevelComments = rawComments
       .filter(_.replyToPostId.isDefined)
       // .process(new ProgressMonitorFunction[CommentEvent]("L1C", 1000))
       .keyBy(_.postId)
@@ -69,7 +69,7 @@ object BuildCommentsHierarchyJob extends App {
 
     val outputTag = if (droppedRepliesStream) Some(outputTagDroppedReplies) else None
 
-    val rootedComments: DataStream[CommentEvent] = postComments
+    val rootedComments: DataStream[CommentEvent] = firstLevelComments
       .connect(repliesBroadcast)
       .process(new BuildReplyTreeProcessFunction(outputTag)).name("tree")
 

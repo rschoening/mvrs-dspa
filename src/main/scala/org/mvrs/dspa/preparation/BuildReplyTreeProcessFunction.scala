@@ -132,7 +132,8 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
         // all dangling children are past the watermark -> parent is no longer expected -> drop replies
         val unresolved = BuildReplyTreeProcessFunction.getDanglingReplies(replies, getDanglingReplies)
 
-        // NOTE with multiple workers, the unresolved replies are emitted for each worker! in the end it might be better to drop that side output, as it can be confusing. better gather metrics on size of state
+        // NOTE with multiple workers, the unresolved replies are emitted for each worker! in the end it might be
+        // better to drop that side output, as it can be confusing. better gather metrics on size of state
         unresolved.foreach(r => {
           danglingReplies.remove(r.id) // remove resolved replies from operator state
 
