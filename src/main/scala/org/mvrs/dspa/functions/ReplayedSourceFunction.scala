@@ -87,9 +87,11 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
   }
 
   private def scheduleWatermark(delayedEventTime: Long): Unit = {
-    val watermarkTime = delayedEventTime + watermarkIntervalMillis
-    val nextWatermark = new Watermark(watermarkTime - maximumDelayMillis - 1)
-    queue += ((watermarkTime, Right(nextWatermark)))
+    val watermarkEmitTime = delayedEventTime + watermarkIntervalMillis
+    val watermarkEventTime = watermarkEmitTime - maximumDelayMillis - 1
+    val nextWatermark = new Watermark(watermarkEventTime)
+
+    queue += ((watermarkEmitTime, Right(nextWatermark)))
   }
 
   override def cancel(): Unit = {
