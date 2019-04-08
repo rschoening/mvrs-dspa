@@ -7,14 +7,14 @@ import org.mvrs.dspa.utils
 import scala.io.{BufferedSource, Source}
 
 
-class TextFileSourceFunction[OUT](filePath: String,
-                                  skipFirstLine: Boolean,
-                                  parse: String => OUT,
-                                  extractEventTime: OUT => Long,
-                                  speedupFactor: Double,
-                                  maximumDelayMillis: Int,
-                                  delay: OUT => Long,
-                                  watermarkInterval: Long)
+class ReplayedTextFileSourceFunction[OUT](filePath: String,
+                                          skipFirstLine: Boolean,
+                                          parse: String => OUT,
+                                          extractEventTime: OUT => Long,
+                                          speedupFactor: Double,
+                                          maximumDelayMillis: Int,
+                                          delay: OUT => Long,
+                                          watermarkInterval: Long)
   extends ReplayedSourceFunction[String, OUT](parse, extractEventTime, speedupFactor, maximumDelayMillis, delay, watermarkInterval) {
 
   @volatile private var source: BufferedSource = _
