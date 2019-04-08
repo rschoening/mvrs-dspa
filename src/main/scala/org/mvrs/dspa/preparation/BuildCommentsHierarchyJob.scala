@@ -2,9 +2,8 @@ package org.mvrs.dspa.preparation
 
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala._
-import org.apache.flink.streaming.api.windowing.time.Time
 import org.mvrs.dspa.events.CommentEvent
-import org.mvrs.dspa.functions.{ProgressMonitorFunction, ScaledReplayFunction, SimpleTextFileSinkFunction}
+import org.mvrs.dspa.functions.{ProgressMonitorFunction, SimpleTextFileSinkFunction, ReplayedTextFileSourceFunction}
 import org.mvrs.dspa.preparation.LoadCommentEventsJob.ParseError
 import org.mvrs.dspa.utils
 
@@ -30,17 +29,20 @@ object BuildCommentsHierarchyJob extends App {
   // NOTE if assignTimeStampsAndWatermarks is (accidentally) set to parallelism=1, then the monitor step
   //      (with parallelism 4) sees watermarks that area AHEAD (negative delays)
 
-  val allComments: DataStream[CommentEvent] = env
-    .readTextFile(filePath).setParallelism(1) // NOTE: read the csv in a single worker, and distribute from there onwards to avoid watermarks lagging very much behind (due to splits)
-    .filter(!_.startsWith("id|")) // TODO better way to skip the header line? use table api csv source and convert to datastream?
-    .map(CommentEvent.parse _) // TODO use parser process function with side output for errors
-    .keyBy(_ => 0L)
-    .process(new ScaledReplayFunction[Long, CommentEvent](_.creationDate, 0, 0))
-    .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](Time.milliseconds(1000), _.creationDate))
+  val allComments: DataStream[CommentEvent] =
+    env.addSource(
+      new ReplayedTextFileSourceFunction[CommentEvent](
+        filePath,
+        true,
+        CommentEvent.parse,
+        _.creationDate,
+        speedupFactor =  10000,
+        maximumDelayMilliseconds = 100,
+        watermarkInterval = 100))
 
   val rootedComments = resolveReplyTree(allComments)
 
-  rootedComments.process(new ProgressMonitorFunction[CommentEvent]("TREE", 10000)).name("tree_monitor")
+  // rootedComments.process(new ProgressMonitorFunction[CommentEvent]("TREE", 10000)).name("tree_monitor")
   // droppedReplies.process(new ProgressMonitorFunction[CommentEvent]("DROP", 10000)).name("drop_monitor")
 
   rootedComments.map(c => s"${c.id};-1;${c.postId};${utils.formatTimestamp(c.creationDate)}")
