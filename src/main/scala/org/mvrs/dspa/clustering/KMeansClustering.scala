@@ -11,7 +11,7 @@ import scala.util.Random
   */
 object KMeansClustering {
 
-  def createRandomCentroids(points: List[Point], k: Int, random: Random): List[Point] = {
+  def createRandomCentroids(points: Seq[Point], k: Int, random: Random): Seq[Point] = {
     require(points.nonEmpty, "empty input")
 
     val randomIndices = collection.mutable.HashSet[Int]()
@@ -26,16 +26,17 @@ object KMeansClustering {
       .map { case (point, _) => point }
   }
 
-  def buildClusters(points: List[Point], k: Int, random: Random = new Random()): Map[Point, List[Point]] =
+  def buildClusters(points: Seq[Point], k: Int, random: Random = new Random()): Map[Point, Seq[Point]] =
     buildClusters(points, createRandomCentroids(points, k, random))
 
-  def buildClusters(points: List[Point], initialClusters: List[Point]): Map[Point, List[Point]] =
+  def buildClusters(points: Seq[Point], initialClusters: Seq[Point]): Map[Point, Seq[Point]] =
     updateClusters(points, initialClusters.map { point => (point, Nil) }.toMap)
 
   @tailrec
-  private def updateClusters(points: List[Point], prevClusters: Map[Point, List[Point]]): Map[Point, List[Point]] = {
+  private def updateClusters(points: Seq[Point], prevClusters: Map[Point, Seq[Point]]): Map[Point, Seq[Point]] = {
 
-    val nextClusters: Map[Point, List[Point]] =
+    // assign points to exisitng clusters
+    val nextClusters: Map[Point, Seq[Point]] =
       if (points.isEmpty) prevClusters
       else points
         .map { point => (point, getNearestCentroid(point, prevClusters.keys)) }
@@ -43,9 +44,11 @@ object KMeansClustering {
         .map { case (centroid, members) => (centroid, members.map { case (p, _) => p }) }
 
     if (nextClusters.size < prevClusters.size) {
-      nextClusters ++ prevClusters.filter(t => ! nextClusters.contains(t._1)).map(t => (t._1, Nil))
+      // less points than clusters - add omitted centroids with empty point lists and return
+      nextClusters ++ prevClusters.filter(t => !nextClusters.contains(t._1)).map(t => (t._1, Nil))
     }
     else if (prevClusters != nextClusters) {
+      // point assignment has changed - update cluster centroids
       val nextClustersWithBetterCentroids = nextClusters.map { case (_, members) => updateCentroid(members) }
 
       updateClusters(points, nextClustersWithBetterCentroids) // iterate until centroids don't change
@@ -60,13 +63,15 @@ object KMeansClustering {
     centroids min byDistanceToPoint
   }
 
-  private def updateCentroid(members: List[Point]): (Point, List[Point]) = {
+  private def updateCentroid(members: Seq[Point]): (Point, Seq[Point]) = {
     assert(members.nonEmpty)
 
-    val dim = members.head.features.size
+    val dim = members.head.features.size // NOTE: assumes all points have equal dimensions
     val zero = Point(Vector.fill(dim)(0.0))
 
-    val (sum: Point, count: Int) = members.foldLeft((zero, 0)) { case ((cur_sum, cur_count), point) => (cur_sum + point, cur_count + 1) }
+    val (sum: Point, count: Int) = members.foldLeft((zero, 0)) {
+      case ((cur_sum, cur_count), point) => (cur_sum + point, cur_count + 1)
+    }
 
     (sum / count, members)
   }
