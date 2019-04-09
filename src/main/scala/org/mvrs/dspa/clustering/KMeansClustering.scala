@@ -37,26 +37,30 @@ object KMeansClustering {
 
     val nextClusters: Map[Point, List[Point]] =
       if (points.isEmpty) prevClusters
-      else
-        points
-          .map { point =>
-            val byDistanceToPoint = new Ordering[Point] {
-              override def compare(p1: Point, p2: Point): Int = p1.distanceTo(point) compareTo p2.distanceTo(point)
-            }
-            val nearestPrevCentroid = prevClusters.keys min byDistanceToPoint
-            (point, nearestPrevCentroid)
-          }
-          .groupBy { case (_, centroid) => centroid }
-          .map { case (centroid, members) => (centroid, members.map { case (p, _) => p }) }
+      else points
+        .map { point => (point, getNearestCentroid(point, prevClusters.keys)) }
+        .groupBy { case (_, centroid) => centroid }
+        .map { case (centroid, members) => (centroid, members.map { case (p, _) => p }) }
 
-    if (prevClusters != nextClusters) {
+    if (nextClusters.size < prevClusters.size) {
+      nextClusters ++ prevClusters.filter(t => ! nextClusters.contains(t._1)).map(t => (t._1, Nil))
+    }
+    else if (prevClusters != nextClusters) {
       val nextClustersWithBetterCentroids = nextClusters.map { case (_, members) => updateCentroid(members) }
 
       updateClusters(points, nextClustersWithBetterCentroids) // iterate until centroids don't change
     } else prevClusters
   }
 
-  private def updateCentroid(members: List[Point]) = {
+  private def getNearestCentroid(point: Point, centroids: Iterable[Point]): Point = {
+    val byDistanceToPoint = new Ordering[Point] {
+      override def compare(p1: Point, p2: Point): Int = p1.squaredDistanceTo(point) compareTo p2.squaredDistanceTo(point)
+    }
+
+    centroids min byDistanceToPoint
+  }
+
+  private def updateCentroid(members: List[Point]): (Point, List[Point]) = {
     assert(members.nonEmpty)
 
     val dim = members.head.features.size
@@ -68,19 +72,28 @@ object KMeansClustering {
   }
 
   case class Point(features: Vector[Double]) {
-    def distanceTo(that: Point): Double =
-      sqrt(
-        features
-          .zip(that.features)
-          .map { case (x0, x1) => pow(x0 - x1, 2) }
-          .sum
-      )
 
-    def +(that: Point) = Point(features.zip(that.features).map { case (x0, x1) => x0 + x1 })
+    def distanceTo(that: Point): Double = sqrt(squaredDistanceTo(that))
+
+    def squaredDistanceTo(that: Point): Double =
+      features
+        .view
+        .zip(that.features)
+        .map { case (x0, x1) => pow(x0 - x1, 2) }
+        .sum
+
+    def +(that: Point) = Point(
+      features
+        .zip(that.features)
+        .map { case (x0, x1) => x0 + x1 })
 
     def /(number: Int) = Point(features.map(_ / number))
 
-    override def toString = s"(${features.mkString(",")})"
+    override def toString = s"Point(${features.mkString(", ")})"
+  }
+
+  object Point {
+    def apply(values: Double*): Point = Point(Vector(values: _*)): Point
   }
 
 }
