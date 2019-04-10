@@ -1,6 +1,7 @@
 package org.mvrs.dspa.clustering
 
 import com.google.common.base.Splitter
+import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
 import org.apache.flink.api.common.state.MapStateDescriptor
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
@@ -15,6 +16,22 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable
 
 object UnusualActivityDetectionJob extends App {
+  val elasticHostName = "localhost"
+  val elasticPort = 9200
+  val elasticScheme = "http"
+  val elasticSearchUri = s"$elasticScheme://$elasticHostName:$elasticPort"
+  val indexName = "activity-classification"
+  val typeName = "activity-classification-type"
+
+  val client = ElasticClient(ElasticProperties(elasticSearchUri))
+  try {
+    utils.dropIndex(client, indexName) // testing: recreate the index
+    ActivityClassificationIndex.create(client, indexName, typeName)
+  }
+  finally {
+    client.close()
+  }
+
   // set up clustering stream:
   // - union of rooted comments and posts
   // - extract features from each event --> (person-id, Vector[Double])
@@ -23,7 +40,7 @@ object UnusualActivityDetectionJob extends App {
   // - broadcast resulting clusters
   // - NOTE: previous clusters are used as seed points for new clusters --> new clusters mapped to old clusters simply by cluster index
   // - side output: cluster center difference
-  implicit val env: StreamExecutionEnvironment = utils.createStreamExecutionEnvironment(true) // use arg (scallop?)
+  implicit val env: StreamExecutionEnvironment = utils.createStreamExecutionEnvironment(false) // use arg (scallop?)
 
   env.setParallelism(4) // NOTE with multiple workers, the comments AND broadcast stream watermarks lag VERY much behind
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
@@ -91,9 +108,10 @@ object UnusualActivityDetectionJob extends App {
   // - another broadcast stream?
 
   // clusters.map(r => (r._1, r._2, r._3.clusters.map(c => (c.index, c.weight)))).print
-  classifiedComments.map(e => s"person: ${e.personId}\tcomment: ${e.eventId}\t-> ${e.cluster.index} (${e.cluster.weight})\t(${e.cluster.centroid})").print
+  // classifiedComments.map(e => s"person: ${e.personId}\tcomment: ${e.eventId}\t-> ${e.cluster.index} (${e.cluster.weight})\t(${e.cluster.centroid})").print
 
   // TODO write classification result to kafka/elasticsearch
+  classifiedComments.addSink(ActivityClassificationIndex.createSink(elasticHostName, elasticPort, elasticScheme, indexName, typeName))
 
   env.execute()
 

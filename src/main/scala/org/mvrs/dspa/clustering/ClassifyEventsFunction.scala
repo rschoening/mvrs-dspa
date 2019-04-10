@@ -25,7 +25,9 @@ class ClassifyEventsFunction(clusterStateDescriptor: MapStateDescriptor[Int, (Lo
       ClassifiedComment(
         personId = value._1,
         eventId = value._2,
-        cluster = clusterState._3.classify(Point(value._3.toVector)))
+        cluster = clusterState._3.classify(Point(value._3.toVector)),
+        timestamp = ctx.timestamp()
+      )
     )
   }
 
