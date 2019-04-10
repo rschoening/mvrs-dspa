@@ -8,7 +8,6 @@ import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindo
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.streaming.api.windowing.triggers.CountTrigger
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow
-import org.mvrs.dspa.clustering.KMeansClustering.Point
 import org.mvrs.dspa.events.CommentEvent
 import org.mvrs.dspa.{streams, utils}
 
@@ -38,23 +37,23 @@ object UnusualActivityDetectionJob extends App {
       .timeWindow(Time.hours(12), Time.hours(1))
       .sum(1).name("calculate comment frequency per user")
 
-  //   frequencyStream.print
-
   val commentFeaturesStream =
     comments
       .keyBy(_.personId)
       .map(c => (c.personId, c.id, extractFeatures(c))).name("extract comment features")
 
-  // TODO use connect to get the *latest* frequency at each comment?
+  // TODO use connect instead of join, to get the *latest* frequency at each comment?
   val featurizedComments: DataStream[(Long, Long, mutable.ArrayBuffer[Double])] =
     commentFeaturesStream
       .join(frequencyStream)
-      .where(_._1)
-      .equalTo(_._1)
+      .where(_._1) // person id
+      .equalTo(_._1) // person id
       .window(TumblingEventTimeWindows.of(Time.hours(1)))
       .apply { (t1, t2) => {
         // append per-user frequency to feature vector
         t1._3.append(t2._2.toDouble)
+
+        // return tuple
         (
           t1._1, // person id
           t1._2, // comment id
@@ -63,25 +62,23 @@ object UnusualActivityDetectionJob extends App {
       }
       }.name("aggregate features")
 
-  // - process featureized comments in clustering stream, broadcast clusters periodically back to the same stream
-  // - connect with cluster stream, classify featurized comments
-
-  val clusters: DataStream[(Long, Int, Seq[Cluster])] = featurizedComments
+  // cluster combined features
+  val clusters: DataStream[(Long, Int, ClusterModel)] = featurizedComments
     .map(_._3)
     .keyBy(_ => 0)
-    .timeWindow(Time.hours(24))
+    .timeWindow(Time.hours(24)) // update clusters at least once a day
     .trigger(CountTrigger.of[TimeWindow](1000L)) // TODO remainder in window lost, need combined end-of-window + early-firing trigger
     .process(new KMeansClusterFunction(k = 4)).name("calculate clusters").setParallelism(1)
 
-  // clusters.print()
-
+  // broadcast stream
   val clusterStateDescriptor = new MapStateDescriptor(
     "ClusterBroadcastState",
     createTypeInformation[Int],
-    createTypeInformation[(Long, Int, Seq[Cluster])])
+    createTypeInformation[(Long, Int, ClusterModel)])
 
   val broadcast = clusters.broadcast(clusterStateDescriptor)
 
+  // connect feature stream with cluster broadcast, classify featurized comments
   val classifiedComments =
     featurizedComments
       .keyBy(_._1)
@@ -93,34 +90,31 @@ object UnusualActivityDetectionJob extends App {
 
   classifiedComments.print
 
+  // TODO write classification result to kafka
+
   env.execute()
-
-  //  val joinedStream = commentFeaturesStream.join()
-
-  // set up detection stream:
-  // - union of rooted comments and posts
-  // - key by person-id
-  // - extract features for events
-  // - assign to nearest cluster
-  // ?? which cluster to report on?
-
-  case class Cluster(index: Int, centroid: Point, size: Int)
 
   def extractFeatures(comment: CommentEvent): mutable.ArrayBuffer[Double] = {
     val tokens: Seq[String] = comment.content.map(str => tokenize(str).toVector).getOrElse(Vector.empty[String])
 
-    val buffer = new mutable.ArrayBuffer[Double](2)
+    val size = 4
+    val buffer = new mutable.ArrayBuffer[Double](size)
 
-    if (tokens.isEmpty) buffer.append(0, 0, 0, 0)
+    if (tokens.isEmpty) buffer ++= List.fill(size)(0.0) // zero vector
     else {
+      // TODO how to scale/normalize features?
       buffer += math.log(tokens.size)
       buffer += math.log(tokens.map(_.toLowerCase()).distinct.size) // distinct word count
+
+      // ... and some bogus features:
       buffer += tokens.count(_.forall(_.isUpper)) / tokens.size // % of all-UPPERCASE words
       buffer += tokens.count(_.length == 4) / tokens.size // % of four-letter words
     }
-    buffer
   }
 
+  /**
+    * guava's splitter to tokenize content
+    */
   private lazy val splitter =
     Splitter
       .onPattern("[\\s,.;]+")

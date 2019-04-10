@@ -29,13 +29,13 @@ object KMeansClustering {
   def buildClusters(points: Seq[Point], k: Int, random: Random = new Random()): Map[Point, Seq[Point]] =
     buildClusters(points, createRandomCentroids(points, k, random))
 
-  def buildClusters(points: Seq[Point], initialClusters: Seq[Point]): Map[Point, Seq[Point]] =
-    updateClusters(points, initialClusters.map { point => (point, Nil) }.toMap)
+  def buildClusters(points: Seq[Point], initialCentroids: Seq[Point]): Map[Point, Seq[Point]] =
+    updateClusters(points, initialCentroids.map { point => (point, Nil) }.toMap)
 
   @tailrec
   private def updateClusters(points: Seq[Point], prevClusters: Map[Point, Seq[Point]]): Map[Point, Seq[Point]] = {
 
-    // assign points to exisitng clusters
+    // assign points to existing clusters
     val nextClusters: Map[Point, Seq[Point]] =
       if (points.isEmpty) prevClusters
       else points
