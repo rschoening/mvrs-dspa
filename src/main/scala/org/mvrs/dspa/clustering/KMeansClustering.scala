@@ -11,7 +11,7 @@ import scala.util.Random
   */
 object KMeansClustering {
 
-  def createRandomCentroids(points: Seq[Point], k: Int, random: Random): Seq[Point] = {
+  def createRandomCentroids(points: Seq[Point], k: Int, random: Random = new Random()): Seq[Point] = {
     require(points.nonEmpty, "empty input")
 
     val randomIndices = collection.mutable.HashSet[Int]()

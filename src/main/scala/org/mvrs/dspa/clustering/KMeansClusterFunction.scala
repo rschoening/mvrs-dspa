@@ -11,6 +11,7 @@ import scala.collection.mutable.ArrayBuffer
 
 class KMeansClusterFunction(k: Int) extends ProcessWindowFunction[mutable.ArrayBuffer[Double], (Long, Int, ClusterModel), Int, TimeWindow] {
   require(k > 1, s"invalid k: $k")
+  val decay = 0.5
 
   private val clusterStateDescriptor = new ValueStateDescriptor("cluster-model", classOf[ClusterModel])
 
@@ -23,39 +24,42 @@ class KMeansClusterFunction(k: Int) extends ProcessWindowFunction[mutable.ArrayB
     val points = elements.map(features => Point(features.toVector)).toSeq
 
     if (points.isEmpty) {
-      // TODO emit previous clusters?
+      // don't emit anything, as the clusters are stored in broadcast state downstream, and there is no reliance on
+      // watermark updates from the broadcast stream
       return
     }
 
-    val previousClusterModel = clusterState.value()
-
-    val clusters = KMeansClustering.buildClusters(points, k)
-
-
-    // TODO take in control stream for value of K
+    // TODO take in control stream for value of K and decay
     // - source: config file read using FileProcessingMode.PROCESS_CONTINUOUSLY -> re-emit on any change
 
-    // TODO get maximum event time of elements seen so far? not meaningful, better to issue the number of points clustered (?)
-    val timestamp = context.window.maxTimestamp()
+    val previousClusterModel = Option(clusterState.value())
 
-    val outputClusters =
-      clusters
-        .zipWithIndex
-        .map { case ((centroid, ps), index) => Cluster(index, centroid, ps.size) }
+    val newClusterModel = cluster(points, previousClusterModel, decay)
 
-    val clusterModel = ClusterModel(outputClusters.toSeq)
+    clusterState.update(newClusterModel)
 
-    clusterState.update(clusterModel)
-
-    out.collect((timestamp, points.size, clusterModel))
-
-    // TODO store clusters in operator state
-    // - use to initialize new clusters?
-    // - produce weighted average between last clusters and current clusters (weighted by cluster size and decay factor)
+    out.collect((context.window.maxTimestamp(), points.size, newClusterModel))
 
     // TODO emit information about cluster movement
     //   - as metric?
     //   - on side output stream?
     // - metric seems more appropriate; however the metric will have to be an aggregate (maximum and average distances?)
+  }
+
+  private def cluster(points: Seq[Point], previousModel: Option[ClusterModel], decay: Double) = {
+    val initialCentroids =
+      previousModel
+        .map(_.clusters.map(_.centroid))
+        .getOrElse(KMeansClustering.createRandomCentroids(points, k))
+
+    val clusters =
+      KMeansClustering
+        .buildClusters(points, initialCentroids)
+        .zipWithIndex
+        .map { case ((centroid, points), index) => Cluster(index, centroid, points.size) }
+
+    previousModel
+      .map(_.update(clusters, decay))
+      .getOrElse(ClusterModel(clusters.toSeq))
   }
 }
