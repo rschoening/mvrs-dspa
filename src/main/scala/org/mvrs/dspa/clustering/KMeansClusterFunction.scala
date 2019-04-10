@@ -65,6 +65,8 @@ object KMeansClusterFunction {
         .map(_.clusters.map(_.centroid))
         .getOrElse(KMeansClustering.createRandomCentroids(points, k))
 
+    assert(initialCentroids.size == k)
+
     val clusters =
       KMeansClustering
         .buildClusters(points, initialCentroids)

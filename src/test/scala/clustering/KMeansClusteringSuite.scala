@@ -71,4 +71,28 @@ class KMeansClusteringSuite extends FlatSpec with Matchers {
     assertResult(List(Point(5, 5)))(clusters(Point(2, 2)))
   }
 
+  "random centroid generation" should "create unique points also with non-unique input points" in {
+    val k = 4
+    val points = List.fill[Point](k)(Point(1, 1))
+
+    val centroids = KMeansClustering.createRandomCentroids(points, k, new Random(137)).toSet
+
+    println(centroids.mkString("\n"))
+
+    assertResult(k)(centroids.size)
+    assert(points.forall(centroids.contains))
+  }
+
+  it should "create unique points also with points < k" in {
+    val k = 4
+    val points = List(Point(1, 1), Point(2,2))
+
+    val centroids = KMeansClustering.createRandomCentroids(points, k, new Random(137)).toSet
+
+    println(centroids.mkString("\n"))
+
+    assertResult(k)(centroids.size)
+    assert(points.forall(centroids.contains))
+
+  }
 }

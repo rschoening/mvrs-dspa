@@ -40,4 +40,18 @@ class ClusterModelSuite extends FlatSpec with Matchers {
     assertResult(Point(2, 2))(newModel.clusters.head.centroid)
     assertResult(1)(newModel.clusters.head.weight)
   }
+
+  it can "correctly classify points" in {
+    val model = ClusterModel(
+      Vector(
+        Cluster(0, Point(1.0, 10.0, 100.0), weight = 1),
+        Cluster(1, Point(2.0, 11.0, 101.0), weight = 1),
+        Cluster(2, Point(100.0, 200.0, 300.0), weight = 1),
+      )
+    )
+
+    assertResult(0)(model.classify(Point(1.4, 10.4, 100.4)).index)
+    assertResult(1)(model.classify(Point(1.6, 10.6, 100.6)).index)
+    assertResult(2)(model.classify(Point(99, 199, 299)).index)
+  }
 }

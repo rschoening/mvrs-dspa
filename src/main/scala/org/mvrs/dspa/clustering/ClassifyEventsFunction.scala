@@ -21,11 +21,12 @@ class ClassifyEventsFunction(clusterStateDescriptor: MapStateDescriptor[Int, (Lo
     if (clusterState == null) {
       // no clusters yet, cannot classify
     }
-    else {
-      val nearestCluster = clusterState._3.classify(Point(value._3.toVector))
-
-      out.collect(ClassifiedComment(personId = value._1, eventId = value._2, nearestCluster))
-    }
+    else out.collect(
+      ClassifiedComment(
+        personId = value._1,
+        eventId = value._2,
+        cluster = clusterState._3.classify(Point(value._3.toVector)))
+    )
   }
 
   override def processBroadcastElement(value: (Long, Int, ClusterModel),

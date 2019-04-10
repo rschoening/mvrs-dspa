@@ -3,6 +3,7 @@ package org.mvrs.dspa.clustering
 import java.lang.Math.{pow, sqrt}
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.util.Random
 
 /**
@@ -14,38 +15,58 @@ object KMeansClustering {
   def createRandomCentroids(points: Seq[Point], k: Int, random: Random = new Random()): Seq[Point] = {
     require(points.nonEmpty, "empty input")
 
-    val randomIndices = collection.mutable.HashSet[Int]()
+    val uniquePoints = points.toSet
+    val resultSet = mutable.Set[Point]()
 
-    if (points.nonEmpty) while (randomIndices.size < k) {
-      randomIndices += random.nextInt(points.size)
+    if (uniquePoints.size < k) {
+      val dim = points.head.features.size
+      resultSet ++= uniquePoints
+
+      while (resultSet.size < k) {
+        resultSet += randomPoint(dim, random)
+      }
+    }
+    else {
+      // there are enough unique points, select them by random index
+      val indexedPoints = uniquePoints.toIndexedSeq
+
+      while (resultSet.size < k) {
+        resultSet += indexedPoints(random.nextInt(indexedPoints.size))
+      }
     }
 
-    points
-      .zipWithIndex
-      .filter { case (_, index) => randomIndices.contains(index) }
-      .map { case (point, _) => point }
+    resultSet.toSeq // to immutable
   }
 
   def buildClusters(points: Seq[Point], k: Int, random: Random = new Random()): Map[Point, Seq[Point]] =
     buildClusters(points, createRandomCentroids(points, k, random))
 
   def buildClusters(points: Seq[Point], initialCentroids: Seq[Point]): Map[Point, Seq[Point]] =
-    updateClusters(points, initialCentroids.map { point => (point, Nil) }.toMap)
+    updateClusters(points, initialCentroids.map((_, Nil)).toMap)
+
+  def randomPoint(dim: Int, random: Random): Point = Point(Vector.fill(dim)(random.nextGaussian()))
 
   @tailrec
   private def updateClusters(points: Seq[Point], prevClusters: Map[Point, Seq[Point]]): Map[Point, Seq[Point]] = {
+    val k = prevClusters.size
 
     // assign points to existing clusters
-    val nextClusters: Map[Point, Seq[Point]] =
+    val nextClusters =
       if (points.isEmpty) prevClusters
       else points
         .map { point => (point, getNearestCentroid(point, prevClusters.keys)) }
         .groupBy { case (_, centroid) => centroid }
         .map { case (centroid, members) => (centroid, members.map { case (p, _) => p }) }
 
-    if (nextClusters.size < prevClusters.size) {
+    if (nextClusters.size < k) {
       // less points than clusters - add omitted centroids with empty point lists and return
-      nextClusters ++ prevClusters.filter(t => !nextClusters.contains(t._1)).map(t => (t._1, Nil))
+      val result = nextClusters ++
+        prevClusters
+          .filter(t => !nextClusters.contains(t._1))
+          .map(t => (t._1, Nil))
+
+      assert(result.size == k)
+      result
     }
     else if (prevClusters != nextClusters) {
       // point assignment has changed - update cluster centroids
