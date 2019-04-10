@@ -16,6 +16,22 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable
 
 object UnusualActivityDetectionJob extends App {
+  // TODO
+  // - add side output stream and/or metrics on cluster evolution
+  //   - maximum cluster movement distance? cluster index for maximum?
+  // - allow controlling replay speed
+  //   - read directly from csv?
+  //   - or read from kafka, with wrapped source?
+  //   - or read from kafka, with scaledreplayfunction?
+  // - add textfile-based control stream to control
+  //   - K
+  //   - which clusters to flag as "unusual"
+  // - use connect instead of join for connecting to frequency?
+  // - create custom trigger that fires at end of window with count-based early firing
+  // - if a cluster gets too small, split the largest cluster
+  // - come up with better text features
+  // - write additional information to ElasticSearch to help interpretation of activity classification
+  // - refactor index classes (instances with base class)
   val elasticHostName = "localhost"
   val elasticPort = 9200
   val elasticScheme = "http"
