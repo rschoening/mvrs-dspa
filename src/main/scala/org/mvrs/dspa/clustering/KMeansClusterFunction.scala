@@ -4,6 +4,7 @@ import org.apache.flink.api.common.state.ValueStateDescriptor
 import org.apache.flink.streaming.api.scala.function.ProcessWindowFunction
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow
 import org.apache.flink.util.Collector
+import org.mvrs.dspa.clustering.KMeansClusterFunction._
 import org.mvrs.dspa.clustering.KMeansClustering.Point
 
 import scala.collection.mutable
@@ -34,7 +35,7 @@ class KMeansClusterFunction(k: Int) extends ProcessWindowFunction[mutable.ArrayB
 
     val previousClusterModel = Option(clusterState.value())
 
-    val newClusterModel = cluster(points, previousClusterModel, decay)
+    val newClusterModel = cluster(points, previousClusterModel, decay, k)
 
     clusterState.update(newClusterModel)
 
@@ -46,7 +47,19 @@ class KMeansClusterFunction(k: Int) extends ProcessWindowFunction[mutable.ArrayB
     // - metric seems more appropriate; however the metric will have to be an aggregate (maximum and average distances?)
   }
 
-  private def cluster(points: Seq[Point], previousModel: Option[ClusterModel], decay: Double) = {
+}
+
+object KMeansClusterFunction {
+  /**
+    * calculate cluster model based on new points, the previous model and the decay factor
+    *
+    * @param points        the points to cluster
+    * @param previousModel the previous cluster model (optional)
+    * @param decay         the decay factor for the previous cluster model
+    * @param k             the number of clusters
+    * @return the new cluster model
+    */
+  def cluster(points: Seq[Point], previousModel: Option[ClusterModel], decay: Double, k: Int): ClusterModel = {
     val initialCentroids =
       previousModel
         .map(_.clusters.map(_.centroid))
@@ -56,10 +69,10 @@ class KMeansClusterFunction(k: Int) extends ProcessWindowFunction[mutable.ArrayB
       KMeansClustering
         .buildClusters(points, initialCentroids)
         .zipWithIndex
-        .map { case ((centroid, points), index) => Cluster(index, centroid, points.size) }
+        .map { case ((centroid, clusterPoints), index) => Cluster(index, centroid, clusterPoints.size) }
 
     previousModel
       .map(_.update(clusters, decay))
-      .getOrElse(ClusterModel(clusters.toSeq))
+      .getOrElse(ClusterModel(clusters.toVector))
   }
 }
