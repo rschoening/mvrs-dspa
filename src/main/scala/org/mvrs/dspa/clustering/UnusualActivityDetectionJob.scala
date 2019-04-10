@@ -42,7 +42,7 @@ object UnusualActivityDetectionJob extends App {
       .keyBy(_.personId)
       .map(c => (c.personId, c.id, extractFeatures(c))).name("extract comment features")
 
-  // TODO use connect instead of join, to get the *latest* frequency at each comment?
+  // TODO use connect instead of join (and store frequency in value state), to get the *latest* per-user frequency at each comment?
   val featurizedComments: DataStream[(Long, Long, mutable.ArrayBuffer[Double])] =
     commentFeaturesStream
       .join(frequencyStream)
@@ -50,7 +50,7 @@ object UnusualActivityDetectionJob extends App {
       .equalTo(_._1) // person id
       .window(TumblingEventTimeWindows.of(Time.hours(1)))
       .apply { (t1, t2) => {
-        // append per-user frequency to feature vector
+        // append per-user frequency to (mutable) feature vector
         t1._3.append(t2._2.toDouble)
 
         // return tuple
@@ -70,7 +70,7 @@ object UnusualActivityDetectionJob extends App {
     .keyBy(_ => 0)
     .timeWindow(Time.hours(24)) // update clusters at least once a day
     .trigger(CountTrigger.of[TimeWindow](2000L)) // TODO remainder in window lost, need combined end-of-window + early-firing trigger
-    .process(new KMeansClusterFunction(k = 4, decay = 0.9)).name("calculate clusters").setParallelism(1)
+    .process(new KMeansClusterFunction(k = 4, decay = 0.0)).name("calculate clusters").setParallelism(1)
 
   // broadcast stream
   val clusterStateDescriptor = new MapStateDescriptor(
@@ -90,9 +90,10 @@ object UnusualActivityDetectionJob extends App {
   // TODO use an additional control stream to identify clusters that should be reported / others that can be ignored
   // - another broadcast stream?
 
-  classifiedComments.print
+  // clusters.map(r => (r._1, r._2, r._3.clusters.map(c => (c.index, c.weight)))).print
+  classifiedComments.map(e => s"person: ${e.personId}\tcomment: ${e.eventId}\t-> ${e.cluster.index} (${e.cluster.weight})\t(${e.cluster.centroid})").print
 
-  // TODO write classification result to kafka
+  // TODO write classification result to kafka/elasticsearch
 
   env.execute()
 
