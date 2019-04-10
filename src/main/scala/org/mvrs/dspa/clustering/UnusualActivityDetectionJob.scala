@@ -62,13 +62,15 @@ object UnusualActivityDetectionJob extends App {
       }
       }.name("aggregate features")
 
-  // cluster combined features
+  // cluster combined features (on a single worker)
+  // To parallelize: distribute points randomly, cluster subsets, merge resulting clusters as in
+  // 7.6.4 of "Mining of massive datasets"
   val clusters: DataStream[(Long, Int, ClusterModel)] = featurizedComments
     .map(_._3)
     .keyBy(_ => 0)
     .timeWindow(Time.hours(24)) // update clusters at least once a day
-    .trigger(CountTrigger.of[TimeWindow](1000L)) // TODO remainder in window lost, need combined end-of-window + early-firing trigger
-    .process(new KMeansClusterFunction(k = 4)).name("calculate clusters").setParallelism(1)
+    .trigger(CountTrigger.of[TimeWindow](2000L)) // TODO remainder in window lost, need combined end-of-window + early-firing trigger
+    .process(new KMeansClusterFunction(k = 4, decay = 0.9)).name("calculate clusters").setParallelism(1)
 
   // broadcast stream
   val clusterStateDescriptor = new MapStateDescriptor(
@@ -95,17 +97,19 @@ object UnusualActivityDetectionJob extends App {
   env.execute()
 
   def extractFeatures(comment: CommentEvent): mutable.ArrayBuffer[Double] = {
-    val tokens: Seq[String] = comment.content.map(str => tokenize(str).toVector).getOrElse(Vector.empty[String])
+    val tokens = comment.content
+      .map(tokenize(_).toVector)
+      .getOrElse(Vector.empty[String])
 
-    val size = 4
-    val buffer = new mutable.ArrayBuffer[Double](size)
+    val dim = 3
+    val buffer = new mutable.ArrayBuffer[Double](dim)
 
-    if (tokens.isEmpty) buffer ++= List.fill(size)(0.0) // zero vector
+    if (tokens.isEmpty) buffer ++= List.fill(dim)(0.0) // zero vector
     else {
       // TODO how to scale/normalize features?
-      buffer += math.log(tokens.size)
-      buffer += math.log(tokens.map(_.toLowerCase()).distinct.size) // distinct word count
-
+      // buffer += math.log(tokens.size)
+      // buffer += math.log(tokens.map(_.toLowerCase()).distinct.size) // distinct word count
+      buffer += 10 * tokens.map(_.toLowerCase()).distinct.size / tokens.size // proportion of distinct words
       // ... and some bogus features:
       buffer += tokens.count(_.forall(_.isUpper)) / tokens.size // % of all-UPPERCASE words
       buffer += tokens.count(_.length == 4) / tokens.size // % of four-letter words

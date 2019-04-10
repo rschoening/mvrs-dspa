@@ -31,7 +31,7 @@ case class ClusterModel(clusters: Vector[Cluster]) {
       oldCluster.index,
       Point(
         oldCluster.centroid.features
-          .zip(updateCluster.centroid.features) // same sizes assumed; otherwise minimum size wins
+          .zip(updateCluster.centroid.features) // same dimensions assumed; otherwise output reduced to minimum dim.
           .map {
           case (oldValue, newValue) =>
             (newValue * updateCluster.weight + oldValue * oldCluster.weight * decay) / newWeight
