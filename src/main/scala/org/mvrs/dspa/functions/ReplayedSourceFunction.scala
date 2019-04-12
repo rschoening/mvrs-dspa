@@ -14,10 +14,9 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
                                                delay: OUT => Long,
                                                watermarkIntervalMillis: Long) extends RichSourceFunction[OUT] {
   @volatile private lazy val scheduler = new EventScheduler[OUT](speedupFactor, watermarkIntervalMillis, maximumDelayMillis, delay)
+  @volatile private lazy val LOG = LoggerFactory.getLogger(classOf[ReplayedSourceFunction[IN, OUT]])
 
-  @volatile private var isRunning = true
-
-  private val LOG = LoggerFactory.getLogger(classOf[ReplayedSourceFunction[IN, OUT]])
+  @volatile private var isCancelled = false
 
   protected def this(parse: IN => OUT,
                      extractEventTime: OUT => Long,
@@ -31,7 +30,7 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
 
 
   override def run(ctx: SourceFunction.SourceContext[OUT]): Unit = {
-    for (input <- inputIterator.takeWhile(_ => isRunning)) {
+    for (input <- inputIterator.takeWhile(_ => ! isCancelled)) {
       val event = parse(input)
       val eventTime = extractEventTime(event)
 
@@ -54,14 +53,14 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
       (e, timestamp) => ctx.collectWithTimestamp(e, timestamp),
       ctx.emitWatermark,
       sleep,
-      () => isRunning,
+      () => isCancelled,
       flush)
   }
 
   private def sleep(waitTime: Long): Unit = if (waitTime > 0) Thread.sleep(waitTime)
 
   override def cancel(): Unit = {
-    isRunning = false
+    isCancelled = true
   }
 }
 

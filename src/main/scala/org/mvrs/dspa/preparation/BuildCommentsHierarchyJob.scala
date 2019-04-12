@@ -33,12 +33,12 @@ object BuildCommentsHierarchyJob extends App {
     env.addSource(
       new ReplayedTextFileSourceFunction[CommentEvent](
         filePath,
-        true,
-        CommentEvent.parse,
-        _.creationDate,
-        speedupFactor = 10000,
-        maximumDelayMilliseconds = 100,
-        watermarkInterval = 100))
+        skipFirstLine = true,
+        parse = CommentEvent.parse,
+        extractEventTime = _.creationDate,
+        speedupFactor = 0, // 0 -> unchanged read speed
+        maximumDelayMilliseconds = 1000,
+        watermarkInterval = 10000))
 
   val rootedComments = resolveReplyTree(allComments)
 

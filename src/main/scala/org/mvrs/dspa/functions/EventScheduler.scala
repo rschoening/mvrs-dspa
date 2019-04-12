@@ -25,19 +25,24 @@ class EventScheduler[OUT](speedupFactor: Double, watermarkIntervalMillis: Long, 
     val delayMillis = delay(event) // in processing time, but at the rate of the event time (subject to speedup)
     assert(delayMillis <= maximumDelayMillis, s"delay $delayMillis exceeds maximum $maximumDelayMillis")
 
-    queue += ((eventTime + delayMillis, Left((event, eventTime)))) // schedule the event
-
     if (firstEventTime == Long.MinValue) {
       firstEventTime = eventTime
-
-      scheduleWatermark(eventTime) // schedule first watermark
     }
+
+    if (queue.isEmpty) {
+      scheduleWatermark(eventTime)
+    }
+
+    queue += ((eventTime + delayMillis, Left((event, eventTime)))) // schedule the event
   }
+
+  private def log(msg: => String): Unit = if (LOG.isDebugEnabled()) LOG.debug(msg)
+
 
   def processPending(emitEvent: (OUT, Long) => Unit,
                      emitWatermark: Watermark => Unit,
                      wait: Long => Unit,
-                     isRunning: () => Boolean,
+                     isCancelled: () => Boolean,
                      flush: Boolean): Unit = {
     while (queue.nonEmpty && (flush || queue.head._1 <= maximumEventTime)) {
       val head = queue.dequeue()
@@ -48,15 +53,17 @@ class EventScheduler[OUT](speedupFactor: Double, watermarkIntervalMillis: Long, 
       val replayTime = if (speedupFactor == 0) now else toReplayTime(replayStartTime, firstEventTime, delayedEventTime, speedupFactor)
       val waitTime = replayTime - now
 
-      LOG.debug(s"replay time: $replayTime - delayed event time: $delayedEventTime - wait time: $waitTime - item: ${head._2}")
+      log(s"replay time: $replayTime - delayed event time: $delayedEventTime - wait time: $waitTime - item: ${head._2}")
 
       if (waitTime > 0) wait(waitTime)
       head._2 match {
         case Left((event, timestamp)) => emitEvent(event, timestamp)
         case Right(watermark) =>
-          emitWatermark(watermark) // ctx.emitWatermark(watermark)
+          emitWatermark(watermark)
 
-          if (isRunning() && queue.nonEmpty) {
+          // if not cancelled: schedule next watermark if there are events left in the queue or if the queue is empty,
+          // but the previous watermark does not cover the maximum event time
+          if (!isCancelled() && (queue.nonEmpty || maximumEventTime > watermark.getTimestamp)) {
             scheduleWatermark(delayedEventTime) // schedule next watermark
           }
       }
