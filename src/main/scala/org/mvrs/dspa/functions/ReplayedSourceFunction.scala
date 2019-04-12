@@ -33,7 +33,7 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
   override def run(ctx: SourceFunction.SourceContext[OUT]): Unit = {
     for (input <- inputIterator.takeWhile(_ => isRunning)) {
       val event = parse(input)
-      val eventTime = extractEventTime(event) // NOT scaled to replay time
+      val eventTime = extractEventTime(event)
 
       assert(eventTime > Long.MinValue, s"invalid event time: $eventTime ($event)")
 
@@ -52,24 +52,20 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
   private def processPending(ctx: SourceFunction.SourceContext[OUT], flush: Boolean = false): Unit = {
     scheduler.processPending(
       (e, timestamp) => ctx.collectWithTimestamp(e, timestamp),
-      wm => ctx.emitWatermark(wm),
+      ctx.emitWatermark,
+      sleep,
       () => isRunning,
       flush)
   }
+
+  private def sleep(waitTime: Long): Unit = if (waitTime > 0) Thread.sleep(waitTime)
 
   override def cancel(): Unit = {
     isRunning = false
   }
 }
 
-
 object ReplayedSourceFunction {
   private[functions] val rand = new Random(137)
 
-  def toReplayTime(replayStartTime: Long, firstEventTime: Long, eventTime: Long, speedupFactor: Double): Long = {
-    require(speedupFactor > 0, s"invalid speedup factor: $speedupFactor")
-
-    val eventTimeSinceStart = eventTime - firstEventTime
-    replayStartTime + (eventTimeSinceStart / speedupFactor).toLong
-  }
 }

@@ -1,7 +1,6 @@
 package org.mvrs.dspa.functions
 
 import org.apache.flink.streaming.api.watermark.Watermark
-import org.mvrs.dspa.functions.ReplayedSourceFunction.toReplayTime
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
@@ -37,6 +36,7 @@ class EventScheduler[OUT](speedupFactor: Double, watermarkIntervalMillis: Long, 
 
   def processPending(emitEvent: (OUT, Long) => Unit,
                      emitWatermark: Watermark => Unit,
+                     wait: Long => Unit,
                      isRunning: () => Boolean,
                      flush: Boolean): Unit = {
     while (queue.nonEmpty && (flush || queue.head._1 <= maximumEventTime)) {
@@ -50,8 +50,7 @@ class EventScheduler[OUT](speedupFactor: Double, watermarkIntervalMillis: Long, 
 
       LOG.debug(s"replay time: $replayTime - delayed event time: $delayedEventTime - wait time: $waitTime - item: ${head._2}")
 
-      Thread.sleep(if (waitTime > 0) waitTime else 0)
-
+      if (waitTime > 0) wait(waitTime)
       head._2 match {
         case Left((event, timestamp)) => emitEvent(event, timestamp)
         case Right(watermark) =>
@@ -65,11 +64,17 @@ class EventScheduler[OUT](speedupFactor: Double, watermarkIntervalMillis: Long, 
   }
 
   private def scheduleWatermark(delayedEventTime: Long): Unit = {
-    val watermarkEmitTime = delayedEventTime + watermarkIntervalMillis
-    val watermarkEventTime = watermarkEmitTime - maximumDelayMillis - 1
-    val nextWatermark = new Watermark(watermarkEventTime)
+    val nextEmitTime = delayedEventTime + watermarkIntervalMillis
+    val nextEventTime = nextEmitTime - maximumDelayMillis - 1
+    val nextWatermark = new Watermark(nextEventTime)
 
-    // TODO watermark event time should be derived based on last seen event at the time of emitting the watermark
-    queue += ((watermarkEmitTime, Right(nextWatermark)))
+    queue += ((nextEmitTime, Right(nextWatermark)))
+  }
+
+  def toReplayTime(replayStartTime: Long, firstEventTime: Long, eventTime: Long, speedupFactor: Double): Long = {
+    require(speedupFactor > 0, s"invalid speedup factor: $speedupFactor")
+
+    val eventTimeSinceStart = eventTime - firstEventTime
+    replayStartTime + (eventTimeSinceStart / speedupFactor).toLong
   }
 }
