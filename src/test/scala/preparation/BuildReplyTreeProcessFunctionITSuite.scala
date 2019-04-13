@@ -115,7 +115,7 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.getConfig.setTaskCancellationTimeout(0) // deactivate the watch dog to allow stress-free debugging
     env.getConfig.setAutoWatermarkInterval(10L) // required for watermarks and correct timers
-    env.setParallelism(4)
+    env.setParallelism(1)
 
     // NOTE it seems that events are broadcasted *more* than once per worker, at least in this test context
     //      (maybe an influence of collect() method below?)

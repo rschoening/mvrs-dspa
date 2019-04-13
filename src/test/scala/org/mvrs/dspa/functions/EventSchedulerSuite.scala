@@ -9,8 +9,14 @@ import scala.collection.mutable
 
 //noinspection ZeroIndexToHead
 class EventSchedulerSuite extends FlatSpec with Matchers {
-  "the event scheduler" must "schedule correctly if no delay" in {
-    val scheduler = new EventScheduler[String](100, 15000, 0, _ => 0)
+  val timeTolerance = 20
+
+  "the event scheduler" must "schedule correctly if no delay and no scaling" in {
+    val scheduler = new EventScheduler[String](
+      speedupFactor = 0,
+      watermarkIntervalMillis = 15000,
+      maximumDelayMillis = 0,
+      delay = _ => 0)
 
     scheduler.schedule("e1", 10000)
     scheduler.schedule("e2", 20000)
@@ -26,16 +32,46 @@ class EventSchedulerSuite extends FlatSpec with Matchers {
     assertResult(List("e1", "e2", "e3"))(events.map(_.event))
     assertResult(List(24999, 39999))(watermarks.map(_.watermark.getTimestamp))
 
-    val timeTolerance = 15
-    assert(math.abs(events(0).replayTimeOffset - 10) <= timeTolerance) // startup delay (jit, ...)
+    assert(math.abs(events(0).replayTimeOffset - 10) <= timeTolerance) // there is some startup delay (jit, ...)
+    assert(math.abs(events(1).replayTimeOffset - events(0).replayTimeOffset) <= timeTolerance)
+    assert(math.abs(events(2).replayTimeOffset - events(1).replayTimeOffset) <= timeTolerance)
+
+    assertWatermarkCoversAllEvents(schedule)
+  }
+
+  it must "schedule correctly if no delay" in {
+    val scheduler = new EventScheduler[String](
+      speedupFactor = 100,
+      watermarkIntervalMillis = 15000,
+      maximumDelayMillis = 0,
+      delay = _ => 0)
+
+    scheduler.schedule("e1", 10000)
+    scheduler.schedule("e2", 20000)
+    scheduler.schedule("e3", 30000)
+
+    val schedule = getSchedule(scheduler)
+
+    println(schedule.mkString("\n"))
+
+    val events = schedule.collect { case s: ScheduledEvent => s }
+    val watermarks = schedule.collect { case s: ScheduledWatermark => s }
+
+    assertResult(List("e1", "e2", "e3"))(events.map(_.event))
+    assertResult(List(24999, 39999))(watermarks.map(_.watermark.getTimestamp)) // same as for unscaled
+
+    assert(math.abs(events(0).replayTimeOffset - 10) <= timeTolerance) // there is some startup delay (jit, ...)
     assert(math.abs(events(1).replayTimeOffset - 100) <= timeTolerance)
     assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
 
     assertWatermarkCoversAllEvents(schedule)
   }
-
   it must "schedule correctly with defined maximum delay" in {
-    val scheduler = new EventScheduler[String](100, 15000, 10000, _ => 0)
+    val scheduler = new EventScheduler[String](
+      speedupFactor = 100,
+      watermarkIntervalMillis = 15000,
+      maximumDelayMillis = 10000,
+      delay = _ => 0)
 
     scheduler.schedule("e1", 10000)
     scheduler.schedule("e2", 20000)
@@ -51,7 +87,6 @@ class EventSchedulerSuite extends FlatSpec with Matchers {
     assertResult(List("e1", "e2", "e3"))(events.map(_.event))
     assertResult(List(14999, 29999, 44999))(watermarks.map(_.watermark.getTimestamp))
 
-    val timeTolerance = 10
     assert(math.abs(events(0).replayTimeOffset - 10) <= timeTolerance) // startup delay (jit, ...)
     assert(math.abs(events(1).replayTimeOffset - 100) <= timeTolerance)
     assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
@@ -83,7 +118,6 @@ class EventSchedulerSuite extends FlatSpec with Matchers {
     assertResult(List("e2", "e1", "e3"))(events.map(_.event))
     assertResult(List(1699, 3699))(watermarks.map(_.watermark.getTimestamp))
 
-    val timeTolerance = 15
     assert(math.abs(events(0).replayTimeOffset - 100) <= timeTolerance)
     assert(math.abs(events(1).replayTimeOffset - 130) <= timeTolerance)
     assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
@@ -121,7 +155,6 @@ class EventSchedulerSuite extends FlatSpec with Matchers {
     assertResult(List("e2", "e1", "e3"))(events.map(_.event))
     assertResult(List(1699, 3699))(watermarks.map(_.watermark.getTimestamp))
 
-    val timeTolerance = 15
     assert(math.abs(events(0).replayTimeOffset - 100) <= timeTolerance)
     assert(math.abs(events(1).replayTimeOffset - 130) <= timeTolerance)
     assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
@@ -153,7 +186,6 @@ class EventSchedulerSuite extends FlatSpec with Matchers {
     assertResult(List("e2", "e1", "e3"))(events.map(_.event))
     assertResult(List(499, 1299, 2099, 2899, 3699))(watermarks.map(_.watermark.getTimestamp))
 
-    val timeTolerance = 15
     assert(math.abs(events(0).replayTimeOffset - 100) <= timeTolerance)
     assert(math.abs(events(1).replayTimeOffset - 130) <= timeTolerance)
     assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
@@ -162,7 +194,8 @@ class EventSchedulerSuite extends FlatSpec with Matchers {
   }
 
   it must "correctly calculate replay time" in {
-    assertResult(1010)(EventScheduler.toReplayTime(replayStartTime = 1000, firstEventTime = 100, eventTime = 200, speedupFactor = 10))
+    assertResult(1010)(EventScheduler.toReplayTime(
+      replayStartTime = 1000, firstEventTime = 100, eventTime = 200, speedupFactor = 10))
   }
 
   it must "correctly calculate replay time for an example of realistic dates" in {
