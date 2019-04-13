@@ -54,6 +54,7 @@ class EventScheduler[OUT](speedupFactor: Double, watermarkIntervalMillis: Long, 
       log(s"replay time: $replayTime - delayed event time: $delayedEventTime - wait time: $waitTime - item: ${head._2}")
 
       if (waitTime > 0) wait(waitTime)
+
       head._2 match {
         case Left((event, timestamp)) => emitEvent(event, timestamp)
         case Right(watermark) =>
