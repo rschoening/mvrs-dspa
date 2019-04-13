@@ -1,8 +1,8 @@
 package org.mvrs.dspa.functions
 
 import org.apache.flink.streaming.api.watermark.Watermark
-import org.slf4j.LoggerFactory
 import org.mvrs.dspa.functions.EventScheduler._
+import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
 
@@ -42,13 +42,18 @@ class EventScheduler[OUT](speedupFactor: Double, watermarkIntervalMillis: Long, 
                      wait: Long => Unit,
                      isCancelled: () => Boolean,
                      flush: Boolean): Unit = {
+    // dequeue only if the next delayed event time is within maximum event time, to make sure that no later events can
+    // schedule before the next delayed event - or when flushing the queue at end of input
     while (queue.nonEmpty && (flush || queue.head._1 <= maximumEventTime)) {
       val head = queue.dequeue()
       val delayedEventTime = head._1
 
       val now = System.currentTimeMillis()
 
-      val replayTime = if (speedupFactor == 0) now else toReplayTime(replayStartTime, firstEventTime, delayedEventTime, speedupFactor)
+      val replayTime =
+        if (speedupFactor == 0) now
+        else toReplayTime(replayStartTime, firstEventTime, delayedEventTime, speedupFactor)
+
       val waitTime = replayTime - now
 
       log(s"replay time: $replayTime - delayed event time: $delayedEventTime - wait time: $waitTime - item: ${head._2}")
