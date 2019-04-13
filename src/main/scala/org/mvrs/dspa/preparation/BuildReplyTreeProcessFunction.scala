@@ -40,8 +40,8 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
   @transient private var processDanglingRepliesNanos0: Gauge[Double] = _
   @transient private var processDanglingRepliesNanos1: Gauge[Double] = _
 
-  private var maximumReplyTimestamp: Long = Long.MinValue
-  private var currentCommentWatermark: Long = Long.MinValue
+  // private var maximumReplyTimestamp: Long = Long.MinValue
+  // private var currentCommentWatermark: Long = Long.MinValue
   private var currentBroadcastWatermark: Long = Long.MinValue
   private var currentMinimumWatermark: Long = Long.MinValue
   private var lastProcessDanglingRepliesNanos0: Double = 0L
@@ -88,15 +88,14 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
     }
 
     // process dangling replies whenever watermark progressed
-    currentCommentWatermark = processWatermark(
-      ctx.currentWatermark(),
-      currentCommentWatermark,
-      out, (t, r) => ctx.output(t, r))
+//    currentCommentWatermark = processWatermark(
+//      ctx.currentWatermark(),
+//      currentCommentWatermark,
+//      out, (t, r) => ctx.output(t, r))
 
     // register a timer (will call back at watermark for the creationDate)
     // NOTE actually the timer should be based on arriving unresolved replies, however the timer can only be registered
     //      in the keyed context of the first-level comments.
-    // NOTE without this timer, the unit tests all fail
     ctx.timerService().registerEventTimeTimer(firstLevelComment.creationDate)
   }
 
@@ -130,7 +129,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
                                        out: Collector[CommentEvent]): Unit = {
     replyCounter.inc() // count per parallel worker
 
-    maximumReplyTimestamp = math.max(maximumReplyTimestamp, reply.creationDate)
+    // maximumReplyTimestamp = math.max(maximumReplyTimestamp, reply.creationDate)
 
     val postId = postForComment.get(reply.replyToCommentId.get)
 
@@ -172,14 +171,14 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
       danglingReplies.clear()
       for (element <- danglingRepliesListState.get().asScala) {
         for {(parentCommentId, replies) <- element} {
-          val maxTimestamp = replies.foldLeft(Long.MinValue)((z, r) => math.max(z, r.creationDate))
+          val earliestReplyTimestamp = replies.foldLeft(Long.MinValue)((z, r) => math.min(z, r.creationDate))
           val set = mutable.Set(replies.toSeq: _*)
-          if (danglingReplies.get(parentCommentId).isEmpty) danglingReplies(parentCommentId) = (maxTimestamp, set)
-          else danglingReplies(parentCommentId) = (maxTimestamp, set ++ danglingReplies(parentCommentId)._2)
+          if (danglingReplies.get(parentCommentId).isEmpty) danglingReplies(parentCommentId) = (earliestReplyTimestamp, set)
+          else danglingReplies(parentCommentId) = (earliestReplyTimestamp, set ++ danglingReplies(parentCommentId)._2)
         }
       }
 
-      // merge comment -> post maps
+      // merge the maps (comment -> post)
       postForComment.clear()
       postForCommentListState.get.asScala.foreach(postForComment ++= _)
     }
@@ -215,13 +214,15 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
     val t1 = System.nanoTime()
 
     // process all remaining dangling replies
-    for {(parentCommentId, (maxTimestamp, replies)) <- danglingReplies} {
-      if (maxTimestamp <= timestamp) {
-        // all dangling children are past the watermark -> parent is no longer expected -> drop replies
+    for {(parentCommentId, (earliestReplyTimestamp, replies)) <- danglingReplies} {
+      if (earliestReplyTimestamp <= timestamp) {
+        // the watermark has passed the earliest reply to this unknown parent. As the parent must have been before
+        // that earliest reply, we can assume that the parent no longer arrives (as wm incorporates the defined bounded delay)
+        // --> recursively drop all replies to this parent
         val unresolved = BuildReplyTreeProcessFunction.getDanglingReplies(replies, getDanglingReplies)
 
-        // NOTE with multiple workers, the unresolved replies are emitted for each worker! in the end it might be
-        // better to drop that side output, as it can be confusing. better gather metrics on size of state
+        // NOTE with multiple workers, the unresolved replies are emitted for each worker. Side output can
+        //      still be useful for analysis with parallelism = 1
         unresolved.foreach(r => {
           danglingReplies.remove(r.id) // remove resolved replies from operator state
 
@@ -263,7 +264,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
     val newValue =
       danglingReplies
         .get(parentCommentId)
-        .map { case (ts, replies) => (math.max(ts, reply.creationDate), replies += reply) } // found, calc new value
+        .map { case (ts, replies) => (math.min(ts, reply.creationDate), replies += reply) } // found, calc new value
         .getOrElse((reply.creationDate, mutable.Set(reply))) // initial value if not in map
 
     danglingReplies.put(parentCommentId, newValue)

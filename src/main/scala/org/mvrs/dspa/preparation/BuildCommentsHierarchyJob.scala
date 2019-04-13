@@ -18,9 +18,8 @@ object BuildCommentsHierarchyJob extends App {
   // set up the streaming execution environment
   implicit val env: StreamExecutionEnvironment = utils.createStreamExecutionEnvironment(true) // use arg (scallop?)
 
-  env.setParallelism(4) // NOTE with multiple workers, the comments AND broadcast stream watermarks lag VERY much behind
+  env.setParallelism(4)
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
-  env.getConfig.setAutoWatermarkInterval(500L) // NOTE this is REQUIRED for timers to fire, apparently
 
   val outputTagParsingErrors = new OutputTag[ParseError]("comment parsing errors")
 
@@ -37,34 +36,35 @@ object BuildCommentsHierarchyJob extends App {
         parse = CommentEvent.parse,
         extractEventTime = _.creationDate,
         speedupFactor = 0, // 0 -> unchanged read speed
-        maximumDelayMilliseconds = 1000,
-        watermarkInterval = 10000))
+        maximumDelayMilliseconds = 0,
+        watermarkInterval = 1000))
 
-  val rootedComments = resolveReplyTree(allComments)
+  val (rootedComments, _) = resolveReplyTree(allComments, droppedRepliesStream = false)
 
   // rootedComments.process(new ProgressMonitorFunction[CommentEvent]("TREE", 10000)).name("tree_monitor")
   // droppedReplies.process(new ProgressMonitorFunction[CommentEvent]("DROP", 10000)).name("drop_monitor")
 
   rootedComments.map(c => s"${c.id};-1;${c.postId};${utils.formatTimestamp(c.creationDate)}")
     .addSink(new SimpleTextFileSinkFunction("c:\\temp\\dspa_rooted"))
-  //  droppedReplies.map(c => s"${c.id};${c.replyToCommentId.get};-1;${utils.formatTimestamp(c.creationDate)}").addSink(new TestingFileSinkFunction("c:\\temp\\dspa_dropped"))
+  //  droppedReplies.map(c => s"${c.id};${c.replyToCommentId.get};-1;${utils.formatTimestamp(c.creationDate)}")
+  //    .addSink(new SimpleTextFileSinkFunction("c:\\temp\\dspa_dropped"))
+
+  // rootedComments.addSink(utils.createKafkaProducer(kafkaTopic, kafkaBrokers, createTypeInformation[CommentEvent]))
 
   println(env.getExecutionPlan) // NOTE this is the same json as env.getStreamGraph.dumpStreamingPlanAsJSON()
   env.execute()
 
-  def resolveReplyTree(rawComments: DataStream[CommentEvent]): DataStream[CommentEvent] = {
-    resolveReplyTree(rawComments, droppedRepliesStream = true)._1
+  def resolveReplyTree(rawComments: DataStream[CommentEvent]): (DataStream[CommentEvent], DataStream[CommentEvent]) = {
+    resolveReplyTree(rawComments, droppedRepliesStream = true)
   }
 
   def resolveReplyTree(rawComments: DataStream[CommentEvent], droppedRepliesStream: Boolean): (DataStream[CommentEvent], DataStream[CommentEvent]) = {
     val firstLevelComments = rawComments
       .filter(_.replyToPostId.isDefined)
-      // .process(new ProgressMonitorFunction[CommentEvent]("L1C", 1000))
       .keyBy(_.postId)
 
     val repliesBroadcast = rawComments
       .filter(_.replyToPostId.isEmpty)
-      // .process(new ProgressMonitorFunction[CommentEvent]("REPLY", 1000))
       .broadcast()
 
     val outputTagDroppedReplies = new OutputTag[CommentEvent]("dropped replies")
@@ -75,8 +75,7 @@ object BuildCommentsHierarchyJob extends App {
       .connect(repliesBroadcast)
       .process(new BuildReplyTreeProcessFunction(outputTag)).name("tree")
 
-    val droppedReplies = rootedComments
-      .getSideOutput(outputTagDroppedReplies)
+    val droppedReplies = rootedComments.getSideOutput(outputTagDroppedReplies)
 
     (rootedComments, droppedReplies)
   }
