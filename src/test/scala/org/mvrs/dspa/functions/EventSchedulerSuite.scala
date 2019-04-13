@@ -1,5 +1,8 @@
 package org.mvrs.dspa.functions
 
+import java.time.temporal.ChronoUnit
+import java.time.{LocalDateTime, ZoneOffset}
+
 import org.apache.flink.streaming.api.watermark.Watermark
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -23,7 +26,7 @@ class EventSchedulerSuite extends FlatSpec with Matchers {
     assertWatermarkCoversAllEvents(schedule)
   }
 
-  "the event scheduler" must "schedule correctly if with valid maximum delay" in {
+  it must "schedule correctly if with valid maximum delay" in {
     val scheduler = new EventScheduler[String](100, 15000, 10000, _ => 0)
 
     scheduler.schedule("e1", 10000)
@@ -37,6 +40,26 @@ class EventSchedulerSuite extends FlatSpec with Matchers {
     assertResult(3)(schedule.count(_.isInstanceOf[ScheduledEvent]))
     assertResult(3)(schedule.count(_.isInstanceOf[ScheduledWatermark]))
     assertWatermarkCoversAllEvents(schedule)
+  }
+
+  it must "correctly calculate replay time" in {
+    assertResult(1010)(EventScheduler.toReplayTime(replayStartTime = 1000, firstEventTime = 100, eventTime = 200, speedupFactor = 10))
+  }
+
+  it must "correctly calculate replay time based on realistic dates" in {
+    val hoursLater = 2
+    val startTime = System.currentTimeMillis()
+    val firstEventTime = LocalDateTime.of(2010, 12, 31, 15, 50, 50)
+    val oneHourLater = firstEventTime.plusHours(hoursLater)
+
+    val speedupFactor = 1000
+    val expectedDelayMillis = hoursLater * 60 * 60 * 1000 / speedupFactor
+
+    assertResult(startTime + expectedDelayMillis)(EventScheduler.toReplayTime(
+      replayStartTime = startTime,
+      firstEventTime = firstEventTime.toEpochSecond(ZoneOffset.UTC) * 1000,
+      eventTime = oneHourLater.toEpochSecond(ZoneOffset.UTC) * 1000,
+      speedupFactor))
   }
 
   private def assertWatermarkCoversAllEvents(schedule: Seq[ScheduledItem]) = {

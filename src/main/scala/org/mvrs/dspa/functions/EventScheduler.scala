@@ -2,6 +2,7 @@ package org.mvrs.dspa.functions
 
 import org.apache.flink.streaming.api.watermark.Watermark
 import org.slf4j.LoggerFactory
+import org.mvrs.dspa.functions.EventScheduler._
 
 import scala.collection.mutable
 
@@ -22,7 +23,7 @@ class EventScheduler[OUT](speedupFactor: Double, watermarkIntervalMillis: Long, 
 
     maximumEventTime = eventTime
 
-    val delayMillis = delay(event) // in processing time, but at the rate of the event time (subject to speedup)
+    val delayMillis = delay(event) // in processing time, but at the rate of the event time (i.e. subject to speedup)
     assert(delayMillis <= maximumDelayMillis, s"delay $delayMillis exceeds maximum $maximumDelayMillis")
 
     if (firstEventTime == Long.MinValue) {
@@ -35,9 +36,6 @@ class EventScheduler[OUT](speedupFactor: Double, watermarkIntervalMillis: Long, 
 
     queue += ((eventTime + delayMillis, Left((event, eventTime)))) // schedule the event
   }
-
-  private def log(msg: => String): Unit = if (LOG.isDebugEnabled()) LOG.debug(msg)
-
 
   def processPending(emitEvent: (OUT, Long) => Unit,
                      emitWatermark: Watermark => Unit,
@@ -64,7 +62,7 @@ class EventScheduler[OUT](speedupFactor: Double, watermarkIntervalMillis: Long, 
           // if not cancelled: schedule next watermark if there are events left in the queue or if the queue is empty,
           // but the previous watermark does not cover the maximum event time
           if (!isCancelled() && (queue.nonEmpty || maximumEventTime > watermark.getTimestamp)) {
-            scheduleWatermark(delayedEventTime) // schedule next watermark
+            scheduleWatermark(delayedEventTime)
           }
       }
     }
@@ -78,6 +76,10 @@ class EventScheduler[OUT](speedupFactor: Double, watermarkIntervalMillis: Long, 
     queue += ((nextEmitTime, Right(nextWatermark)))
   }
 
+  private def log(msg: => String): Unit = if (LOG.isDebugEnabled()) LOG.debug(msg)
+}
+
+object EventScheduler {
   def toReplayTime(replayStartTime: Long, firstEventTime: Long, eventTime: Long, speedupFactor: Double): Long = {
     require(speedupFactor > 0, s"invalid speedup factor: $speedupFactor")
 
