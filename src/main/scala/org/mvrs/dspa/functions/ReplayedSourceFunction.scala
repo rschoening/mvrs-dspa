@@ -66,5 +66,4 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
 
 object ReplayedSourceFunction {
   private[functions] val rand = new Random(137)
-
 }

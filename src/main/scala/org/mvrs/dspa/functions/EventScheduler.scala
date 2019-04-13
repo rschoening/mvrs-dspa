@@ -14,7 +14,7 @@ class EventScheduler[OUT](speedupFactor: Double, watermarkIntervalMillis: Long, 
   private val queue = mutable.PriorityQueue.empty[(Long, Either[(OUT, Long), Watermark])](Ordering.by((_: (Long, Either[(OUT, Long), Watermark]))._1).reverse)
 
   private var firstEventTime = Long.MinValue
-  private var maximumEventTime = Long.MinValue
+  var maximumEventTime: Long = Long.MinValue
 
   private val LOG = LoggerFactory.getLogger(classOf[EventScheduler[OUT]])
 
@@ -41,7 +41,7 @@ class EventScheduler[OUT](speedupFactor: Double, watermarkIntervalMillis: Long, 
                      emitWatermark: Watermark => Unit,
                      wait: Long => Unit,
                      isCancelled: () => Boolean,
-                     flush: Boolean): Unit = {
+                     flush: Boolean): Option[Long] = {
     // dequeue only if the next delayed event time is within maximum event time, to make sure that no later events can
     // schedule before the next delayed event - or when flushing the queue at end of input
     while (queue.nonEmpty && (flush || queue.head._1 <= maximumEventTime)) {
@@ -72,6 +72,8 @@ class EventScheduler[OUT](speedupFactor: Double, watermarkIntervalMillis: Long, 
           }
       }
     }
+
+    if (queue.nonEmpty && queue.head._2.isLeft) Some(queue.head._1) else None
   }
 
   private def scheduleWatermark(delayedEventTime: Long): Unit = {
