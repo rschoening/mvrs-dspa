@@ -26,7 +26,7 @@ class EventSchedulerSuite extends FlatSpec with Matchers {
     assertResult(List("e1", "e2", "e3"))(events.map(_.event))
     assertResult(List(24999, 39999))(watermarks.map(_.watermark.getTimestamp))
 
-    val timeTolerance = 10
+    val timeTolerance = 15
     assert(math.abs(events(0).replayTimeOffset - 10) <= timeTolerance) // startup delay (jit, ...)
     assert(math.abs(events(1).replayTimeOffset - 100) <= timeTolerance)
     assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
@@ -83,7 +83,7 @@ class EventSchedulerSuite extends FlatSpec with Matchers {
     assertResult(List("e2", "e1", "e3"))(events.map(_.event))
     assertResult(List(1699, 3699))(watermarks.map(_.watermark.getTimestamp))
 
-    val timeTolerance = 10
+    val timeTolerance = 15
     assert(math.abs(events(0).replayTimeOffset - 100) <= timeTolerance)
     assert(math.abs(events(1).replayTimeOffset - 130) <= timeTolerance)
     assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
@@ -121,7 +121,7 @@ class EventSchedulerSuite extends FlatSpec with Matchers {
     assertResult(List("e2", "e1", "e3"))(events.map(_.event))
     assertResult(List(1699, 3699))(watermarks.map(_.watermark.getTimestamp))
 
-    val timeTolerance = 10
+    val timeTolerance = 15
     assert(math.abs(events(0).replayTimeOffset - 100) <= timeTolerance)
     assert(math.abs(events(1).replayTimeOffset - 130) <= timeTolerance)
     assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
@@ -153,7 +153,7 @@ class EventSchedulerSuite extends FlatSpec with Matchers {
     assertResult(List("e2", "e1", "e3"))(events.map(_.event))
     assertResult(List(499, 1299, 2099, 2899, 3699))(watermarks.map(_.watermark.getTimestamp))
 
-    val timeTolerance = 10
+    val timeTolerance = 15
     assert(math.abs(events(0).replayTimeOffset - 100) <= timeTolerance)
     assert(math.abs(events(1).replayTimeOffset - 130) <= timeTolerance)
     assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
