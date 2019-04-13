@@ -98,6 +98,7 @@ object UnusualActivityDetectionJob extends App {
   // cluster combined features (on a single worker)
   // To parallelize: distribute points randomly, cluster subsets, merge resulting clusters as in
   // 7.6.4 of "Mining of massive datasets"
+  // TODO use global window with custom trigger: fire every n elements, but at most m hours after previous trigger
   val clusters: DataStream[(Long, Int, ClusterModel)] = featurizedComments
     .map(_._3)
     .keyBy(_ => 0)

@@ -18,7 +18,7 @@ package object streams {
 
     env.addSource(commentsSource)
       .keyBy(_.id) // only for scaled replay function (timer)
-      .process(new ScaledReplayFunction[Long, CommentEvent](_.creationDate, speedupFactor, randomDelay))
+      // .process(new ScaledReplayFunction[Long, CommentEvent](_.creationDate, speedupFactor, randomDelay))
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](maxOutOfOrderness, _.creationDate))
   }
 
