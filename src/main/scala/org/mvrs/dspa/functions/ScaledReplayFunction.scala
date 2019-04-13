@@ -29,19 +29,19 @@ class ScaledReplayFunction[K, I](extractEventTime: I => Long,
   }
 
   private def processPending(out: Collector[I], timerService: TimerService): Unit = {
-    val headTime = scheduler.processPending(
+    val upcomingEventTime = scheduler.processPending(
       (e, _) => out.collect(e),
       _ => (),
       sleep,
       () => false,
       flush = false)
 
-    headTime.foreach(registerTimer(_, timerService))
+    upcomingEventTime.foreach(registerTimer(_, timerService))
   }
 
   override def onTimer(timestamp: Long, ctx: KeyedProcessFunction[K, I, I]#OnTimerContext, out: Collector[I]): Unit = {
-    // TODO let scheduler know about this timestamp?
-    scheduler.maximumEventTime = math.max(scheduler.maximumEventTime, timestamp)
+    scheduler.updateMaximumEventTime(timestamp)
+
     processPending(out, ctx.timerService())
   }
 

@@ -14,7 +14,7 @@ class EventScheduler[OUT](speedupFactor: Double, watermarkIntervalMillis: Long, 
   private val queue = mutable.PriorityQueue.empty[(Long, Either[(OUT, Long), Watermark])](Ordering.by((_: (Long, Either[(OUT, Long), Watermark]))._1).reverse)
 
   private var firstEventTime = Long.MinValue
-  var maximumEventTime: Long = Long.MinValue
+  private var maximumEventTime: Long = Long.MinValue
 
   private val LOG = LoggerFactory.getLogger(classOf[EventScheduler[OUT]])
 
@@ -73,8 +73,11 @@ class EventScheduler[OUT](speedupFactor: Double, watermarkIntervalMillis: Long, 
       }
     }
 
+    // return delayed timestamp of upcoming event in queue (None if queue is empty or next scheduled item is a watermark)
     if (queue.nonEmpty && queue.head._2.isLeft) Some(queue.head._1) else None
   }
+
+  def updateMaximumEventTime(timestamp: Long): Unit = maximumEventTime = math.max(maximumEventTime, timestamp)
 
   private def scheduleWatermark(delayedEventTime: Long): Unit = {
     val nextEmitTime = delayedEventTime + watermarkIntervalMillis
