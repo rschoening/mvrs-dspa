@@ -14,6 +14,7 @@ object BuildCommentsHierarchyJob extends App {
   val filePath: String = args(0)
   val kafkaTopic = "comments"
   val kafkaBrokers = "localhost:9092"
+  val speedupFactor = 10000
 
   // set up the streaming execution environment
   implicit val env: StreamExecutionEnvironment = utils.createStreamExecutionEnvironment(true) // use arg (scallop?)
@@ -35,19 +36,14 @@ object BuildCommentsHierarchyJob extends App {
         skipFirstLine = true,
         parse = CommentEvent.parse,
         extractEventTime = _.creationDate,
-        speedupFactor = 0, // 0 -> unchanged read speed
-        maximumDelayMilliseconds = 0,
-        watermarkInterval = 1000))
+        speedupFactor = speedupFactor, // 0 -> unchanged read speed
+        maximumDelayMilliseconds = 10000,
+        watermarkInterval = 10000))
 
   val (rootedComments, _) = resolveReplyTree(allComments, droppedRepliesStream = false)
 
-  // rootedComments.process(new ProgressMonitorFunction[CommentEvent]("TREE", 10000)).name("tree_monitor")
-  // droppedReplies.process(new ProgressMonitorFunction[CommentEvent]("DROP", 10000)).name("drop_monitor")
-
   rootedComments.map(c => s"${c.id};-1;${c.postId};${utils.formatTimestamp(c.creationDate)}")
     .addSink(new SimpleTextFileSinkFunction("c:\\temp\\dspa_rooted"))
-  //  droppedReplies.map(c => s"${c.id};${c.replyToCommentId.get};-1;${utils.formatTimestamp(c.creationDate)}")
-  //    .addSink(new SimpleTextFileSinkFunction("c:\\temp\\dspa_dropped"))
 
   // rootedComments.addSink(utils.createKafkaProducer(kafkaTopic, kafkaBrokers, createTypeInformation[CommentEvent]))
 

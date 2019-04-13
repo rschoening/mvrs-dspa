@@ -22,10 +22,8 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
 
   // checkpointed operator state
   private val danglingReplies: mutable.Map[Long, (Long, mutable.Set[CommentEvent])] = mutable.Map[Long, (Long, mutable.Set[CommentEvent])]()
-  // TODO use a separate data structure for the parent keys and maximum timestamps, to quickly identify those that can be dropped (priority queue of (parent-id, timestamp)?)
-  // TODO create class for danglingreplies, with merge operation when reading from list state, and with unit tests
-
   private val postForComment: mutable.Map[Long, Long] = mutable.Map()
+
   @transient private var danglingRepliesListState: ListState[Map[Long, Set[CommentEvent]]] = _
   @transient private var postForCommentListState: ListState[Map[Long, Long]] = _
 
@@ -34,18 +32,12 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
   @transient private var replyCounter: Counter = _
   @transient private var resolvedReplyCount: Counter = _
   @transient private var droppedReplyCounter: Counter = _
-  @transient private var processingDanglingRepliesCounter: Counter = _
   @transient private var throughputMeter: Meter = _
   @transient private var danglingRepliesCount: Gauge[Int] = _
-  @transient private var processDanglingRepliesNanos0: Gauge[Double] = _
-  @transient private var processDanglingRepliesNanos1: Gauge[Double] = _
 
-  // private var maximumReplyTimestamp: Long = Long.MinValue
-  // private var currentCommentWatermark: Long = Long.MinValue
+  private var currentCommentWatermark: Long = Long.MinValue
   private var currentBroadcastWatermark: Long = Long.MinValue
   private var currentMinimumWatermark: Long = Long.MinValue
-  private var lastProcessDanglingRepliesNanos0: Double = 0L
-  private var lastProcessDanglingRepliesNanos1: Double = 0L
 
   override def open(parameters: Configuration): Unit = {
     val group = getRuntimeContext.getMetricGroup
@@ -54,11 +46,8 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
     replyCounter = group.counter("reply-counter")
     resolvedReplyCount = group.counter("rootedreply-counter")
     droppedReplyCounter = group.counter("droppedreply-counter")
-    processingDanglingRepliesCounter = group.counter("process-dangling-replies-counter")
     throughputMeter = group.meter("throughput-meter", new DropwizardMeterWrapper(new com.codahale.metrics.Meter()))
     danglingRepliesCount = group.gauge[Int, ScalaGauge[Int]]("dangling-replies-gauge", ScalaGauge[Int](() => danglingReplies.size))
-    processDanglingRepliesNanos0 = group.gauge[Double, ScalaGauge[Double]]("process-dangling-replies-0-gauge", ScalaGauge[Double](() => lastProcessDanglingRepliesNanos0))
-    processDanglingRepliesNanos1 = group.gauge[Double, ScalaGauge[Double]]("process-dangling-replies-1-gauge", ScalaGauge[Double](() => lastProcessDanglingRepliesNanos1))
   }
 
   override def processElement(firstLevelComment: CommentEvent,
@@ -88,10 +77,10 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
     }
 
     // process dangling replies whenever watermark progressed
-//    currentCommentWatermark = processWatermark(
-//      ctx.currentWatermark(),
-//      currentCommentWatermark,
-//      out, (t, r) => ctx.output(t, r))
+    currentCommentWatermark = processWatermark(
+      ctx.currentWatermark(),
+      currentCommentWatermark,
+      out, (t, r) => ctx.output(t, r))
 
     // register a timer (will call back at watermark for the creationDate)
     // NOTE actually the timer should be based on arriving unresolved replies, however the timer can only be registered
@@ -105,14 +94,10 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
     if (newWatermark > currentWatermark) {
       val newMinimum = math.min(newWatermark, currentWatermark)
 
-      // val msg = s"Comment WM ${utils.formatTimestamp(currentCommentWatermark)} -> ${utils.formatTimestamp(ctx.currentWatermark())}"
-
       if (newMinimum > currentMinimumWatermark) {
-        // println(s"$msg >> minimum + ${utils.formatDuration(newMinimum - currentMinimumWatermark)} *********************")
         currentMinimumWatermark = newMinimum
         processDanglingReplies(currentMinimumWatermark, collector, reportDropped(_, sideOutput))
       }
-      // else println(msg)
     }
 
     newWatermark
@@ -129,13 +114,13 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
                                        out: Collector[CommentEvent]): Unit = {
     replyCounter.inc() // count per parallel worker
 
-    // maximumReplyTimestamp = math.max(maximumReplyTimestamp, reply.creationDate)
-
     val postId = postForComment.get(reply.replyToCommentId.get)
 
     if (postId.isDefined) {
       postForComment(reply.id) = postId.get // remember our new friend
+
       out.collect(reply.copy(replyToPostId = postId)) // ... and immediately emit the rooted reply
+      throughputMeter.markEvent()
     }
     else rememberDanglingReply(reply) // cache for later evaluation, globally in this operator/worker
 
@@ -188,30 +173,20 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
     outputTagDroppedReplies.foreach(output(_, reply))
 
   private def processDanglingReplies(timestamp: Long, out: Collector[CommentEvent], reportDroppedReply: CommentEvent => Unit): Unit = {
-    processingDanglingRepliesCounter.inc()
-
-    val startTime = System.nanoTime()
-
     // first, let all known parents resolve their children
     for {(parentCommentId, (_, replies)) <- danglingReplies} {
       // check if the post id for the parent comment id is now known
       val postId = postForComment.get(parentCommentId)
 
-      if (postId.isDefined) {
+      postId.foreach(id => {
         // the post id was found -> point all dangling children to it
-        val resolved = BuildReplyTreeProcessFunction.resolveDanglingReplies(
-          replies, postId.get, getDanglingReplies)
+        val resolved = BuildReplyTreeProcessFunction.resolveDanglingReplies(replies, id, getDanglingReplies)
 
         emitResolvedReplies(resolved, out)
 
         danglingReplies.remove(parentCommentId)
-      }
+      })
     }
-
-    // measure elapsed time, to report in gauge
-    lastProcessDanglingRepliesNanos0 = (System.nanoTime() - startTime) / 1000000.0
-
-    val t1 = System.nanoTime()
 
     // process all remaining dangling replies
     for {(parentCommentId, (earliestReplyTimestamp, replies)) <- danglingReplies} {
@@ -235,8 +210,6 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Co
         danglingReplies.remove(parentCommentId)
       }
     }
-
-    lastProcessDanglingRepliesNanos1 = (System.nanoTime() - t1) / 1000000.0
   }
 
   private def emitResolvedReplies(resolved: Iterable[CommentEvent], out: Collector[CommentEvent]): Unit = {
