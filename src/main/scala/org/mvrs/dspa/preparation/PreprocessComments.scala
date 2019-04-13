@@ -1,7 +1,5 @@
 package org.mvrs.dspa.preparation
 
-import java.time.temporal.ChronoUnit
-
 import org.mvrs.dspa.events.CommentEvent
 
 import scala.collection.mutable
@@ -13,6 +11,8 @@ object PreprocessComments extends App {
   val filePath: String = args(0)
 
   val dict = mutable.Map[Long, Long]()
+  val postByCommentId = mutable.Map[Long, Long]()
+  var referenceToLaterComment = 0
 
   // first pass: build dictionary comment id -> creation date
   using(io.Source.fromFile(filePath))(source => {
@@ -24,17 +24,26 @@ object PreprocessComments extends App {
 
   // second pass: collect negative time differences
   using(io.Source.fromFile(filePath))(source => {
-    val unit = ChronoUnit.MILLIS
-
     var minDifference: Long = Long.MaxValue
     var maxDifference: Long = Long.MinValue
     var minDifferenceComment: Option[CommentEvent] = None
 
     for (line <- source.getLines.drop(1)) {
+
       val c = CommentEvent.parse(line)
+
       if (c.replyToPostId.isEmpty) {
+        // it's a reply to a comment
         val childCreationDate = c.creationDate
         val parentId = c.replyToCommentId.get
+
+        if (postByCommentId.get(parentId).isEmpty) {
+          // the parent id has not yet been seen
+          referenceToLaterComment += 1
+        }
+        else {
+          postByCommentId += c.id -> postByCommentId(parentId)
+        }
 
         val parentCreationDate = dict.get(parentId)
 
@@ -51,10 +60,14 @@ object PreprocessComments extends App {
           maxDifference = math.max(maxDifference, difference)
         }
       }
+      else {
+        postByCommentId += c.id -> c.postId
+      }
     }
 
     val millisPerHour = 60.0 * 60.0 * 1000
 
+    println(s"references to comments appearing later in file: $referenceToLaterComment") // 35606
     println(s"minimum difference: $minDifference milliseconds (${minDifference / millisPerHour} hours)")
     println(s"maximum difference: $maxDifference milliseconds (${maxDifference / millisPerHour} hours)")
 
@@ -66,18 +79,14 @@ object PreprocessComments extends App {
       })
 
 
-    /*
-      id|personId|creationDate|locationIP|browserUsed|content|reply_to_postId|reply_to_commentId|placeId
-
-      reply:
-      4112780|866|2012-09-11T00:00:53Z|196.11.124.6|Firefox|About Mobutu Sese Seko, commonly known as Mobutu or Mobutu Sese Seko, was the President of the Democratic Republic of the Congo (also known as Zaire for much of his.||4112760|94
-
-      comment replied to:
-      4112760|626|2012-09-11T11:59:55Z|27.115.0.13|Internet Explorer|About Mobutu Sese Seko, 1997), commonly known as Mobutu or Mobutu Sese Seko, was the President of the Democratic Republic of the Congo (also.||4112740|73
-
-      parent (comment): 2012-09-11T11:59:55Z
-      child (reply):    2012-09-11T00:00:53Z
-     */
+    // 1k_users_sorted: comment_event_stream.csv
+    // - total rows: 632042
+    // - there are 35606 replies for which at least one of the parent replies appears later in the file
+    //
+    // - BuildCommentsHierarchyJob drops 34753 replies and resolves 597289 rooted replies/comments, with a WM interval of 1000 (no scaling)
+    //   -> the job can resolve 853 additional replies
+    //      => due to watermark interval (the number of unresolved can be further decreased by increasing the WM interval)
+    //   - note above numbers are for parallelism = 1; for p=4, there are 598659 rooted replies/comments
   })
 
   /**
