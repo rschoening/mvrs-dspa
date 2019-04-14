@@ -56,13 +56,13 @@ object ActivePostStatisticsJob extends App {
       .process(new PostStatisticsFunction(windowSize, slide))
   }
 
-  private def createEvent(e: LikeEvent) = Event(EventType.Like, e.postId, e.personId, e.creationDate)
+  private def createEvent(e: LikeEvent) = Event(EventType.Like, e.postId, e.personId, e.timestamp)
 
-  private def createEvent(e: PostEvent) = Event(EventType.Post, e.id, e.personId, e.creationDate)
+  private def createEvent(e: PostEvent) = Event(EventType.Post, e.postId, e.personId, e.timestamp)
 
   private def createEvent(e: CommentEvent) = Event(
     e.replyToCommentId.map(_ => EventType.Reply).getOrElse(EventType.Comment),
-    e.postId, e.personId, e.creationDate)
+    e.postId, e.personId, e.timestamp)
 }
 
 object EventType extends Enumeration {

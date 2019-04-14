@@ -1,6 +1,7 @@
 package org.mvrs.dspa
 
 import java.nio.file.Paths
+import java.time.{Instant, ZoneId, ZonedDateTime}
 import java.util.{Base64, Optional, Properties}
 
 import com.sksamuel.elastic4s.http.index.admin.DeleteIndexResponse
@@ -34,6 +35,8 @@ package object utils {
 
   val kafkaBrokers = "localhost:9092"
   private val dateFormat = ThreadLocal.withInitial[SimpleDateFormat](() => new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
+
+  def toDate(millis: Long): ZonedDateTime = Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC"))
 
   /** @return The filesystem path of the given resource */
   def fsPath(resource: String): String =

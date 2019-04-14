@@ -7,7 +7,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.{NonNegative, Positive}
 import eu.timepit.refined.string.Trimmed
-import org.mvrs.dspa.events.CommentEvent
+import org.mvrs.dspa.events.RawCommentEvent
 
 object RefinedEventsTrial extends App {
   type LongId = Long Refined Positive
@@ -118,7 +118,7 @@ object NewEventsTrial extends App {
 
     val start = System.nanoTime()
 
-    val comments = source.getLines.drop(1).map(l => CommentEvent.parse(l))
+    val comments = source.getLines.drop(1).map(l => RawCommentEvent.parse(l))
     val count = comments.count(_ => true)
 
     source.close()

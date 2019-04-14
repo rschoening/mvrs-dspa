@@ -73,7 +73,7 @@ object UnusualActivityDetectionJob extends App {
   val commentFeaturesStream =
     comments
       .keyBy(_.personId)
-      .map(c => (c.personId, c.id, extractFeatures(c))).name("extract comment features")
+      .map(c => (c.personId, c.commentId, extractFeatures(c))).name("extract comment features")
 
   // TODO use connect instead of join (and store frequency in value state), to get the *latest* per-user frequency at each comment?
   val featurizedComments: DataStream[(Long, Long, mutable.ArrayBuffer[Double])] =

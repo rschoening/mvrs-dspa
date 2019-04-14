@@ -17,9 +17,9 @@ package object streams {
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
 
     env.addSource(commentsSource)
-      .keyBy(_.id) // only for scaled replay function (timer)
+      .keyBy(_.commentId) // only for scaled replay function (timer)
       // .process(new ScaledReplayFunction[Long, CommentEvent](_.creationDate, speedupFactor, randomDelay))
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](maxOutOfOrderness, _.creationDate))
+      .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](maxOutOfOrderness, _.timestamp))
   }
 
   def posts(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[PostEvent] = {
@@ -29,9 +29,9 @@ package object streams {
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
 
     env.addSource(postsSource)
-      .keyBy(_.id) // only for scaled replay function (timer)
-      .process(new ScaledReplayFunction[Long, PostEvent](_.creationDate, speedupFactor, randomDelay))
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[PostEvent](maxOutOfOrderness, _.creationDate))
+      .keyBy(_.postId) // only for scaled replay function (timer)
+      .process(new ScaledReplayFunction[Long, PostEvent](_.timestamp, speedupFactor, randomDelay))
+      .assignTimestampsAndWatermarks(utils.timeStampExtractor[PostEvent](maxOutOfOrderness, _.timestamp))
   }
 
   private def getKafkaConsumerProperties(consumerGroup: String) = {
@@ -54,7 +54,7 @@ package object streams {
 
     env.addSource(likesSource)
       .keyBy(_.postId) // only for scaled replay function (timer)
-      .process(new ScaledReplayFunction[Long, LikeEvent](_.creationDate, speedupFactor, randomDelay))
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[LikeEvent](maxOutOfOrderness, _.creationDate))
+      .process(new ScaledReplayFunction[Long, LikeEvent](_.timestamp, speedupFactor, randomDelay))
+      .assignTimestampsAndWatermarks(utils.timeStampExtractor[LikeEvent](maxOutOfOrderness, _.timestamp))
   }
 }

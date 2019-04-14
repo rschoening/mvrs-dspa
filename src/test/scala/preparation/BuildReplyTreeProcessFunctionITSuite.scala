@@ -6,7 +6,7 @@ import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
-import org.mvrs.dspa.events.CommentEvent
+import org.mvrs.dspa.events.{CommentEvent, RawCommentEvent}
 import org.mvrs.dspa.preparation.BuildCommentsHierarchyJob
 import org.mvrs.dspa.utils
 import org.scalatest.Assertions.assertResult
@@ -21,6 +21,7 @@ import scala.collection.mutable
 class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
 
   private val repetitions = 20
+
   @Test
   def testOrderedInput(): Unit = for (_ <- 0 until repetitions) {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
@@ -31,16 +32,16 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
 
     val postId = 999
     val personId = 1
-    val rawComments: List[CommentEvent] = List(
-      CommentEvent(id = 111, personId, creationDate = 1000, None, None, None, Some(postId), None, 0),
-      CommentEvent(id = 112, personId, creationDate = 2000, None, None, None, None, Some(111), 0),
-      CommentEvent(id = 113, personId, creationDate = 3000, None, None, None, None, Some(112), 0),
-      CommentEvent(id = 114, personId, creationDate = 4000, None, None, None, None, Some(112), 0),
-      CommentEvent(id = 115, personId, creationDate = 5000, None, None, None, None, Some(113), 0),
+    val rawComments: List[RawCommentEvent] = List(
+      RawCommentEvent(commentId = 111, personId, creationDate = utils.toDate(1000), None, None, None, Some(postId), None, 0),
+      RawCommentEvent(commentId = 112, personId, creationDate = utils.toDate(2000), None, None, None, None, Some(111), 0),
+      RawCommentEvent(commentId = 113, personId, creationDate = utils.toDate(3000), None, None, None, None, Some(112), 0),
+      RawCommentEvent(commentId = 114, personId, creationDate = utils.toDate(4000), None, None, None, None, Some(112), 0),
+      RawCommentEvent(commentId = 115, personId, creationDate = utils.toDate(5000), None, None, None, None, Some(113), 0),
     )
 
     val stream = env.fromCollection(rawComments)
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](Time.milliseconds(100), _.creationDate))
+      .assignTimestampsAndWatermarks(utils.timeStampExtractor[RawCommentEvent](Time.milliseconds(100), _.timestamp))
 
     val (rootedStream, droppedStream) = BuildCommentsHierarchyJob.resolveReplyTree(stream, droppedRepliesStream = true)
 
@@ -75,16 +76,16 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
 
     val postId = 999
     val personId = 1
-    val rawComments: List[CommentEvent] = List(
-      CommentEvent(id = 114, personId, creationDate = 1000, None, None, None, None, Some(112), 0),
-      CommentEvent(id = 115, personId, creationDate = 1000, None, None, None, None, Some(113), 0),
-      CommentEvent(id = 112, personId, creationDate = 3000, None, None, None, None, Some(111), 0),
-      CommentEvent(id = 113, personId, creationDate = 4000, None, None, None, None, Some(112), 0),
-      CommentEvent(id = 111, personId, creationDate = 5000, None, None, None, Some(postId), None, 0),
+    val rawComments: List[RawCommentEvent] = List(
+      RawCommentEvent(commentId = 114, personId, creationDate = utils.toDate(1000), None, None, None, None, Some(112), 0),
+      RawCommentEvent(commentId = 115, personId, creationDate = utils.toDate(1000), None, None, None, None, Some(113), 0),
+      RawCommentEvent(commentId = 112, personId, creationDate = utils.toDate(3000), None, None, None, None, Some(111), 0),
+      RawCommentEvent(commentId = 113, personId, creationDate = utils.toDate(4000), None, None, None, None, Some(112), 0),
+      RawCommentEvent(commentId = 111, personId, creationDate = utils.toDate(5000), None, None, None, Some(postId), None, 0),
     )
 
     val stream = env.fromCollection(rawComments)
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](Time.milliseconds(100), _.creationDate))
+      .assignTimestampsAndWatermarks(utils.timeStampExtractor[RawCommentEvent](Time.milliseconds(100), _.timestamp))
 
     val (rootedStream, droppedStream) = BuildCommentsHierarchyJob.resolveReplyTree(stream, droppedRepliesStream = true)
 
@@ -121,16 +122,16 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     //      (maybe an influence of collect() method below?)
     val postId = 999
     val personId = 1
-    val rawComments: List[CommentEvent] = List(
-      CommentEvent(id = 114, personId, creationDate = 1000, None, None, None, None, Some(112), 0),
-      CommentEvent(id = 115, personId, creationDate = 1000, None, None, None, None, Some(113), 0), // child of dangling parent
-      CommentEvent(id = 112, personId, creationDate = 3000, None, None, None, None, Some(111), 0),
-      CommentEvent(id = 113, personId, creationDate = 4000, None, None, None, None, Some(888), 0), // dangling, unknown parent
-      CommentEvent(id = 111, personId, creationDate = 5000, None, None, None, Some(postId), None, 0),
+    val rawComments: List[RawCommentEvent] = List(
+      RawCommentEvent(commentId = 114, personId, creationDate = utils.toDate(1000), None, None, None, None, Some(112), 0),
+      RawCommentEvent(commentId = 115, personId, creationDate = utils.toDate(1000), None, None, None, None, Some(113), 0), // child of dangling parent
+      RawCommentEvent(commentId = 112, personId, creationDate = utils.toDate(3000), None, None, None, None, Some(111), 0),
+      RawCommentEvent(commentId = 113, personId, creationDate = utils.toDate(4000), None, None, None, None, Some(888), 0), // dangling, unknown parent
+      RawCommentEvent(commentId = 111, personId, creationDate = utils.toDate(5000), None, None, None, Some(postId), None, 0),
     )
 
     val stream = env.fromCollection(rawComments)
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](Time.milliseconds(100), _.creationDate))
+      .assignTimestampsAndWatermarks(utils.timeStampExtractor[RawCommentEvent](Time.milliseconds(100), _.timestamp))
 
     val (rootedStream, droppedStream) = BuildCommentsHierarchyJob.resolveReplyTree(stream, droppedRepliesStream = true)
 
@@ -154,9 +155,8 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     val danglingIds = List(113, 115)
     assertResult(2)(dropped.length)
     assert(dropped.forall(_.replyToPostId.isEmpty))
-    assert(dropped.forall(r => danglingIds.contains(r.id)))
+    assert(dropped.forall(r => danglingIds.contains(r.commentId)))
   }
-
 }
 
 // sinks: see https://ci.apache.org/projects/flink/flink-docs-stable/dev/stream/testing.html
@@ -173,13 +173,13 @@ object RootedSink {
   val values: mutable.MutableList[CommentEvent] = mutable.MutableList[CommentEvent]() // must be static
 }
 
-class DroppedSink extends SinkFunction[CommentEvent] {
-  override def invoke(value: CommentEvent): Unit =
+class DroppedSink extends SinkFunction[RawCommentEvent] {
+  override def invoke(value: RawCommentEvent): Unit =
     synchronized {
       DroppedSink.values += value
     }
 }
 
 object DroppedSink {
-  val values: mutable.MutableList[CommentEvent] = mutable.MutableList[CommentEvent]() // must be static
+  val values: mutable.MutableList[RawCommentEvent] = mutable.MutableList[RawCommentEvent]() // must be static
 }

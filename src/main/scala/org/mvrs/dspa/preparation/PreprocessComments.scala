@@ -1,6 +1,6 @@
 package org.mvrs.dspa.preparation
 
-import org.mvrs.dspa.events.CommentEvent
+import org.mvrs.dspa.events.RawCommentEvent
 
 import scala.collection.mutable
 import scala.language.reflectiveCalls
@@ -17,8 +17,8 @@ object PreprocessComments extends App {
   // first pass: build dictionary comment id -> creation date
   using(io.Source.fromFile(filePath))(source => {
     for (line <- source.getLines.drop(1)) {
-      val c = CommentEvent.parse(line)
-      dict += c.id -> c.creationDate
+      val c = RawCommentEvent.parse(line)
+      dict += c.commentId -> c.timestamp
     }
   })
 
@@ -26,15 +26,15 @@ object PreprocessComments extends App {
   using(io.Source.fromFile(filePath))(source => {
     var minDifference: Long = Long.MaxValue
     var maxDifference: Long = Long.MinValue
-    var minDifferenceComment: Option[CommentEvent] = None
+    var minDifferenceComment: Option[RawCommentEvent] = None
 
     for (line <- source.getLines.drop(1)) {
 
-      val c = CommentEvent.parse(line)
+      val c = RawCommentEvent.parse(line)
 
       if (c.replyToPostId.isEmpty) {
         // it's a reply to a comment
-        val childCreationDate = c.creationDate
+        val childCreationDate = c.timestamp
         val parentId = c.replyToCommentId.get
 
         if (postByCommentId.get(parentId).isEmpty) {
@@ -42,13 +42,13 @@ object PreprocessComments extends App {
           referenceToLaterComment += 1
         }
         else {
-          postByCommentId += c.id -> postByCommentId(parentId)
+          postByCommentId += c.commentId -> postByCommentId(parentId)
         }
 
         val parentCreationDate = dict.get(parentId)
 
         if (parentCreationDate.isEmpty) {
-          println(s"comment ${c.id} replies to unknown comment $parentId")
+          println(s"comment ${c.commentId} replies to unknown comment $parentId")
         }
         else {
           val difference: Long = childCreationDate - parentCreationDate.get
@@ -61,7 +61,7 @@ object PreprocessComments extends App {
         }
       }
       else {
-        postByCommentId += c.id -> c.postId
+        postByCommentId += c.commentId -> c.replyToPostId.get
       }
     }
 
@@ -73,7 +73,7 @@ object PreprocessComments extends App {
 
     minDifferenceComment.foreach(
       c => {
-        println(s"comment with minimum difference to replied-to comment: ${c.id}")
+        println(s"comment with minimum difference to replied-to comment: ${c.commentId}")
         println(s"replied to ${c.replyToCommentId.get}")
         println(s"comment details: $c")
       })

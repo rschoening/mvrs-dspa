@@ -53,9 +53,10 @@ class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
     csvReader.map(_.map {
       case row@Left(error) => reportRowError(error); row // to be dropped in collect
       case row => row
-    }.collect {
-      case Right(out) => out
-    })
+    }
+      .collect {
+        case Right(out) => out
+      })
       .getOrElse(List[OUT]())
       .toIterator
 
