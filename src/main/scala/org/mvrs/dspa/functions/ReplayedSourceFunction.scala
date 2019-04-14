@@ -15,9 +15,9 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
                                                watermarkIntervalMillis: Long) extends RichSourceFunction[OUT] {
   @volatile private lazy val scheduler = new EventScheduler[OUT](speedupFactor, watermarkIntervalMillis, maximumDelayMillis, delay)
   @volatile private lazy val LOG = LoggerFactory.getLogger(classOf[ReplayedSourceFunction[IN, OUT]])
-
   @volatile private var isCancelled = false
-  private var rowIndex: Int = -1 // single worker, processing entire input
+
+  private var rowIndex: Int = _
 
   protected def this(parse: IN => OUT,
                      extractEventTime: OUT => Long,
@@ -30,16 +30,19 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
       watermarkInterval)
 
   override def run(ctx: SourceFunction.SourceContext[OUT]): Unit = {
+    rowIndex = 0
+
     for (input <- inputIterator.takeWhile(_ => !isCancelled)) {
-      rowIndex += 1
-      scheduleInput(input)
+      scheduleInput(input, rowIndex)
       processPending(ctx)
+
+      rowIndex += 1
     }
 
     processPending(ctx, flush = true)
   }
 
-  private def scheduleInput(input: IN): Unit = {
+  private def scheduleInput(input: IN, rowIndex: Int): Unit = {
     try {
       val event = parse(input)
       val eventTime = extractEventTime(event)
@@ -49,8 +52,12 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
       scheduler.schedule(event, eventTime)
     }
     catch {
-      case e: Throwable => LOG.warn(s"error processing row $rowIndex: ${e.getMessage}")
+      case e: Throwable => reportRowError(e) // ... and ignore input
     }
+  }
+
+  protected def reportRowError(e: Throwable): Unit = {
+    LOG.warn(s"error processing row $rowIndex: ${e.getMessage}")
   }
 
   protected def inputIterator: Iterator[IN]

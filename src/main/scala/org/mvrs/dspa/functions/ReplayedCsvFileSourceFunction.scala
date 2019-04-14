@@ -50,9 +50,11 @@ class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
   override def close(): Unit = closeSource()
 
   override protected def inputIterator: Iterator[OUT] =
-    csvReader.map(_.collect {
+    csvReader.map(_.map {
+      case row@Left(error) => reportRowError(error); row // to be dropped in collect
+      case row => row
+    }.collect {
       case Right(out) => out
-      case Left(e: ReadError) => throw e
     })
       .getOrElse(List[OUT]())
       .toIterator
