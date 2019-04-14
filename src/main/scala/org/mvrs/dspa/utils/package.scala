@@ -36,7 +36,7 @@ package object utils {
   val kafkaBrokers = "localhost:9092"
   private val dateFormat = ThreadLocal.withInitial[SimpleDateFormat](() => new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
 
-  def toDateTime(millis: Long): LocalDateTime = LocalDateTime.from(Instant.ofEpochMilli(millis))
+  def toDateTime(millis: Long): LocalDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneId.of("UTC"))
 
   /** @return The filesystem path of the given resource */
   def fsPath(resource: String): String =
