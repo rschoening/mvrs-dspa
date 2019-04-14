@@ -1,6 +1,6 @@
 package org.mvrs.dspa.events
 
-import java.time.ZonedDateTime
+import java.time.{LocalDateTime, ZoneOffset}
 
 import kantan.csv.DecodeError.TypeError
 import kantan.csv.{CellDecoder, RowDecoder}
@@ -11,18 +11,18 @@ case class PostStatistics(postId: Long, time: Long, commentCount: Int, replyCoun
 
 trait ForumEvent {
   val personId: Long
-  val creationDate: ZonedDateTime
-  val timestamp: Long = creationDate.toInstant.toEpochMilli
+  val creationDate: LocalDateTime
+  val timestamp: Long = creationDate.toInstant(ZoneOffset.UTC).toEpochMilli
 }
 
 final case class LikeEvent(personId: Long,
-                           creationDate: ZonedDateTime,
+                           creationDate: LocalDateTime,
                            postId: Long) extends ForumEvent {
 }
 
 final case class PostEvent(postId: Long,
                            personId: Long,
-                           creationDate: ZonedDateTime,
+                           creationDate: LocalDateTime,
                            imageFile: Option[String],
                            locationIP: Option[String],
                            browserUsed: Option[String],
@@ -35,7 +35,7 @@ final case class PostEvent(postId: Long,
 
 final case class RawCommentEvent(commentId: Long,
                                  personId: Long,
-                                 creationDate: ZonedDateTime,
+                                 creationDate: LocalDateTime,
                                  locationIP: Option[String],
                                  browserUsed: Option[String],
                                  content: Option[String],
@@ -46,7 +46,7 @@ final case class RawCommentEvent(commentId: Long,
 
 final case class CommentEvent(commentId: Long,
                               personId: Long,
-                              creationDate: ZonedDateTime,
+                              creationDate: LocalDateTime,
                               locationIP: Option[String],
                               browserUsed: Option[String],
                               content: Option[String],
@@ -114,7 +114,7 @@ object RawCommentEvent {
     RawCommentEvent(
       commentId = tokens(0).toLong,
       personId = tokens(1).toLong,
-      creationDate = ParseUtils.toDate(tokens(2).trim),
+      creationDate = ParseUtils.toDateTime(tokens(2).trim),
       locationIP = ParseUtils.toOptionalString(tokens(3)),
       browserUsed = ParseUtils.toOptionalString(tokens(4)),
       content = ParseUtils.toOptionalString(tokens(5)),
@@ -141,7 +141,7 @@ object LikeEvent {
     LikeEvent(
       personId = tokens(0).toLong,
       postId = tokens(1).toLong,
-      creationDate = ParseUtils.toDate(tokens(2).trim))
+      creationDate = ParseUtils.toDateTime(tokens(2).trim))
   }
 }
 
@@ -150,7 +150,8 @@ object PostEvent {
     import kantan.csv.java8._
 
     // id|personId|creationDate|imageFile|locationIP|browserUsed|language|content|tags|forumId|placeId
-    implicit val cellDecoder: CellDecoder[scala.collection.Set[Int]] = CellDecoder.from(toSet)
+    implicit val dateDecoder: CellDecoder[LocalDateTime] = CellDecoder.from(str => Right(ParseUtils.toDateTime(str)))
+    implicit val setDecoder: CellDecoder[scala.collection.Set[Int]] = CellDecoder.from(toSet)
     RowDecoder.decoder(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)(PostEvent.apply)
   }
 
@@ -170,7 +171,7 @@ object PostEvent {
     PostEvent(
       postId = tokens(0).toLong,
       personId = tokens(1).toLong,
-      creationDate = ParseUtils.toDate(tokens(2).trim),
+      creationDate = ParseUtils.toDateTime(tokens(2).trim),
       imageFile = ParseUtils.toOptionalString(tokens(3)),
       locationIP = ParseUtils.toOptionalString(tokens(4)),
       browserUsed = ParseUtils.toOptionalString(tokens(5)),
