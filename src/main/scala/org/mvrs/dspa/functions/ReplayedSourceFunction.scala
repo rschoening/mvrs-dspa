@@ -17,6 +17,7 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
   @volatile private lazy val LOG = LoggerFactory.getLogger(classOf[ReplayedSourceFunction[IN, OUT]])
 
   @volatile private var isCancelled = false
+  private var rowIndex: Int = -1 // single worker, processing entire input
 
   protected def this(parse: IN => OUT,
                      extractEventTime: OUT => Long,
@@ -28,22 +29,28 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
       else (_: OUT) => utils.getNormalDelayMillis(rand, maximumDelayMilliseconds),
       watermarkInterval)
 
-
   override def run(ctx: SourceFunction.SourceContext[OUT]): Unit = {
-    for (input <- inputIterator.takeWhile(_ => ! isCancelled)) {
+    for (input <- inputIterator.takeWhile(_ => !isCancelled)) {
+      rowIndex += 1
+      scheduleInput(input)
+      processPending(ctx)
+    }
+
+    processPending(ctx, flush = true)
+  }
+
+  private def scheduleInput(input: IN): Unit = {
+    try {
       val event = parse(input)
       val eventTime = extractEventTime(event)
 
       assert(eventTime > Long.MinValue, s"invalid event time: $eventTime ($event)")
 
       scheduler.schedule(event, eventTime)
-
-      processPending(ctx)
     }
-
-    processPending(ctx, flush = true)
-
-    LOG.info("replay ended")
+    catch {
+      case e: Throwable => LOG.warn(s"error processing row $rowIndex: ${e.getMessage}")
+    }
   }
 
   protected def inputIterator: Iterator[IN]

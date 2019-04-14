@@ -49,18 +49,17 @@ class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
 
   override def close(): Unit = closeSource()
 
+  override protected def inputIterator: Iterator[OUT] =
+    csvReader.map(_.collect {
+      case Right(out) => out
+      case Left(e: ReadError) => throw e
+    })
+      .getOrElse(List[OUT]())
+      .toIterator
+
   private def closeSource(): Unit = {
     csvReader.foreach(_.close())
     csvReader = None
   }
-
-  override protected def inputIterator: Iterator[OUT] =
-    csvReader
-      .map(_.collect {
-        case Right(out) => out
-        case Left(e: ReadError) => throw e // TODO how to report read errors?
-      })
-      .getOrElse(List[OUT]())
-      .toIterator
 }
 
