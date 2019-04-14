@@ -22,28 +22,7 @@ object BuildCommentsHierarchyJob extends App {
   env.setParallelism(4)
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
-  // NOTE it seems that a non-default parallelism must be set for each operator, otherwise an immediate rebalance
-  //      back to default parallelism occurs
-  // NOTE if assignTimeStampsAndWatermarks is (accidentally) set to parallelism=1, then the monitor step
-  //      (with parallelism 4) sees watermarks that area AHEAD (negative delays)
-
-  //  import kantan.csv.refined._
-  //  import kantan.csv.java8._
-  //  implicit val decoder: RowDecoder[RawComment] = RowDecoder.decoder(0, 1, 2, 3, 4, 5, 6, 7, 8)(RawComment.apply)
-  //
-  //  val rawComments =
-  //    env.addSource(
-  //      new ReplayedCsvFileSourceFunction[RawComment](
-  //        filePath,
-  //        skipFirstLine = true, '|',
-  //        extractEventTime = _.timestamp,
-  //        speedupFactor = speedupFactor, // 0 -> unchanged read speed
-  //        maximumDelayMilliseconds = 10000,
-  //        watermarkInterval = 10000))
-  //  rawComments.print
-
-  import kantan.csv.java8._
-  implicit val decoder: RowDecoder[RawCommentEvent] = RowDecoder.decoder(0, 1, 2, 3, 4, 5, 6, 7, 8)(RawCommentEvent.apply)
+  implicit val decoder: RowDecoder[RawCommentEvent] = RawCommentEvent.decoder
 
   val allComments: DataStream[RawCommentEvent] =
     env.addSource(

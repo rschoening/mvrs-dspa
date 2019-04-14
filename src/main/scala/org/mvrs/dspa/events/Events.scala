@@ -2,6 +2,9 @@ package org.mvrs.dspa.events
 
 import java.time.ZonedDateTime
 
+import kantan.csv.DecodeError.TypeError
+import kantan.csv.{CellDecoder, RowDecoder}
+
 import scala.collection.Set
 
 case class PostStatistics(postId: Long, time: Long, commentCount: Int, replyCount: Int, likeCount: Int, distinctUserCount: Int, newPost: Boolean)
@@ -95,6 +98,12 @@ final case class CommentEvent(commentId: Long,
 //}
 
 object RawCommentEvent {
+  def decoder: RowDecoder[RawCommentEvent] = {
+    import kantan.csv.java8._
+    // "id|personId|creationDate|locationIP|browserUsed|content|reply_to_postId|reply_to_commentId|placeId"
+    RowDecoder.decoder(0, 1, 2, 3, 4, 5, 6, 7, 8)(RawCommentEvent.apply)
+  }
+
   def parse(line: String): RawCommentEvent = {
     // "id|personId|creationDate|locationIP|browserUsed|content|reply_to_postId|reply_to_commentId|placeId"
 
@@ -116,6 +125,13 @@ object RawCommentEvent {
 }
 
 object LikeEvent {
+  def decoder: RowDecoder[LikeEvent] = {
+    import kantan.csv.java8._
+
+    // Person.id|Post.id|creationDate
+    RowDecoder.decoder(0, 2, 1)(LikeEvent.apply)
+  }
+
   def parse(line: String): LikeEvent = {
     // Person.id|Post.id|creationDate
     val tokens = line.split('|')
@@ -130,6 +146,21 @@ object LikeEvent {
 }
 
 object PostEvent {
+  def decoder: RowDecoder[PostEvent] = {
+    import kantan.csv.java8._
+
+    // id|personId|creationDate|imageFile|locationIP|browserUsed|language|content|tags|forumId|placeId
+    implicit val cellDecoder: CellDecoder[scala.collection.Set[Int]] = CellDecoder.from(toSet)
+    RowDecoder.decoder(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)(PostEvent.apply)
+  }
+
+  private def toSet(str: String) = {
+    try Right(ParseUtils.toSet(str))
+    catch {
+      case e: Exception => Left(new TypeError(e.getMessage))
+    }
+  }
+
   def parse(line: String): PostEvent = {
     // id|personId|creationDate|imageFile|locationIP|browserUsed|language|content|tags|forumId|placeId
     val tokens = line.split('|')

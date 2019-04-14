@@ -1,7 +1,9 @@
 package org.mvrs.dspa.preparation
 
+import kantan.csv.RowDecoder
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.events.LikeEvent
+import org.mvrs.dspa.functions.ReplayedCsvFileSourceFunction
 import org.mvrs.dspa.utils
 
 
@@ -16,13 +18,19 @@ object LoadLikeEventsJob extends App {
   implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
   env.setParallelism(1)
 
-  val stream = env
-    .readTextFile(filePath)
-    .filter(!_.startsWith("Person.id|")) // TODO better way to skip the header line?
-    .map(LikeEvent.parse _)
-  //    .keyBy(_.postId) // not currently needed
+  implicit val decoder: RowDecoder[LikeEvent] = LikeEvent.decoder
+  val speedupFactor = 0
 
-  // stream.print
+  val stream =
+    env.addSource(
+      new ReplayedCsvFileSourceFunction[LikeEvent](
+        filePath,
+        skipFirstLine = true, '|',
+        extractEventTime = _.timestamp,
+        speedupFactor = speedupFactor, // 0 -> unchanged read speed
+        maximumDelayMilliseconds = 10000,
+        watermarkInterval = 10000))
+
   stream.addSink(utils.createKafkaProducer(kafkaTopic, kafkaBrokers, createTypeInformation[LikeEvent]))
 
   // execute program
