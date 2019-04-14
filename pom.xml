@@ -153,6 +153,34 @@ under the License.
             <version>27.1-jre</version>
         </dependency>
 
+        <!-- https://mvnrepository.com/artifact/com.nrinaudo/kantan.csv -->
+        <dependency>
+            <groupId>com.nrinaudo</groupId>
+            <artifactId>kantan.csv_${scala.binary.version}</artifactId>
+            <version>0.5.0</version>
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/com.nrinaudo/kantan.csv-refined -->
+        <dependency>
+            <groupId>com.nrinaudo</groupId>
+            <artifactId>kantan.csv-refined_${scala.binary.version}</artifactId>
+            <version>0.5.0</version>
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/com.nrinaudo/kantan.csv-generic -->
+        <dependency>
+            <groupId>com.nrinaudo</groupId>
+            <artifactId>kantan.csv-generic_${scala.binary.version}</artifactId>
+            <version>0.5.0</version>
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/com.nrinaudo/kantan.csv-java8 -->
+        <dependency>
+            <groupId>com.nrinaudo</groupId>
+            <artifactId>kantan.csv-java8_${scala.binary.version}</artifactId>
+            <version>0.5.0</version>
+        </dependency>
+
         <!-- unit testing -->
 
         <!-- https://mvnrepository.com/artifact/org.scalacheck/scalacheck -->
