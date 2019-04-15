@@ -7,8 +7,7 @@ import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
 import org.mvrs.dspa.events.{CommentEvent, RawCommentEvent}
-import org.mvrs.dspa.preparation.BuildCommentsHierarchyJob
-import org.mvrs.dspa.utils
+import org.mvrs.dspa.{streams, utils}
 import org.scalatest.Assertions.assertResult
 
 import scala.collection.mutable
@@ -43,7 +42,7 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     val stream = env.fromCollection(rawComments)
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[RawCommentEvent](Time.milliseconds(100), _.timestamp))
 
-    val (rootedStream, droppedStream) = BuildCommentsHierarchyJob.resolveReplyTree(stream, droppedRepliesStream = true)
+    val (rootedStream, droppedStream) = streams.resolveReplyTree(stream, droppedRepliesStream = true)
 
     RootedSink.values.clear()
     DroppedSink.values.clear()
@@ -87,7 +86,7 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     val stream = env.fromCollection(rawComments)
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[RawCommentEvent](Time.milliseconds(100), _.timestamp))
 
-    val (rootedStream, droppedStream) = BuildCommentsHierarchyJob.resolveReplyTree(stream, droppedRepliesStream = true)
+    val (rootedStream, droppedStream) = streams.resolveReplyTree(stream, droppedRepliesStream = true)
 
     RootedSink.values.clear()
     DroppedSink.values.clear()
@@ -133,7 +132,7 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     val stream = env.fromCollection(rawComments)
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[RawCommentEvent](Time.milliseconds(100), _.timestamp))
 
-    val (rootedStream, droppedStream) = BuildCommentsHierarchyJob.resolveReplyTree(stream, droppedRepliesStream = true)
+    val (rootedStream, droppedStream) = streams.resolveReplyTree(stream, droppedRepliesStream = true)
 
     RootedSink.values.clear()
     DroppedSink.values.clear()

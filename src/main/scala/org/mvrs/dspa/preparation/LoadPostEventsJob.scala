@@ -19,7 +19,7 @@ object LoadPostEventsJob extends App {
 
   val speedupFactor = 0
 
-  implicit val decoder: RowDecoder[PostEvent] = PostEvent.decoder
+  implicit val decoder: RowDecoder[PostEvent] = PostEvent.csvDecoder
   val stream =
     env.addSource(
       new ReplayedCsvFileSourceFunction[PostEvent](

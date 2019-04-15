@@ -18,7 +18,7 @@ object LoadLikeEventsJob extends App {
   implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
   env.setParallelism(1)
 
-  implicit val decoder: RowDecoder[LikeEvent] = LikeEvent.decoder
+  implicit val decoder: RowDecoder[LikeEvent] = LikeEvent.csvDecoder
   val speedupFactor = 0
 
   val stream =

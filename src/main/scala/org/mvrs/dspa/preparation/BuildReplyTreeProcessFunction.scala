@@ -12,6 +12,7 @@ import org.apache.flink.streaming.api.scala.{OutputTag, createTypeInformation}
 import org.apache.flink.util.Collector
 import org.mvrs.dspa.events.{CommentEvent, RawCommentEvent}
 import org.mvrs.dspa.preparation.BuildReplyTreeProcessFunction._
+
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -266,7 +267,7 @@ object BuildReplyTreeProcessFunction {
     loop(Set())(replies, getChildren)
   }
 
-  def resolve(c: RawCommentEvent, postId: Long): CommentEvent = {
+  private def resolve(c: RawCommentEvent, postId: Long): CommentEvent = {
     CommentEvent(
       c.commentId,
       c.personId,
@@ -278,4 +279,5 @@ object BuildReplyTreeProcessFunction {
       c.replyToCommentId,
       c.placeId)
   }
+
 }

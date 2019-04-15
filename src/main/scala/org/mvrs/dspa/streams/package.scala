@@ -2,13 +2,53 @@ package org.mvrs.dspa
 
 import java.util.Properties
 
-import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, createTypeInformation}
+import kantan.csv.RowDecoder
+import org.apache.flink.streaming.api.scala.{DataStream, OutputTag, StreamExecutionEnvironment, createTypeInformation}
 import org.apache.flink.streaming.api.windowing.time.Time
-import org.mvrs.dspa.events.{CommentEvent, LikeEvent, PostEvent}
-import org.mvrs.dspa.functions.ScaledReplayFunction
+import org.mvrs.dspa.events.{CommentEvent, LikeEvent, PostEvent, RawCommentEvent}
+import org.mvrs.dspa.functions.{ReplayedCsvFileSourceFunction, ScaledReplayFunction}
+import org.mvrs.dspa.preparation.BuildReplyTreeProcessFunction
 
 package object streams {
-  val kafkaBrokers = "localhost:9092"
+  val kafkaBrokers = "localhost:9092" // TODO to central configuration
+
+  def resolveReplyTree(rawComments: DataStream[RawCommentEvent]): DataStream[CommentEvent] =
+    resolveReplyTree(rawComments, droppedRepliesStream = false)._1
+
+  def resolveReplyTree(rawComments: DataStream[RawCommentEvent], droppedRepliesStream: Boolean): (DataStream[CommentEvent], DataStream[RawCommentEvent]) = {
+    val firstLevelComments = rawComments
+      .filter(_.replyToPostId.isDefined)
+      .map(c => CommentEvent(c.commentId, c.personId, c.creationDate, c.locationIP, c.browserUsed, c.content, c.replyToPostId.get, None, c.placeId))
+      .keyBy(_.postId)
+
+    val repliesBroadcast = rawComments
+      .filter(_.replyToPostId.isEmpty)
+      .broadcast()
+
+    val outputTagDroppedReplies = new OutputTag[RawCommentEvent]("dropped replies")
+
+    val outputTag = if (droppedRepliesStream) Some(outputTagDroppedReplies) else None
+
+    val rootedComments: DataStream[CommentEvent] = firstLevelComments
+      .connect(repliesBroadcast)
+      .process(new BuildReplyTreeProcessFunction(outputTag)).name("tree")
+
+    val droppedReplies = rootedComments.getSideOutput(outputTagDroppedReplies)
+
+    (rootedComments, droppedReplies)
+  }
+
+  def rawComments(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)(implicit env: StreamExecutionEnvironment): DataStream[RawCommentEvent] = {
+    implicit val decoder: RowDecoder[RawCommentEvent] = RawCommentEvent.csvDecoder
+
+    env.addSource(new ReplayedCsvFileSourceFunction[RawCommentEvent](
+      filePath,
+      skipFirstLine = true, '|',
+      extractEventTime = _.timestamp,
+      speedupFactor, // 0 -> unchanged read speed
+      randomDelay,
+      watermarkInterval))
+  }
 
   def comments(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] = {
     val commentsSource = utils.createKafkaConsumer("comments", createTypeInformation[CommentEvent],
@@ -56,5 +96,6 @@ package object streams {
     props
   }
 
-  private def getMaxOutOfOrderness(speedupFactor: Int, randomDelay: Int) = Time.milliseconds(if (speedupFactor == 0) randomDelay else randomDelay / speedupFactor)
+  private def getMaxOutOfOrderness(speedupFactor: Int, randomDelay: Int) =
+    Time.milliseconds(if (speedupFactor == 0) randomDelay else randomDelay / speedupFactor)
 }
