@@ -2,17 +2,16 @@ package org.mvrs.dspa.recommendations
 
 import java.util.concurrent.TimeUnit
 
-import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.datastream.AsyncDataStream
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.mvrs.dspa.events.ForumEvent
 import org.mvrs.dspa.functions.CollectSetFunction
-import org.mvrs.dspa.{Settings, streams, utils}
+import org.mvrs.dspa.utils.ElasticSearchNode
+import org.mvrs.dspa.{Settings, streams}
 
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext.Implicits.global
 
 object RecommendationsJob extends App {
   val elasticHostName = "localhost"
@@ -22,14 +21,8 @@ object RecommendationsJob extends App {
   val typeName = "recommendations_type"
   val elasticSearchUri = s"$elasticScheme://$elasticHostName:$elasticPort"
 
-  val client = ElasticClient(ElasticProperties(elasticSearchUri))
-  try {
-    utils.dropIndex(client, indexName) // testing: recreate the index
-    RecommendationsIndex.create(client, indexName, typeName)
-  }
-  finally {
-    client.close()
-  }
+  val index = new RecommendationsIndex(List(ElasticSearchNode(elasticHostName)), indexName, typeName)
+  index.create()
 
   implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
@@ -69,7 +62,7 @@ object RecommendationsJob extends App {
       .timeWindow(windowSize, windowSlide)
       .aggregate(new CollectSetFunction[ForumEvent, Long, Long](key = _.personId, value = _.postId))
 
-  postIds.print
+//   postIds.print
 
   // TODO get tags per post, get forum of post and tags of forum
 
@@ -106,7 +99,7 @@ object RecommendationsJob extends App {
     5
   )
 
-  // recommendations.addSink(RecommendationsIndex.createSink(elasticHostName, elasticPort, elasticScheme, indexName, typeName))
+  recommendations.addSink(index.createSink(numMaxActions = 100))
 
   env.execute("recommendations")
 }
