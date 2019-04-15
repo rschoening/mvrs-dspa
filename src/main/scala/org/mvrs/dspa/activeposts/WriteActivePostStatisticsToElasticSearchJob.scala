@@ -5,7 +5,6 @@ import java.util.Properties
 import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala._
-import org.mvrs.dspa.events.PostStatistics
 import org.mvrs.dspa.utils
 
 

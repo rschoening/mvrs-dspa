@@ -7,17 +7,15 @@ import kantan.csv.{CellDecoder, RowDecoder}
 
 import scala.collection.Set
 
-case class PostStatistics(postId: Long,
-                          time: Long,
-                          commentCount: Int,
-                          replyCount: Int,
-                          likeCount: Int,
-                          distinctUserCount: Int, newPost: Boolean)
 
-trait ForumEvent {
-  val personId: Long
+trait TimestampedEvent {
   val creationDate: Date
   val timestamp: Long = creationDate.toInstant.toEpochMilli
+}
+
+trait ForumEvent extends TimestampedEvent {
+  val personId: Long
+  val postId: Long
 }
 
 final case class LikeEvent(personId: Long,
@@ -38,17 +36,6 @@ final case class PostEvent(postId: Long,
                            placeId: Int) extends ForumEvent {
 }
 
-final case class RawCommentEvent(commentId: Long,
-                                 personId: Long,
-                                 creationDate: Date,
-                                 locationIP: Option[String],
-                                 browserUsed: Option[String],
-                                 content: Option[String],
-                                 replyToPostId: Option[Long],
-                                 replyToCommentId: Option[Long],
-                                 placeId: Int) extends ForumEvent {
-}
-
 final case class CommentEvent(commentId: Long,
                               personId: Long,
                               creationDate: Date,
@@ -58,6 +45,17 @@ final case class CommentEvent(commentId: Long,
                               postId: Long,
                               replyToCommentId: Option[Long],
                               placeId: Int) extends ForumEvent {
+}
+
+final case class RawCommentEvent(commentId: Long,
+                                 personId: Long,
+                                 creationDate: Date,
+                                 locationIP: Option[String],
+                                 browserUsed: Option[String],
+                                 content: Option[String],
+                                 replyToPostId: Option[Long],
+                                 replyToCommentId: Option[Long],
+                                 placeId: Int) extends TimestampedEvent {
 }
 
 object RawCommentEvent {

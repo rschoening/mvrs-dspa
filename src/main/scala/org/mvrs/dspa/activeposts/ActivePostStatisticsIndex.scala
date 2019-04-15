@@ -8,7 +8,6 @@ import org.apache.flink.streaming.connectors.elasticsearch.{ElasticsearchSinkFun
 import org.apache.flink.streaming.connectors.elasticsearch6.ElasticsearchSink
 import org.apache.http.HttpHost
 import org.elasticsearch.action.index.IndexRequest
-import org.mvrs.dspa.events.PostStatistics
 
 import scala.collection.JavaConverters._
 

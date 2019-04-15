@@ -3,8 +3,7 @@ package org.mvrs.dspa.activeposts
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, createTypeInformation}
 import org.apache.flink.streaming.api.windowing.time.Time
-import org.mvrs.dspa.activeposts.EventType.EventType
-import org.mvrs.dspa.events.{CommentEvent, LikeEvent, PostEvent, PostStatistics}
+import org.mvrs.dspa.events.{CommentEvent, LikeEvent, PostEvent}
 import org.mvrs.dspa.{streams, utils}
 
 object ActivePostStatisticsJob extends App {
@@ -65,11 +64,6 @@ object ActivePostStatisticsJob extends App {
     e.postId, e.personId, e.timestamp)
 }
 
-object EventType extends Enumeration {
-  type EventType = Value
-  val Post, Comment, Reply, Like = Value
-}
 
-case class Event(eventType: EventType, postId: Long, personId: Long, timestamp: Long)
 
 
