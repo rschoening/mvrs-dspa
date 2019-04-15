@@ -20,7 +20,7 @@ object LoadCommentEventsJob extends App {
   env.setParallelism(4)
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
-  val rawComments = streams.rawComments(filePath, speedupFactor, maximumDelayMilliseconds, watermarkInterval)
+  val rawComments = streams.rawCommentsFromCsv(filePath, speedupFactor, maximumDelayMilliseconds, watermarkInterval)
 
   val rootedComments = streams.resolveReplyTree(rawComments)
 

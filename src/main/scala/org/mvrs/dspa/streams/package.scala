@@ -38,7 +38,7 @@ package object streams {
     (rootedComments, droppedReplies)
   }
 
-  def rawComments(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)(implicit env: StreamExecutionEnvironment): DataStream[RawCommentEvent] = {
+  def rawCommentsFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)(implicit env: StreamExecutionEnvironment): DataStream[RawCommentEvent] = {
     implicit val decoder: RowDecoder[RawCommentEvent] = RawCommentEvent.csvDecoder
 
     env.addSource(new ReplayedCsvFileSourceFunction[RawCommentEvent](
@@ -50,7 +50,31 @@ package object streams {
       watermarkInterval))
   }
 
-  def comments(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] = {
+  def likesFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)(implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
+    implicit val decoder: RowDecoder[LikeEvent] = LikeEvent.csvDecoder
+
+    env.addSource(new ReplayedCsvFileSourceFunction[LikeEvent](
+      filePath,
+      skipFirstLine = true, '|',
+      extractEventTime = _.timestamp,
+      speedupFactor, // 0 -> unchanged read speed
+      randomDelay,
+      watermarkInterval))
+  }
+
+  def postsFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)(implicit env: StreamExecutionEnvironment): DataStream[PostEvent] = {
+    implicit val decoder: RowDecoder[PostEvent] = PostEvent.csvDecoder
+
+    env.addSource(new ReplayedCsvFileSourceFunction[PostEvent](
+      filePath,
+      skipFirstLine = true, '|',
+      extractEventTime = _.timestamp,
+      speedupFactor, // 0 -> unchanged read speed
+      randomDelay,
+      watermarkInterval))
+  }
+
+  def commentsFromKafka(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] = {
     val commentsSource = utils.createKafkaConsumer("comments", createTypeInformation[CommentEvent],
       getKafkaConsumerProperties(consumerGroup))
 
@@ -62,7 +86,7 @@ package object streams {
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](maxOutOfOrderness, _.timestamp))
   }
 
-  def posts(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[PostEvent] = {
+  def postsFromKafka(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[PostEvent] = {
     val postsSource = utils.createKafkaConsumer("posts", createTypeInformation[PostEvent],
       getKafkaConsumerProperties(consumerGroup))
 
@@ -74,7 +98,7 @@ package object streams {
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[PostEvent](maxOutOfOrderness, _.timestamp))
   }
 
-  def likes(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
+  def likesFromKafka(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
     val likesSource = utils.createKafkaConsumer("likes", createTypeInformation[LikeEvent],
       getKafkaConsumerProperties(consumerGroup))
 

@@ -17,9 +17,9 @@ object ActivePostStatisticsJob extends App {
   val speedupFactor = 0 // 0 --> read as fast as can
   val randomDelay = 0 // event time
 
-  val commentsStream = streams.comments(consumerGroup, speedupFactor, randomDelay)
-  val postsStream = streams.posts(consumerGroup, speedupFactor, randomDelay)
-  val likesStream = streams.likes(consumerGroup, speedupFactor, randomDelay)
+  val commentsStream = streams.commentsFromKafka(consumerGroup, speedupFactor, randomDelay)
+  val postsStream = streams.postsFromKafka(consumerGroup, speedupFactor, randomDelay)
+  val likesStream = streams.likesFromKafka(consumerGroup, speedupFactor, randomDelay)
 
   val statsStream = statisticsStream(
     commentsStream, postsStream, likesStream,

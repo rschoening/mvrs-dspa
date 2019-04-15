@@ -61,7 +61,7 @@ object UnusualActivityDetectionJob extends App {
   env.setParallelism(4) // NOTE with multiple workers, the comments AND broadcast stream watermarks lag VERY much behind
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
-  val comments = streams.comments("activity-detection")
+  val comments = streams.commentsFromKafka("activity-detection")
 
   val frequencyStream: DataStream[(Long, Int)] =
     comments

@@ -1,8 +1,11 @@
 package preparation
 
+import java.util
+import java.util.Collections
+
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.functions.sink.SinkFunction
-import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
+import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
@@ -10,7 +13,7 @@ import org.mvrs.dspa.events.{CommentEvent, RawCommentEvent}
 import org.mvrs.dspa.{streams, utils}
 import org.scalatest.Assertions.assertResult
 
-import scala.collection.mutable
+import scala.collection.JavaConverters._
 
 /**
   * Integration test suite for [[org.mvrs.dspa.preparation.BuildReplyTreeProcessFunction]]
@@ -51,8 +54,8 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
 
     env.execute()
 
-    val rooted = RootedSink.values
-    val dropped = DroppedSink.values
+    val rooted = RootedSink.values.asScala
+    val dropped = DroppedSink.values.asScala
 
     println("rooted:")
     println(rooted.mkString("\n"))
@@ -60,8 +63,8 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     println("dropped:")
     println(dropped.mkString("\n"))
 
-    assertResult(0)(dropped.length)
-    assertResult(rawComments.length)(rooted.length)
+    assertResult(0)(dropped.size)
+    assertResult(rawComments.length)(rooted.size)
     assert(rooted.forall(_.postId == postId))
   }
 
@@ -95,8 +98,8 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
 
     env.execute()
 
-    val rooted = RootedSink.values
-    val dropped = DroppedSink.values
+    val rooted = RootedSink.values.asScala
+    val dropped = DroppedSink.values.asScala
 
     println("rooted:")
     println(rooted.mkString("\n"))
@@ -104,7 +107,7 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     println("dropped:")
     println(dropped.mkString("\n"))
 
-    assertResult(rawComments.length)(rooted.length)
+    assertResult(rawComments.length)(rooted.size)
     assert(rooted.forall(_.postId == postId))
   }
 
@@ -141,8 +144,8 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
 
     env.execute()
 
-    val rooted = RootedSink.values
-    val dropped = DroppedSink.values
+    val rooted = RootedSink.values.asScala
+    val dropped = DroppedSink.values.asScala
 
     println("rooted:")
     println(rooted.mkString("\n"))
@@ -150,9 +153,9 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     println("dropped:")
     println(dropped.mkString("\n"))
 
-    assertResult(3)(rooted.length)
+    assertResult(3)(rooted.size)
     val danglingIds = List(113, 115)
-    assertResult(2)(dropped.length)
+    assertResult(2)(dropped.size)
     assert(dropped.forall(_.replyToPostId.isEmpty))
     assert(dropped.forall(r => danglingIds.contains(r.commentId)))
   }
@@ -162,23 +165,18 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
 // NOTE: these classes must not be nested in the test class, otherwise they are not serializable
 
 class RootedSink extends SinkFunction[CommentEvent] {
-  override def invoke(value: CommentEvent): Unit =
-    synchronized {
-      RootedSink.values += value
-    }
+  override def invoke(value: CommentEvent): Unit = RootedSink.values.add(value)
 }
 
 object RootedSink {
-  val values: mutable.MutableList[CommentEvent] = mutable.MutableList[CommentEvent]() // must be static
+  val values: util.Collection[CommentEvent] = Collections.synchronizedCollection(new util.ArrayList[CommentEvent])
 }
 
 class DroppedSink extends SinkFunction[RawCommentEvent] {
-  override def invoke(value: RawCommentEvent): Unit =
-    synchronized {
-      DroppedSink.values += value
-    }
+  override def invoke(value: RawCommentEvent): Unit = DroppedSink.values.add(value)
 }
 
 object DroppedSink {
-  val values: mutable.MutableList[RawCommentEvent] = mutable.MutableList[RawCommentEvent]() // must be static
+  // NOTE synchronized { /* access to non-threadsafe collection */ } does not work, collection still corrupt
+  val values: util.Collection[RawCommentEvent] = Collections.synchronizedCollection(new util.ArrayList[RawCommentEvent])
 }

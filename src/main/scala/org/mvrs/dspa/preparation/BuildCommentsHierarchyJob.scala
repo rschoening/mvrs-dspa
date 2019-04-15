@@ -21,7 +21,7 @@ object BuildCommentsHierarchyJob extends App {
   env.setParallelism(4)
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
-  val allComments = streams.rawComments(filePath, speedupFactor, maximumDelayMilliseconds, watermarkInterval)
+  val allComments = streams.rawCommentsFromCsv(filePath, speedupFactor, maximumDelayMilliseconds, watermarkInterval)
 
   val rootedComments = streams.resolveReplyTree(allComments)
 
