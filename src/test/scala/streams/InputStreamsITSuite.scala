@@ -9,7 +9,7 @@ import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
-import org.mvrs.dspa.streams
+import org.mvrs.dspa.{streams, utils}
 import org.scalatest.Assertions._
 
 import scala.collection.JavaConverters._
@@ -22,8 +22,8 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
-    env.getConfig.setTaskCancellationTimeout(0) // deactivate the watch dog to allow stress-free debugging
-    env.getConfig.setAutoWatermarkInterval(1000L) // required for watermarks and correct timers
+    env.getConfig.setTaskCancellationTimeout(0)
+    env.getConfig.setAutoWatermarkInterval(1000L)
     env.setParallelism(4)
 
     streams
@@ -52,9 +52,11 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
-    env.getConfig.setTaskCancellationTimeout(0) // deactivate the watch dog to allow stress-free debugging
-    env.getConfig.setAutoWatermarkInterval(1000L) // required for watermarks and correct timers
+    env.getConfig.setTaskCancellationTimeout(0)
+    env.getConfig.setAutoWatermarkInterval(1000L)
     env.setParallelism(4)
+
+    val startTime = System.currentTimeMillis()
 
     streams
       .postsFromCsv(filePath)
@@ -73,6 +75,10 @@ class InputStreamsITSuite extends AbstractTestBase {
     assertResult(173401)(results.map(_._2).sum) // post event count
     assertResult(984)(results.map(_._1).distinct.size) // distinct persons
     assertResult(6381)(results.size) // count of per-person windows
+
+    val duration = System.currentTimeMillis() - startTime
+
+    println(s"duration: ${utils.formatDuration(duration)}")
   }
 
   @Test
@@ -82,9 +88,11 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
-    env.getConfig.setTaskCancellationTimeout(0) // deactivate the watch dog to allow stress-free debugging
-    env.getConfig.setAutoWatermarkInterval(1000L) // required for watermarks and correct timers
+    env.getConfig.setTaskCancellationTimeout(0)
+    env.getConfig.setAutoWatermarkInterval(1000L)
     env.setParallelism(4)
+
+    val startTime = System.currentTimeMillis()
 
     streams
       .rawCommentsFromCsv(filePath)
@@ -103,6 +111,10 @@ class InputStreamsITSuite extends AbstractTestBase {
     assertResult(632042)(results.map(_._2).sum) // post event count
     assertResult(912)(results.map(_._1).distinct.size) // distinct persons
     assertResult(8966)(results.size) // count of per-person windows
+
+    val duration = System.currentTimeMillis() - startTime
+
+    println(s"duration: ${utils.formatDuration(duration)}")
   }
 
   @Test
@@ -112,11 +124,13 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
-    env.getConfig.setTaskCancellationTimeout(0) // deactivate the watch dog to allow stress-free debugging
-    env.getConfig.setAutoWatermarkInterval(1000L) // required for watermarks and correct timers
+    env.getConfig.setTaskCancellationTimeout(0)
+    env.getConfig.setAutoWatermarkInterval(1000L)
     env.setParallelism(4)
 
-    streams.resolveReplyTree(streams.rawCommentsFromCsv(filePath))
+    val startTime = System.currentTimeMillis()
+
+    streams.resolveReplyTree(streams.rawCommentsFromCsv(filePath)) // speedup factor 50000: ~11 minutes
       .map(e => (e.postId, 1))
       .keyBy(_._1)
       .timeWindow(Time.days(30))
@@ -132,6 +146,10 @@ class InputStreamsITSuite extends AbstractTestBase {
     //    assertResult(602120)(results.map(_._2).sum) // post event count NOTE currently not deterministic
     assertResult(63177)(results.map(_._1).distinct.size) // distinct posts
     //    assertResult(68499)(results.size) // count of per-post windows NOTE currently not deterministic
+
+    val duration = System.currentTimeMillis() - startTime
+
+    println(s"duration: ${utils.formatDuration(duration)}")
   }
 }
 
