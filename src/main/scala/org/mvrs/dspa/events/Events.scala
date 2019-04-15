@@ -1,6 +1,6 @@
 package org.mvrs.dspa.events
 
-import java.time.{LocalDateTime, ZoneOffset}
+import java.util.Date
 
 import kantan.csv.DecodeError.TypeError
 import kantan.csv.{CellDecoder, RowDecoder}
@@ -16,18 +16,18 @@ case class PostStatistics(postId: Long,
 
 trait ForumEvent {
   val personId: Long
-  val creationDate: LocalDateTime
-  val timestamp: Long = creationDate.toInstant(ZoneOffset.UTC).toEpochMilli
+  val creationDate: Date
+  val timestamp: Long = creationDate.toInstant.toEpochMilli
 }
 
 final case class LikeEvent(personId: Long,
-                           creationDate: LocalDateTime,
+                           creationDate: Date,
                            postId: Long) extends ForumEvent {
 }
 
 final case class PostEvent(postId: Long,
                            personId: Long,
-                           creationDate: LocalDateTime,
+                           creationDate: Date,
                            imageFile: Option[String],
                            locationIP: Option[String],
                            browserUsed: Option[String],
@@ -40,7 +40,7 @@ final case class PostEvent(postId: Long,
 
 final case class RawCommentEvent(commentId: Long,
                                  personId: Long,
-                                 creationDate: LocalDateTime,
+                                 creationDate: Date,
                                  locationIP: Option[String],
                                  browserUsed: Option[String],
                                  content: Option[String],
@@ -51,7 +51,7 @@ final case class RawCommentEvent(commentId: Long,
 
 final case class CommentEvent(commentId: Long,
                               personId: Long,
-                              creationDate: LocalDateTime,
+                              creationDate: Date,
                               locationIP: Option[String],
                               browserUsed: Option[String],
                               content: Option[String],
@@ -63,7 +63,8 @@ final case class CommentEvent(commentId: Long,
 object RawCommentEvent {
   def csvDecoder: RowDecoder[RawCommentEvent] = {
     // "id|personId|creationDate|locationIP|browserUsed|content|reply_to_postId|reply_to_commentId|placeId"
-    implicit val dateDecoder: CellDecoder[LocalDateTime] = CellDecoder.from(str => Right(ParseUtils.toDateTime(str)))
+    //    implicit val dateDecoder: Decoder[String, Date, DecodeError, codecs.type] = ParseUtils.dateDecoder
+    import ParseUtils.utcDateDecoder
     RowDecoder.decoder(0, 1, 2, 3, 4, 5, 6, 7, 8)(RawCommentEvent.apply)
   }
 
@@ -77,7 +78,7 @@ object RawCommentEvent {
     RawCommentEvent(
       commentId = tokens(0).toLong,
       personId = tokens(1).toLong,
-      creationDate = ParseUtils.toDateTime(tokens(2).trim),
+      creationDate = ParseUtils.toUtcDate(tokens(2).trim),
       locationIP = ParseUtils.toOptionalString(tokens(3)),
       browserUsed = ParseUtils.toOptionalString(tokens(4)),
       content = ParseUtils.toOptionalString(tokens(5)),
@@ -90,7 +91,7 @@ object RawCommentEvent {
 object LikeEvent {
   def csvDecoder: RowDecoder[LikeEvent] = {
     // Person.id|Post.id|creationDate
-    implicit val dateDecoder: CellDecoder[LocalDateTime] = CellDecoder.from(str => Right(ParseUtils.toDateTime(str)))
+    import ParseUtils.utcDateDecoder
     RowDecoder.decoder(0, 2, 1)(LikeEvent.apply)
   }
 
@@ -103,14 +104,14 @@ object LikeEvent {
     LikeEvent(
       personId = tokens(0).toLong,
       postId = tokens(1).toLong,
-      creationDate = ParseUtils.toDateTime(tokens(2).trim))
+      creationDate = ParseUtils.toUtcDate(tokens(2).trim))
   }
 }
 
 object PostEvent {
   def csvDecoder: RowDecoder[PostEvent] = {
     // id|personId|creationDate|imageFile|locationIP|browserUsed|language|content|tags|forumId|placeId
-    implicit val dateDecoder: CellDecoder[LocalDateTime] = CellDecoder.from(str => Right(ParseUtils.toDateTime(str)))
+    import ParseUtils.utcDateDecoder
     implicit val setDecoder: CellDecoder[scala.collection.Set[Int]] = CellDecoder.from(toSet)
     RowDecoder.decoder(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)(PostEvent.apply)
   }
@@ -124,7 +125,7 @@ object PostEvent {
     PostEvent(
       postId = tokens(0).toLong,
       personId = tokens(1).toLong,
-      creationDate = ParseUtils.toDateTime(tokens(2).trim),
+      creationDate = ParseUtils.toUtcDate(tokens(2).trim),
       imageFile = ParseUtils.toOptionalString(tokens(3)),
       locationIP = ParseUtils.toOptionalString(tokens(4)),
       browserUsed = ParseUtils.toOptionalString(tokens(5)),

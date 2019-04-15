@@ -2,6 +2,7 @@ package org.mvrs.dspa.events
 
 import java.time.format.DateTimeFormatter
 import java.time.{LocalDateTime, ZoneId, ZonedDateTime}
+import java.util.Date
 
 import kantan.codecs.Decoder
 import kantan.csv.{CellDecoder, DecodeError, codecs}
@@ -9,7 +10,7 @@ import kantan.csv.{CellDecoder, DecodeError, codecs}
 object ParseUtils {
   private val formatter = DateTimeFormatter.ISO_DATE_TIME
 
-  def dateDecoder: Decoder[String, LocalDateTime, DecodeError, codecs.type] = CellDecoder.from(s => Right(toDateTime(s)))
+  implicit def utcDateDecoder: Decoder[String, Date, DecodeError, codecs.type] = CellDecoder.from(s => Right(toUtcDate(s)))
 
   def toSet(str: String): Set[Int] = str match {
     case "" | null => Set()
@@ -23,9 +24,10 @@ object ParseUtils {
 
   def toEpochMillis(str: String): Long = ZonedDateTime.parse(str, formatter).toInstant.toEpochMilli
 
-  // NOTE due to the problems with LocalDateTime in flink (and apparently elsewhere, see https://github.com/twitter/chill/issues/251)
-  //      currently the event classes use LocalDateTime in UTC
-  def toDateTime(str: String): LocalDateTime = ZonedDateTime.parse(str, formatter).withZoneSameInstant(ZoneId.of("UTC")).toLocalDateTime
+  def toUtcLocalDateTime(str: String): LocalDateTime = ZonedDateTime.parse(str, formatter).withZoneSameInstant(ZoneId.of("UTC")).toLocalDateTime
+
+  // since flink can't serialize ZonedDateTime/LocalDateTime natively, event classes currently use java.util.Date in UTC
+  def toUtcDate(str: String): Date = Date.from(ZonedDateTime.parse(str, formatter).withZoneSameInstant(ZoneId.of("UTC")).toInstant)
 
   def toOptionalString(str: String): Option[String] = str match {
     case "" | null => None

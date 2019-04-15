@@ -32,11 +32,11 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     val postId = 999
     val personId = 1
     val rawComments: List[RawCommentEvent] = List(
-      RawCommentEvent(commentId = 111, personId, creationDate = utils.toDateTime(1000), None, None, None, Some(postId), None, 0),
-      RawCommentEvent(commentId = 112, personId, creationDate = utils.toDateTime(2000), None, None, None, None, Some(111), 0),
-      RawCommentEvent(commentId = 113, personId, creationDate = utils.toDateTime(3000), None, None, None, None, Some(112), 0),
-      RawCommentEvent(commentId = 114, personId, creationDate = utils.toDateTime(4000), None, None, None, None, Some(112), 0),
-      RawCommentEvent(commentId = 115, personId, creationDate = utils.toDateTime(5000), None, None, None, None, Some(113), 0),
+      RawCommentEvent(commentId = 111, personId, creationDate = utils.toDate(1000), None, None, None, Some(postId), None, 0),
+      RawCommentEvent(commentId = 112, personId, creationDate = utils.toDate(2000), None, None, None, None, Some(111), 0),
+      RawCommentEvent(commentId = 113, personId, creationDate = utils.toDate(3000), None, None, None, None, Some(112), 0),
+      RawCommentEvent(commentId = 114, personId, creationDate = utils.toDate(4000), None, None, None, None, Some(112), 0),
+      RawCommentEvent(commentId = 115, personId, creationDate = utils.toDate(5000), None, None, None, None, Some(113), 0),
     )
 
     val stream = env.fromCollection(rawComments)
@@ -76,11 +76,11 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     val postId = 999
     val personId = 1
     val rawComments: List[RawCommentEvent] = List(
-      RawCommentEvent(commentId = 114, personId, creationDate = utils.toDateTime(1000), None, None, None, None, Some(112), 0),
-      RawCommentEvent(commentId = 115, personId, creationDate = utils.toDateTime(1000), None, None, None, None, Some(113), 0),
-      RawCommentEvent(commentId = 112, personId, creationDate = utils.toDateTime(3000), None, None, None, None, Some(111), 0),
-      RawCommentEvent(commentId = 113, personId, creationDate = utils.toDateTime(4000), None, None, None, None, Some(112), 0),
-      RawCommentEvent(commentId = 111, personId, creationDate = utils.toDateTime(5000), None, None, None, Some(postId), None, 0),
+      RawCommentEvent(commentId = 114, personId, creationDate = utils.toDate(1000), None, None, None, None, Some(112), 0),
+      RawCommentEvent(commentId = 115, personId, creationDate = utils.toDate(1000), None, None, None, None, Some(113), 0),
+      RawCommentEvent(commentId = 112, personId, creationDate = utils.toDate(3000), None, None, None, None, Some(111), 0),
+      RawCommentEvent(commentId = 113, personId, creationDate = utils.toDate(4000), None, None, None, None, Some(112), 0),
+      RawCommentEvent(commentId = 111, personId, creationDate = utils.toDate(5000), None, None, None, Some(postId), None, 0),
     )
 
     val stream = env.fromCollection(rawComments)
@@ -122,11 +122,11 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     val postId = 999
     val personId = 1
     val rawComments: List[RawCommentEvent] = List(
-      RawCommentEvent(commentId = 114, personId, creationDate = utils.toDateTime(1000), None, None, None, None, Some(112), 0),
-      RawCommentEvent(commentId = 115, personId, creationDate = utils.toDateTime(1000), None, None, None, None, Some(113), 0), // child of dangling parent
-      RawCommentEvent(commentId = 112, personId, creationDate = utils.toDateTime(3000), None, None, None, None, Some(111), 0),
-      RawCommentEvent(commentId = 113, personId, creationDate = utils.toDateTime(4000), None, None, None, None, Some(888), 0), // dangling, unknown parent
-      RawCommentEvent(commentId = 111, personId, creationDate = utils.toDateTime(5000), None, None, None, Some(postId), None, 0),
+      RawCommentEvent(commentId = 114, personId, creationDate = utils.toDate(1000), None, None, None, None, Some(112), 0),
+      RawCommentEvent(commentId = 115, personId, creationDate = utils.toDate(1000), None, None, None, None, Some(113), 0), // child of dangling parent
+      RawCommentEvent(commentId = 112, personId, creationDate = utils.toDate(3000), None, None, None, None, Some(111), 0),
+      RawCommentEvent(commentId = 113, personId, creationDate = utils.toDate(4000), None, None, None, None, Some(888), 0), // dangling, unknown parent
+      RawCommentEvent(commentId = 111, personId, creationDate = utils.toDate(5000), None, None, None, Some(postId), None, 0),
     )
 
     val stream = env.fromCollection(rawComments)
