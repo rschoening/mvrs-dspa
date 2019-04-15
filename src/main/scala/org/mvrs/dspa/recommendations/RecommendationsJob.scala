@@ -47,6 +47,7 @@ object RecommendationsJob extends App {
   val postsStream = streams.postsFromCsv(Settings.postStreamCsvPath, speedupFactor, randomDelay)
   val likesStream = streams.likesFromCsv(Settings.likesStreamCsvPath, speedupFactor, randomDelay)
 
+
   val minHasher = RecommendationUtils.createMinHasher()
 
   // TODO write post information to ElasticSearch (postId -> tags, forum)

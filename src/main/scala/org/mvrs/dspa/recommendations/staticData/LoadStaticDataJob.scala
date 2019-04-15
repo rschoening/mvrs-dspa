@@ -84,7 +84,7 @@ object LoadStaticDataJob extends App {
 
   personFeatures.output(new FeaturesOutputFormat(elasticSearchUri, personFeaturesIndex, personFeaturesTypeName))
   personMinHashes.output(new MinHashOutputFormat(elasticSearchUri, personMinHashIndex, personMinHashIndexType))
-  buckets.output(new BucketsOutputFormat2(elasticSearchUri, bucketsIndex, bucketTypeName))
+  buckets.output(new BucketsOutputFormat(elasticSearchUri, bucketsIndex, bucketTypeName))
   knownPersons.output(new KnownUsersOutputFormat(elasticSearchUri, knownPersonsIndex, knownPersonsTypeName))
 
   env.execute("import static data for recommendations")
