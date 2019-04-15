@@ -50,6 +50,11 @@ package object streams {
       watermarkInterval))
   }
 
+  def commentsFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)(implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] = {
+    resolveReplyTree(rawCommentsFromCsv(filePath, speedupFactor, randomDelay, watermarkInterval))
+  }
+
+
   def likesFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)(implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
     implicit val decoder: RowDecoder[LikeEvent] = LikeEvent.csvDecoder
 

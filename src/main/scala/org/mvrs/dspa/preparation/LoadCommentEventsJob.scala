@@ -20,14 +20,12 @@ object LoadCommentEventsJob extends App {
   env.setParallelism(4)
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
-  val rawComments = streams.rawCommentsFromCsv(filePath, speedupFactor, maximumDelayMilliseconds, watermarkInterval)
+  val comments = streams.commentsFromCsv(filePath, speedupFactor, maximumDelayMilliseconds, watermarkInterval)
 
-  val rootedComments = streams.resolveReplyTree(rawComments)
-
-  rootedComments.map(c => s"${c.commentId};-1;${c.postId};${c.creationDate}")
+  comments.map(c => s"${c.commentId};-1;${c.postId};${c.creationDate}")
     .addSink(new SimpleTextFileSinkFunction("c:\\temp\\dspa_rooted"))
 
-  // rootedComments.addSink(utils.createKafkaProducer(kafkaTopic, kafkaBrokers, createTypeInformation[CommentEvent]))
+  // comments.addSink(utils.createKafkaProducer(kafkaTopic, kafkaBrokers, createTypeInformation[CommentEvent]))
 
   // execute program
   env.execute("Import comment events from csv file to Kafka")

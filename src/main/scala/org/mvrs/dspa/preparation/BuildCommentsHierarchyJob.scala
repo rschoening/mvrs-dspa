@@ -21,11 +21,9 @@ object BuildCommentsHierarchyJob extends App {
   env.setParallelism(4)
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
-  val allComments = streams.rawCommentsFromCsv(filePath, speedupFactor, maximumDelayMilliseconds, watermarkInterval)
+  val comments = streams.commentsFromCsv(filePath, speedupFactor, maximumDelayMilliseconds, watermarkInterval)
 
-  val rootedComments = streams.resolveReplyTree(allComments)
-
-  rootedComments.map(c => s"${c.commentId};-1;${c.postId};${c.creationDate}")
+  comments.map(c => s"${c.commentId};-1;${c.postId};${c.creationDate}")
     .addSink(new SimpleTextFileSinkFunction("c:\\temp\\dspa_rooted"))
 
   // rootedComments.addSink(utils.createKafkaProducer(kafkaTopic, kafkaBrokers, createTypeInformation[CommentEvent]))
