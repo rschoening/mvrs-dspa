@@ -21,13 +21,17 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     with CheckpointedFunction {
 
   // checkpointed operator state
+  // - since state has to be accessed from the broadcast side also (outside of keyed context), unkeyed state is used.
+  //   An alternative would be the use of applyToKeyedState(), however this processes all keyed states in sequence,
+  //   which might become too slow if many keys are active
   private val danglingReplies: mutable.Map[Long, (Long, mutable.Set[RawCommentEvent])] = mutable.Map[Long, (Long, mutable.Set[RawCommentEvent])]()
-  private val postForComment: mutable.Map[Long, Long] = mutable.Map()
+  private val postForComment: mutable.Map[Long, Long] = mutable.Map() // TODO persist to ElasticSearch, use as cache (then no longer in operator state)
 
   @transient private var danglingRepliesListState: ListState[Map[Long, Set[RawCommentEvent]]] = _
   @transient private var postForCommentListState: ListState[Map[Long, Long]] = _
 
   // metrics
+  // TODO remove redundant metrics (eg. throughput, row counts per input/output)
   @transient private var firstLevelCommentCounter: Counter = _
   @transient private var replyCounter: Counter = _
   @transient private var resolvedReplyCount: Counter = _

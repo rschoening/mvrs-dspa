@@ -18,7 +18,7 @@ package object streams {
 
     env.addSource(commentsSource)
       .keyBy(_.commentId) // only for scaled replay function (timer)
-      // .process(new ScaledReplayFunction[Long, CommentEvent](_.creationDate, speedupFactor, randomDelay))
+      .process(new ScaledReplayFunction[Long, CommentEvent](_.timestamp, speedupFactor, randomDelay))
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](maxOutOfOrderness, _.timestamp))
   }
 
@@ -34,18 +34,6 @@ package object streams {
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[PostEvent](maxOutOfOrderness, _.timestamp))
   }
 
-  private def getKafkaConsumerProperties(consumerGroup: String) = {
-
-    val props = new Properties()
-    props.setProperty("bootstrap.servers", kafkaBrokers)
-    props.setProperty("group.id", consumerGroup)
-    props.setProperty("isolation.level", "read_committed")
-
-    props
-  }
-
-  private def getMaxOutOfOrderness(speedupFactor: Int, randomDelay: Int) = Time.milliseconds(if (speedupFactor == 0) randomDelay else randomDelay / speedupFactor)
-
   def likes(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
     val likesSource = utils.createKafkaConsumer("likes", createTypeInformation[LikeEvent],
       getKafkaConsumerProperties(consumerGroup))
@@ -57,4 +45,16 @@ package object streams {
       .process(new ScaledReplayFunction[Long, LikeEvent](_.timestamp, speedupFactor, randomDelay))
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[LikeEvent](maxOutOfOrderness, _.timestamp))
   }
+
+  private def getKafkaConsumerProperties(consumerGroup: String) = {
+
+    val props = new Properties()
+    props.setProperty("bootstrap.servers", kafkaBrokers)
+    props.setProperty("group.id", consumerGroup)
+    props.setProperty("isolation.level", "read_committed")
+
+    props
+  }
+
+  private def getMaxOutOfOrderness(speedupFactor: Int, randomDelay: Int) = Time.milliseconds(if (speedupFactor == 0) randomDelay else randomDelay / speedupFactor)
 }
