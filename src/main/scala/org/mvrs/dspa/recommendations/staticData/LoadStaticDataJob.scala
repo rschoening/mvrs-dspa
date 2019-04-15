@@ -6,6 +6,7 @@ import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
 import com.twitter.algebird.{MinHashSignature, MinHasher32}
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
 import org.apache.flink.streaming.api.scala._
+import org.mvrs.dspa.recommendations.RecommendationUtils
 import org.mvrs.dspa.utils
 
 object LoadStaticDataJob extends App {
@@ -61,7 +62,7 @@ object LoadStaticDataJob extends App {
       .groupBy(_._1)
       .reduceGroup(sortedValues[String] _)
 
-  val minHasher: MinHasher32 = utils.createMinHasher()
+  val minHasher: MinHasher32 = RecommendationUtils.createMinHasher()
 
   val personMinHashes: DataSet[(Long, MinHashSignature)] =
     personFeatures.map(t => (t._1, minHasher.combineAll(t._2.map(minHasher.init))))

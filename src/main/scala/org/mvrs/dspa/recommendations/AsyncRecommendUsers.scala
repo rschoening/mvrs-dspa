@@ -5,7 +5,6 @@ import com.sksamuel.elastic4s.http.{ElasticClient, Response}
 import com.twitter.algebird.{MinHashSignature, MinHasher32}
 import org.apache.flink.streaming.api.functions.async.ResultFuture
 import org.mvrs.dspa.io.AsyncElasticSearchFunction
-import org.mvrs.dspa.utils
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
@@ -33,24 +32,17 @@ class AsyncRecommendUsers(elasticSearchUri: String, minHasher: MinHasher32)
   private def unpackResponse(input: (Long, MinHashSignature, Set[Long]), response: Response[SearchResponse]): List[(Long, Seq[(Long, Double)])] = {
     val candidates = response.result.hits.hits.map(hit => (hit.id.toLong, getMinHash(hit))).toList
 
-    List((input._1, getTopN(input._2, candidates, 5, 0.2)))
+    List((input._1, RecommendationUtils.getTopN(input._2, candidates, minHasher, 5, 0.2)))
   }
 
   // TODO do this outside for testability
-  private def getTopN(minHashSignature: MinHashSignature,
-                      candidates: Seq[(Long, MinHashSignature)],
-                      n: Int,
-                      minimumSimilarity: Double) = {
-    candidates.map(c => (c._1, minHasher.similarity(minHashSignature, c._2)))
-      .filter(t => t._2 >= minimumSimilarity)
-      .sortBy(-1 * _._2)
-      .take(n)
-  }
 
   private def getMinHash(hit: SearchHit) = {
     val result = hit.sourceAsMap("minhash").asInstanceOf[String]
 
-    utils.decodeMinHashSignature(result)
+    RecommendationUtils.decodeMinHashSignature(result)
   }
 
 }
+
+

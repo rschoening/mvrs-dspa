@@ -40,7 +40,9 @@ object RecommendationsJob extends App {
   val postsStream = streams.postsFromKafka(consumerGroup, speedupFactor, randomDelay)
   val likesStream = streams.likesFromKafka(consumerGroup, speedupFactor, randomDelay)
 
-  val minHasher = utils.createMinHasher()
+  val minHasher = RecommendationUtils.createMinHasher()
+
+  // write post information to ElasticSearch
 
   val eventStream =
     commentsStream

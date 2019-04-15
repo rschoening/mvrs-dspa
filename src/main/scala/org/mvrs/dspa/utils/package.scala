@@ -2,11 +2,10 @@ package org.mvrs.dspa
 
 import java.nio.file.Paths
 import java.time.{Instant, LocalDateTime, ZoneId}
-import java.util.{Base64, Optional, Properties}
+import java.util.{Optional, Properties}
 
 import com.sksamuel.elastic4s.http.index.admin.DeleteIndexResponse
 import com.sksamuel.elastic4s.http.{ElasticClient, Response}
-import com.twitter.algebird.{MinHashSignature, MinHasher, MinHasher32}
 import org.apache.flink.api.common.serialization.TypeInformationSerializationSchema
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
@@ -14,7 +13,6 @@ import org.apache.flink.configuration.{ConfigConstants, Configuration}
 import org.apache.flink.streaming.api.functions.AssignerWithPeriodicWatermarks
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor
 import org.apache.flink.streaming.api.windowing.time.Time
-import org.mvrs.dspa.io.ElasticSearchOutputFormat
 
 import scala.reflect.ClassTag
 //import org.apache.avro.{Schema, SchemaBuilder}
@@ -33,7 +31,8 @@ import org.apache.kafka.clients.producer.ProducerConfig
 // NOTE this will be refactored, currently a mixed bag
 package object utils {
 
-  val kafkaBrokers = "localhost:9092"
+  val kafkaBrokers = "localhost:9092" // TODO move to centralized configuration
+
   private val dateFormat = ThreadLocal.withInitial[SimpleDateFormat](() => new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
 
   def toDateTime(millis: Long): LocalDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneId.of("UTC"))
@@ -69,14 +68,6 @@ package object utils {
   def formatTimestamp(timestamp: Long): String = dateFormat.get.format(new Date(timestamp))
 
   def formatDuration(millis: Long): String = DurationFormatUtils.formatDuration(millis, "HH:mm:ss,SSS")
-
-  def getMinHashSignature(features: Seq[String], minHasher: MinHasher32): MinHashSignature =
-    minHasher.combineAll(features.map(minHasher.init))
-
-  def decodeMinHashSignature(base64: String) = MinHashSignature(Base64.getDecoder.decode(base64))
-
-  def createMinHasher(numHashes: Int = 100, targetThreshold: Double = 0.2): MinHasher32 =
-    new MinHasher32(numHashes, MinHasher.pickBands(targetThreshold, numHashes))
 
   def dropIndex(client: ElasticClient, indexName: String): Response[DeleteIndexResponse] = {
     // we must import the dsl
@@ -147,26 +138,6 @@ package object utils {
   def timeStampExtractor[T](maxOutOfOrderness: Time, extract: T => Long): AssignerWithPeriodicWatermarks[T] = {
     new BoundedOutOfOrdernessTimestampExtractor[T](maxOutOfOrderness) {
       override def extractTimestamp(element: T): Long = extract(element)
-    }
-  }
-
-  // TODO move elsewhere
-  class BucketsOutputFormat(uri: String, indexName: String, typeName: String)
-    extends ElasticSearchOutputFormat[(Long, Seq[(Long, MinHashSignature)])](uri) {
-
-    import com.sksamuel.elastic4s.http.ElasticDsl._
-
-    override def process(record: (Long, Seq[(Long, MinHashSignature)]), client: ElasticClient): Unit = {
-      // NOTE: connections are "unexpectedly closed" when using onComplete on the future - need to await
-      client.execute {
-        indexInto(indexName / typeName)
-          .withId(record._1.toString)
-          .fields(
-            "users" -> record._2.map(t => Map(
-              "uid" -> t._1,
-              "minhash" -> Base64.getEncoder.encodeToString(t._2.bytes))),
-            "lastUpdate" -> System.currentTimeMillis())
-      }.await // synchronous per-record round trip --> slow but sufficient for loading static data
     }
   }
 
