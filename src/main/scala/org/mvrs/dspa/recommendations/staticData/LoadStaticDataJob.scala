@@ -7,7 +7,7 @@ import com.twitter.algebird.{MinHashSignature, MinHasher32}
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.recommendations.RecommendationUtils
-import org.mvrs.dspa.utils
+import org.mvrs.dspa.{Settings, utils}
 
 object LoadStaticDataJob extends App {
   implicit val env: ExecutionEnvironment = ExecutionEnvironment.getExecutionEnvironment
@@ -15,7 +15,7 @@ object LoadStaticDataJob extends App {
 
   // TODO determine how to manage settings
 
-  val rootPath = raw"C:\\data\\dspa\\project\\1k-users-sorted\\tables"
+  val rootPath = Settings.tablesDirectory
   val hasInterestCsv = Paths.get(rootPath, "person_hasInterest_tag.csv").toString
   val worksAtCsv = Paths.get(rootPath, "person_workAt_organisation.csv").toString
   val studyAtCsv = Paths.get(rootPath, "person_studyAt_organisation.csv").toString

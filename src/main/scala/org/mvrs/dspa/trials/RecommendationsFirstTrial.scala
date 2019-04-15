@@ -15,7 +15,7 @@ import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.util.Collector
 import org.mvrs.dspa.events.{CommentEvent, ForumEvent, LikeEvent, PostEvent}
-import org.mvrs.dspa.utils
+import org.mvrs.dspa.{Settings, utils}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -27,7 +27,7 @@ object RecommendationsFirstTrial extends App {
   env.setParallelism(1)
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
-  val rootPath = raw"C:\\data\\dspa\\project\\1k-users-sorted\\tables"
+  val rootPath = Settings.tablesDirectory
   val hasInterestCsv = Paths.get(rootPath, "person_hasInterest_tag.csv").toString
   val worksAtCsv = Paths.get(rootPath, "person_workAt_organisation.csv").toString
 

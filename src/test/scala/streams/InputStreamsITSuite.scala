@@ -9,7 +9,7 @@ import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
-import org.mvrs.dspa.{streams, utils}
+import org.mvrs.dspa.{Settings, streams, utils}
 import org.scalatest.Assertions._
 
 import scala.collection.JavaConverters._
@@ -17,9 +17,6 @@ import scala.collection.JavaConverters._
 class InputStreamsITSuite extends AbstractTestBase {
   @Test
   def testReadingLikes(): Unit = {
-    // TODO get from configuration
-    val filePath = "C:\\data\\dspa\\project\\1k-users-sorted\\streams\\likes_event_stream.csv"
-
     implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.getConfig.setTaskCancellationTimeout(0)
@@ -27,7 +24,7 @@ class InputStreamsITSuite extends AbstractTestBase {
     env.setParallelism(4)
 
     streams
-      .likesFromCsv(filePath)
+      .likesFromCsv(Settings.likesStreamCsvPath)
       .map(e => (e.postId, 1))
       .keyBy(_._1)
       .timeWindow(Time.days(30))
@@ -47,8 +44,6 @@ class InputStreamsITSuite extends AbstractTestBase {
 
   @Test
   def testReadingPosts(): Unit = {
-    // TODO get from configuration
-    val filePath = "C:\\data\\dspa\\project\\1k-users-sorted\\streams\\post_event_stream.csv"
 
     implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
@@ -59,7 +54,7 @@ class InputStreamsITSuite extends AbstractTestBase {
     val startTime = System.currentTimeMillis()
 
     streams
-      .postsFromCsv(filePath)
+      .postsFromCsv(Settings.postStreamCsvPath)
       .map(e => (e.personId, 1))
       .keyBy(_._1)
       .timeWindow(Time.days(30))
@@ -83,9 +78,6 @@ class InputStreamsITSuite extends AbstractTestBase {
 
   @Test
   def testReadingRawComments(): Unit = {
-    // TODO get from configuration
-    val filePath = "C:\\data\\dspa\\project\\1k-users-sorted\\streams\\comment_event_stream.csv"
-
     implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.getConfig.setTaskCancellationTimeout(0)
@@ -95,7 +87,7 @@ class InputStreamsITSuite extends AbstractTestBase {
     val startTime = System.currentTimeMillis()
 
     streams
-      .rawCommentsFromCsv(filePath)
+      .rawCommentsFromCsv(Settings.commentStreamCsvPath)
       .map(e => (e.personId, 1))
       .keyBy(_._1)
       .timeWindow(Time.days(30))
@@ -119,9 +111,6 @@ class InputStreamsITSuite extends AbstractTestBase {
 
   @Test
   def testReadingComments(): Unit = {
-    // TODO get from configuration
-    val filePath = "C:\\data\\dspa\\project\\1k-users-sorted\\streams\\comment_event_stream.csv"
-
     implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.getConfig.setTaskCancellationTimeout(0)
@@ -130,7 +119,7 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     val startTime = System.currentTimeMillis()
 
-    streams.resolveReplyTree(streams.rawCommentsFromCsv(filePath)) // speedup factor 50000: ~11 minutes
+    streams.commentsFromCsv(Settings.commentStreamCsvPath) // speedup factor 50000: ~11 minutes
       .map(e => (e.postId, 1))
       .keyBy(_._1)
       .timeWindow(Time.days(30))
