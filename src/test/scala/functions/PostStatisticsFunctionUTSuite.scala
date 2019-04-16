@@ -1,4 +1,4 @@
-package org.mvrs.dspa.functions
+package functions
 
 import org.mvrs.dspa.jobs.activeposts.PostStatisticsFunction
 import org.scalatest.{FlatSpec, Matchers}

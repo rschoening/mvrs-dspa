@@ -1,4 +1,4 @@
-package recommendations
+package jobs.recommendations
 
 import org.apache.flink.streaming.api.scala._
 import org.junit.Test

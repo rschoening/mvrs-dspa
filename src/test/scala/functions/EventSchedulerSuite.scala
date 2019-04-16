@@ -1,8 +1,9 @@
-package org.mvrs.dspa.functions
+package functions
 
 import java.time.{LocalDateTime, ZoneOffset}
 
 import org.apache.flink.streaming.api.watermark.Watermark
+import org.mvrs.dspa.functions.EventScheduler
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.collection.mutable

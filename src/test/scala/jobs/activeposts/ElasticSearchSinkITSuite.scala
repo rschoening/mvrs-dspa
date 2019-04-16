@@ -1,4 +1,4 @@
-package activeposts
+package jobs.activeposts
 
 import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
 import org.apache.flink.streaming.api.TimeCharacteristic

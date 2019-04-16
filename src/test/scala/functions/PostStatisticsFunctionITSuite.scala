@@ -1,4 +1,4 @@
-package org.mvrs.dspa.functions
+package functions
 
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.datastream.DataStreamUtils

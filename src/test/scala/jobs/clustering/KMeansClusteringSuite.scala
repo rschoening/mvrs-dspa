@@ -1,4 +1,4 @@
-package clustering
+package jobs.clustering
 
 import org.mvrs.dspa.jobs.clustering.KMeansClustering
 import org.mvrs.dspa.jobs.clustering.KMeansClustering.Point

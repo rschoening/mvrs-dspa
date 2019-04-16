@@ -1,4 +1,4 @@
-package org.mvrs.dspa.events
+package events
 
 import org.scalatest.{FlatSpec, Matchers}
 

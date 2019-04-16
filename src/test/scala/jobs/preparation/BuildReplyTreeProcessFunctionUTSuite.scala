@@ -1,4 +1,4 @@
-package preparation
+package jobs.preparation
 
 import org.mvrs.dspa.events.RawCommentEvent
 import org.mvrs.dspa.jobs.preparation.BuildReplyTreeProcessFunction

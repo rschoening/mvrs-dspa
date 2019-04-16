@@ -1,10 +1,11 @@
-package org.mvrs.dspa.functions
+package functions
 
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.datastream.DataStreamUtils
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
+import org.mvrs.dspa.functions.ReplayedSequenceSourceFunction
 import org.scalatest.Assertions._
 
 import scala.collection.JavaConverters._
