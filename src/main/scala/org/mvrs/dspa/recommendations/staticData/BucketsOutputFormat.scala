@@ -1,4 +1,4 @@
-package org.mvrs.dspa.recommendations.staticData
+package org.mvrs.dspa.recommendations.staticdata
 
 import java.util.Base64
 

@@ -1,4 +1,4 @@
-package org.mvrs.dspa.recommendations.staticData
+package org.mvrs.dspa.recommendations.staticdata
 
 import java.nio.file.Paths
 
@@ -11,7 +11,7 @@ import org.mvrs.dspa.{Settings, utils}
 
 object LoadStaticDataJob extends App {
   implicit val env: ExecutionEnvironment = ExecutionEnvironment.getExecutionEnvironment
-  env.setParallelism(5)
+  env.setParallelism(4)
 
   // TODO determine how to manage settings
 
@@ -90,7 +90,7 @@ object LoadStaticDataJob extends App {
   env.execute("import static data for recommendations")
 
   private def sortedValues[V: Ordering](x: Iterator[(Long, V)]): (Long, List[V]) = {
-    val t = x.foldLeft[(Long, List[V])]((0L, Nil))((z, t) => (t._1, t._2 :: z._2))
+    val t: (Long, List[V]) = x.foldLeft[(Long, List[V])]((0L, Nil))((z, t) => (t._1, t._2 :: z._2))
     (t._1, t._2.sorted)
   }
 
