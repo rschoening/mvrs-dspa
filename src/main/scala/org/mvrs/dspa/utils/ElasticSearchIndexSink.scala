@@ -10,7 +10,7 @@ import scala.collection.JavaConverters._
 
 abstract class ElasticSearchIndexSink[T](hosts: Seq[ElasticSearchNode], indexName: String, typeName: String)
   extends ElasticSearchIndex(hosts, indexName, typeName) {
-  
+
   def createSink(numMaxActions: Int): ElasticsearchSink[T] = {
     val builder = new ElasticsearchSink.Builder[T](
       hosts.map(_.httpHost).asJava,
