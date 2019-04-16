@@ -18,7 +18,7 @@ class AsyncMinHashLookup(minHasher: MinHasher32, nodes: ElasticSearchNode*)
 
   override def asyncInvoke(client: ElasticClient, input: ForumEvent, resultFuture: ResultFuture[(Long, MinHashSignature)]): Unit = {
     client.execute {
-      get(input.personId.toString).from("recommendation_person_features" / "recommendation_person_features_type")
+      get(input.personId.toString).from("recommendation_person_features" / "recommendation_person_features_type") // TODO pass as ctor args
     }.onComplete {
       case Success(response) => resultFuture.complete(unpackResponse(input, response).asJava)
       case Failure(exception) => resultFuture.completeExceptionally(exception)
@@ -27,7 +27,13 @@ class AsyncMinHashLookup(minHasher: MinHasher32, nodes: ElasticSearchNode*)
 
   // TODO do this outside for testability? Just return the raw features from the function?
   private def unpackResponse(input: ForumEvent, response: Response[GetResponse]) =
-    if (response.result.found) List((input.personId, RecommendationUtils.getMinHashSignature(getFeatures(response.result), minHasher)))
+    if (response.result.found)
+      List(
+        (
+          input.personId,
+          RecommendationUtils.getMinHashSignature(getFeatures(response.result), minHasher)
+        )
+      )
     else Nil
 
   def getFeatures(response: GetResponse): Seq[String] = response.source("features").asInstanceOf[List[String]]

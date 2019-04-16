@@ -23,4 +23,7 @@ object RecommendationUtils {
 
   def createMinHasher(numHashes: Int = 100, targetThreshold: Double = 0.2): MinHasher32 =
     new MinHasher32(numHashes, MinHasher.pickBands(targetThreshold, numHashes))
+
+  def toFeature(input: Long, prefix: String): String = s"$prefix$input"
+
 }

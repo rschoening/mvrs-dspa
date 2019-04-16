@@ -10,7 +10,7 @@ import org.mvrs.dspa.jobs.recommendations.RecommendationUtils
 import org.mvrs.dspa.{Settings, utils}
 
 object LoadStaticDataJob extends App {
-  implicit val env: ExecutionEnvironment =  utils.createBatchExecutionEnvironment(localWithUI = true) // TODO arg
+  implicit val env: ExecutionEnvironment = utils.createBatchExecutionEnvironment(localWithUI = false) // TODO arg
   env.setParallelism(4)
 
   // TODO determine how to manage settings
@@ -100,5 +100,5 @@ object LoadStaticDataJob extends App {
     (t._1, t._2.sorted)
   }
 
-  private def toFeature(input: (Long, Long), prefix: String): (Long, String) = (input._1, s"$prefix${input._2}")
+  private def toFeature(input: (Long, Long), prefix: String): (Long, String) = (input._1, RecommendationUtils.toFeature(input._2, prefix))
 }
