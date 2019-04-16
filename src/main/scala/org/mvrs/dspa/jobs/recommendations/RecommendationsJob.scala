@@ -99,7 +99,7 @@ object RecommendationsJob extends App {
     5
   )
 
-  recommendations.addSink(index.createSink(numMaxActions = 100))
+  recommendations.addSink(index.createSink(batchSize = 100))
 
   env.execute("recommendations")
 }

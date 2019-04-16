@@ -11,14 +11,17 @@ import scala.collection.JavaConverters._
 abstract class ElasticSearchIndexSink[T](hosts: Seq[ElasticSearchNode], indexName: String, typeName: String)
   extends ElasticSearchIndex(hosts, indexName, typeName) {
 
-  def createSink(numMaxActions: Int): ElasticsearchSink[T] = {
+  def createSink(batchSize: Int): ElasticsearchSink[T] = {
+    require(batchSize > 0, s"invalid batch size: $batchSize")
+
     val builder = new ElasticsearchSink.Builder[T](
       hosts.map(_.httpHost).asJava,
       new ElasticsearchSinkFunction[T] {
         private def createUpsertRequest(record: T): UpdateRequest = {
 
+          // NOTE this closes over the containing class, which therefore must be serializable
           val document = createDocument(record).asJava
-          val id = getId(record)
+          val id = getDocumentId(record)
 
           val indexRequest = new IndexRequest(indexName, typeName, id).source(document)
           new UpdateRequest(indexName, typeName, id).doc(document).upsert(indexRequest)
@@ -31,23 +34,23 @@ abstract class ElasticSearchIndexSink[T](hosts: Seq[ElasticSearchNode], indexNam
     )
 
     // configuration for the bulk requests
-    builder.setBulkFlushMaxActions(numMaxActions)
+    builder.setBulkFlushMaxActions(batchSize)
 
-    //    // provide a RestClientFactory for custom configuration on the internally created REST client
-    //    //    esSinkBuilder.setRestClientFactory(
-    //    //      restClientBuilder => {
-    //    //         restClientBuilder.setDefaultHeaders(...)
-    //    //         restClientBuilder.setMaxRetryTimeoutMillis(...)
-    //    //         restClientBuilder.setPathPrefix(...)
-    //    //         restClientBuilder.setHttpClientConfigCallback(...)
-    //    //      }
-    //    //    )
+    // if ever needed: provide a RestClientFactory for custom configuration on the internally created REST client
     //
+    //    builder.setRestClientFactory(
+    //      restClientBuilder => {
+    //         restClientBuilder.setDefaultHeaders(...)
+    //         restClientBuilder.setMaxRetryTimeoutMillis(...)
+    //         restClientBuilder.setPathPrefix(...)
+    //         restClientBuilder.setHttpClientConfigCallback(...)
+    //      }
+    //    )
 
     builder.build()
   }
 
-  protected def getId(record: T): String
+  protected def getDocumentId(record: T): String
 
   protected def createDocument(record: T): Map[String, Any]
 }

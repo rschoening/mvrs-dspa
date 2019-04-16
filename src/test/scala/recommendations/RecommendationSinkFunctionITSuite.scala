@@ -24,7 +24,7 @@ class RecommendationSinkFunctionITSuite {
       .generateSequence(1L, 1000L)
       .map(v => (v, (0L to 10L).map(u => (u, 0.5))))
 
-    generated.addSink(index.createSink(numMaxActions = 100))
+    generated.addSink(index.createSink(batchSize = 100))
 
     env.execute("test")
   }
