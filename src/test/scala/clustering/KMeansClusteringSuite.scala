@@ -1,7 +1,7 @@
 package clustering
 
-import org.mvrs.dspa.clustering.KMeansClustering
-import org.mvrs.dspa.clustering.KMeansClustering.Point
+import org.mvrs.dspa.jobs.clustering.KMeansClustering
+import org.mvrs.dspa.jobs.clustering.KMeansClustering.Point
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.util.Random

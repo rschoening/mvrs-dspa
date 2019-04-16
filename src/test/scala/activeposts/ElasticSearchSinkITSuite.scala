@@ -5,7 +5,7 @@ import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
-import org.mvrs.dspa.activeposts.{ActivePostStatisticsIndex, PostStatistics}
+import org.mvrs.dspa.jobs.activeposts.{ActivePostStatisticsIndex, PostStatistics}
 import org.mvrs.dspa.utils
 
 class ElasticSearchSinkITSuite extends AbstractTestBase {

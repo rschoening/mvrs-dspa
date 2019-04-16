@@ -1,6 +1,6 @@
 package org.mvrs.dspa.functions
 
-import org.mvrs.dspa.activeposts.PostStatisticsFunction
+import org.mvrs.dspa.jobs.activeposts.PostStatisticsFunction
 import org.scalatest.{FlatSpec, Matchers}
 
 class PostStatisticsFunctionUTSuite extends FlatSpec with Matchers {

@@ -7,7 +7,7 @@ import org.apache.flink.streaming.api.scala.{DataStream, OutputTag, StreamExecut
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.mvrs.dspa.events.{CommentEvent, LikeEvent, PostEvent, RawCommentEvent}
 import org.mvrs.dspa.functions.{ReplayedCsvFileSourceFunction, ScaledReplayFunction}
-import org.mvrs.dspa.preparation.BuildReplyTreeProcessFunction
+import org.mvrs.dspa.jobs.preparation.BuildReplyTreeProcessFunction
 
 package object streams {
   val kafkaBrokers = "localhost:9092" // TODO to central configuration

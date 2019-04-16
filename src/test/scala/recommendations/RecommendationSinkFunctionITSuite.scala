@@ -2,8 +2,8 @@ package recommendations
 
 import org.apache.flink.streaming.api.scala._
 import org.junit.Test
-import org.mvrs.dspa.recommendations.RecommendationsIndex
-import org.mvrs.dspa.utils.ElasticSearchNode
+import org.mvrs.dspa.io.ElasticSearchNode
+import org.mvrs.dspa.jobs.recommendations.RecommendationsIndex
 
 class RecommendationSinkFunctionITSuite {
   @Test

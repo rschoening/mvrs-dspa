@@ -16,7 +16,7 @@ import org.scalatest.Assertions.assertResult
 import scala.collection.JavaConverters._
 
 /**
-  * Integration test suite for [[org.mvrs.dspa.preparation.BuildReplyTreeProcessFunction]]
+  * Integration test suite for [[org.mvrs.dspa.jobs.preparation.BuildReplyTreeProcessFunction]]
   *
   * since the execution is not deterministic with parallelism > 1, the tests are repeated
   */

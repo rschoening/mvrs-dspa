@@ -6,14 +6,14 @@ import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
-import org.mvrs.dspa.activeposts.{Event, EventType, PostStatisticsFunction}
+import org.mvrs.dspa.jobs.activeposts.{Event, EventType, PostStatisticsFunction}
 import org.mvrs.dspa.utils
 import org.scalatest.Assertions._
 
 import scala.collection.JavaConverters._
 
 /**
-  * Integration test suite for [[org.mvrs.dspa.activeposts.PostStatisticsFunction]]
+  * Integration test suite for [[org.mvrs.dspa.jobs.activeposts.PostStatisticsFunction]]
   */
 class PostStatisticsFunctionITSuite extends AbstractTestBase {
 
