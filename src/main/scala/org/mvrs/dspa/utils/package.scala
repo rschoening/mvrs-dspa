@@ -50,6 +50,10 @@ package object utils {
     delay
   }
 
+  def createBatchExecutionEnvironment(localWithUI: Boolean = false): ExecutionEnvironment =
+    if (localWithUI) ExecutionEnvironment.createLocalEnvironmentWithWebUI()
+    else ExecutionEnvironment.getExecutionEnvironment
+
   def createStreamExecutionEnvironment(localWithUI: Boolean = false): StreamExecutionEnvironment = {
     // TODO include metrics always? or rely on flink config when running in cluster?
     if (localWithUI) {
