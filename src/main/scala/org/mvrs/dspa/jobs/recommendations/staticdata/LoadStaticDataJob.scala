@@ -10,7 +10,7 @@ import org.mvrs.dspa.jobs.recommendations.RecommendationUtils
 import org.mvrs.dspa.{Settings, utils}
 
 object LoadStaticDataJob extends App {
-  implicit val env: ExecutionEnvironment =  ExecutionEnvironment.getExecutionEnvironment
+  implicit val env: ExecutionEnvironment =  utils.createBatchExecutionEnvironment(localWithUI = true) // TODO arg
   env.setParallelism(4)
 
   // TODO determine how to manage settings
