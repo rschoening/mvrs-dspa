@@ -2,64 +2,68 @@ package org.mvrs.dspa.jobs.recommendations.staticdata
 
 import java.nio.file.Paths
 
-import com.sksamuel.elastic4s.http.ElasticClient
 import com.twitter.algebird.{MinHashSignature, MinHasher32}
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
 import org.apache.flink.streaming.api.scala._
-import org.mvrs.dspa.io.{ElasticSearchNode, ElasticSearchUtils}
+import org.mvrs.dspa.io.ElasticSearchNode
 import org.mvrs.dspa.jobs.recommendations.RecommendationUtils
 import org.mvrs.dspa.{Settings, utils}
 
 object LoadStaticDataJob extends App {
-  implicit val env: ExecutionEnvironment = ExecutionEnvironment.getExecutionEnvironment
+  implicit val env: ExecutionEnvironment =  ExecutionEnvironment.getExecutionEnvironment
   env.setParallelism(4)
 
   // TODO determine how to manage settings
 
   val rootPath = Settings.tablesDirectory
   val hasInterestCsv = Paths.get(rootPath, "person_hasInterest_tag.csv").toString
+  val forumTagsCsv = Paths.get(rootPath, "forum_hasTag_tag.csv").toString
   val worksAtCsv = Paths.get(rootPath, "person_workAt_organisation.csv").toString
   val studyAtCsv = Paths.get(rootPath, "person_studyAt_organisation.csv").toString
   val knownPersonsCsv = Paths.get(rootPath, "person_knows_person.csv").toString
 
   val elasticSearchNode = ElasticSearchNode("localhost")
 
-  val bucketsIndex = "recommendation_lsh_buckets"
-  val personFeaturesIndex = "recommendation_person_features"
-  val knownPersonsIndex = "recommendation_known_persons"
-  val personMinHashIndex = "recommendation_person_minhash"
+  val bucketsIndexName = "recommendation_lsh_buckets"
+  val personFeaturesIndexName = "recommendation_person_features"
+  val forumFeaturesIndexName = "recommendation_forum_features"
+  val knownPersonsIndexName = "recommendation_known_persons"
+  val personMinHashIndexName = "recommendation_person_minhash"
 
   val typeSuffix = "_type"
-  val personFeaturesTypeName = personFeaturesIndex + typeSuffix
-  val bucketTypeName = bucketsIndex + typeSuffix
-  val knownPersonsTypeName = knownPersonsIndex + typeSuffix
-  val personMinHashIndexType = personMinHashIndex + typeSuffix
+  val personFeaturesTypeName = personFeaturesIndexName + typeSuffix
+  val forumFeaturesTypeName = forumFeaturesIndexName + typeSuffix
+  val bucketTypeName = bucketsIndexName + typeSuffix
+  val knownPersonsTypeName = knownPersonsIndexName + typeSuffix
+  val personMinHashIndexType = personMinHashIndexName + typeSuffix
 
-  val client = ElasticSearchUtils.createClient(elasticSearchNode)
-  try {
-    ElasticSearchUtils.dropIndex(client, personFeaturesIndex)
-    ElasticSearchUtils.dropIndex(client, bucketsIndex)
-    ElasticSearchUtils.dropIndex(client, knownPersonsIndex)
-    ElasticSearchUtils.dropIndex(client, personMinHashIndex)
+  val personFeaturesIndex = new FeaturesIndex(personFeaturesIndexName, personFeaturesTypeName, elasticSearchNode)
+  val forumFeaturesIndex = new FeaturesIndex(forumFeaturesIndexName, forumFeaturesTypeName, elasticSearchNode)
+  val personMinHashIndex = new MinHashIndex(personMinHashIndexName, personMinHashIndexType, elasticSearchNode)
+  val knownPersonsIndex = new KnownUsersIndex(knownPersonsIndexName, knownPersonsTypeName, elasticSearchNode)
+  val bucketsIndex = new BucketsIndex(bucketsIndexName, bucketTypeName, elasticSearchNode)
 
-    createFeaturesIndex(client, personFeaturesIndex, personFeaturesTypeName)
-    createKnownPersonsIndex(client, knownPersonsIndex, knownPersonsTypeName)
-    createMinHashIndex(client, personMinHashIndex, personMinHashIndexType)
-    createBucketIndex(client, bucketsIndex, bucketTypeName)
-  }
-  finally {
-    client.close()
-  }
+  personFeaturesIndex.create()
+  forumFeaturesIndex.create()
+  personMinHashIndex.create()
+  knownPersonsIndex.create()
+  bucketsIndex.create()
 
-  val personInterests = utils.readCsv[(Long, Long)](hasInterestCsv).map(toFeature(_, "I"))
+  val personInterests = utils.readCsv[(Long, Long)](hasInterestCsv).map(toFeature(_, "T"))
   val personWork = utils.readCsv[(Long, Long)](worksAtCsv).map(toFeature(_, "W"))
   val personStudy = utils.readCsv[(Long, Long)](studyAtCsv).map(toFeature(_, "S"))
+  val forumTags = utils.readCsv[(Long, Long)](forumTagsCsv).map(toFeature(_, "T"))
 
   // TODO do example for hierarchy (place, tag structure) --> flatten over all levels
   val personFeatures: DataSet[(Long, List[String])] =
     personInterests
       .union(personWork)
       .union(personStudy)
+      .groupBy(_._1)
+      .reduceGroup(sortedValues[String] _)
+
+  val forumFeatures: DataSet[(Long, List[String])] =
+    forumTags
       .groupBy(_._1)
       .reduceGroup(sortedValues[String] _)
 
@@ -83,10 +87,11 @@ object LoadStaticDataJob extends App {
     .groupBy(_._1)
     .reduceGroup(sortedValues[Long] _)
 
-  personFeatures.output(new FeaturesOutputFormat(personFeaturesIndex, personFeaturesTypeName, elasticSearchNode))
-  personMinHashes.output(new MinHashOutputFormat(personMinHashIndex, personMinHashIndexType, elasticSearchNode))
-  buckets.output(new BucketsOutputFormat(bucketsIndex, bucketTypeName, elasticSearchNode))
-  knownPersons.output(new KnownUsersOutputFormat(knownPersonsIndex, knownPersonsTypeName, elasticSearchNode))
+  personFeatures.output(personFeaturesIndex.createUpsertFormat())
+  forumFeatures.output(forumFeaturesIndex.createUpsertFormat())
+  personMinHashes.output(personMinHashIndex.createUpsertFormat())
+  knownPersons.output(knownPersonsIndex.createUpsertFormat())
+  buckets.output(bucketsIndex.createUpsertFormat())
 
   env.execute("import static data for recommendations")
 
@@ -96,62 +101,4 @@ object LoadStaticDataJob extends App {
   }
 
   private def toFeature(input: (Long, Long), prefix: String): (Long, String) = (input._1, s"$prefix${input._2}")
-
-  private def createKnownPersonsIndex(client: ElasticClient, indexName: String, typeName: String): Unit = {
-    import com.sksamuel.elastic4s.http.ElasticDsl._
-
-    client.execute {
-      createIndex(indexName).mappings(
-        mapping(typeName).fields(
-          longField("knownUsers").index(false),
-          dateField("lastUpdate")
-        )
-      )
-    }.await
-
-  }
-
-  private def createBucketIndex(client: ElasticClient, indexName: String, typeName: String): Unit = {
-    import com.sksamuel.elastic4s.http.ElasticDsl._
-
-    client.execute {
-      createIndex(indexName).mappings(
-        mapping(typeName).fields(
-          longField("uid").index(false),
-          dateField("lastUpdate")
-        )
-      )
-    }.await
-
-  }
-
-  private def createMinHashIndex(client: ElasticClient, indexName: String, typeName: String): Unit = {
-    import com.sksamuel.elastic4s.http.ElasticDsl._
-
-    client.execute {
-      createIndex(indexName).mappings(
-        mapping(typeName).fields(
-          binaryField("minhash").index(false),
-          dateField("lastUpdate")
-        )
-      )
-    }.await
-
-  }
-
-  private def createFeaturesIndex(client: ElasticClient, indexName: String, typeName: String): Unit = {
-    import com.sksamuel.elastic4s.http.ElasticDsl._
-
-    client.execute {
-      createIndex(indexName).mappings(
-        mapping(typeName).fields(
-          textField("features").index(false),
-          dateField("lastUpdate")
-        )
-      )
-    }.await
-
-  }
-
-
 }

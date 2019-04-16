@@ -1,5 +1,6 @@
 package org.mvrs.dspa.io
 
+import com.sksamuel.elastic4s.http.ElasticClient
 import org.apache.flink.api.common.functions.RuntimeContext
 import org.apache.flink.streaming.connectors.elasticsearch.{ElasticsearchSinkFunction, RequestIndexer}
 import org.apache.flink.streaming.connectors.elasticsearch6.ElasticsearchSink
@@ -54,3 +55,6 @@ abstract class ElasticSearchIndexSink[T](indexName: String, typeName: String, no
 
   protected def createDocument(record: T): Map[String, Any]
 }
+
+
+

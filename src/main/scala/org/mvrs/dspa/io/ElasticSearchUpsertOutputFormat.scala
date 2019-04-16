@@ -9,11 +9,11 @@ abstract class ElasticSearchUpsertOutputFormat[T](indexName: String, typeName: S
 
   override def process(record: T, client: ElasticClient): Unit = {
     client.execute {
-      update(getId(record)) in indexName / typeName docAsUpsert getFields(record)
+      update(getDocumentId(record)) in indexName / typeName docAsUpsert createDocument(record)
     }.await
   }
 
-  def getId(record: T): String
+  def getDocumentId(record: T): String
 
-  def getFields(record: T): Iterable[(String, Any)]
+  def createDocument(record: T): Map[String, Any]
 }
