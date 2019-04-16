@@ -11,14 +11,16 @@ import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class AsyncMinHashLookup(minHasher: MinHasher32, nodes: ElasticSearchNode*)
+class AsyncPersonMinHashLookup(personFeaturesIndex: String, personFeaturesType: String, minHasher: MinHasher32, nodes: ElasticSearchNode*)
   extends AsyncElasticSearchFunction[ForumEvent, (Long, MinHashSignature)](nodes: _*) {
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
-  override def asyncInvoke(client: ElasticClient, input: ForumEvent, resultFuture: ResultFuture[(Long, MinHashSignature)]): Unit = {
+  override def asyncInvoke(client: ElasticClient,
+                           input: ForumEvent,
+                           resultFuture: ResultFuture[(Long, MinHashSignature)]): Unit = {
     client.execute {
-      get(input.personId.toString).from("recommendation_person_features" / "recommendation_person_features_type") // TODO pass as ctor args
+      get(input.personId.toString) from personFeaturesIndex / personFeaturesType
     }.onComplete {
       case Success(response) => resultFuture.complete(unpackResponse(input, response).asJava)
       case Failure(exception) => resultFuture.completeExceptionally(exception)

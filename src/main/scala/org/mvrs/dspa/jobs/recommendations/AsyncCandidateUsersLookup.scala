@@ -9,19 +9,21 @@ import org.mvrs.dspa.io.{AsyncElasticSearchFunction, ElasticSearchNode}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class AsyncCandidateUsersLookup(minHasher: MinHasher32, nodes: ElasticSearchNode*)
+class AsyncCandidateUsersLookup(lshBucketsIndex: String, minHasher: MinHasher32, nodes: ElasticSearchNode*)
   extends AsyncElasticSearchFunction[(Long, MinHashSignature), (Long, MinHashSignature, Set[Long])](nodes: _*) {
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
-  override def asyncInvoke(client: ElasticClient, input: (Long, MinHashSignature), resultFuture: ResultFuture[(Long, MinHashSignature, Set[Long])]): Unit = {
+  override def asyncInvoke(client: ElasticClient,
+                           input: (Long, MinHashSignature),
+                           resultFuture: ResultFuture[(Long, MinHashSignature, Set[Long])]): Unit = {
     import scala.collection.JavaConverters._
 
     val buckets = minHasher.buckets(input._2)
 
     // TODO or use termsQuery to get more compact result?
     client.execute {
-      search("recommendation_lsh_buckets").query {
+      search(lshBucketsIndex) query {
         idsQuery(buckets.map(_.toString))
       }
     }.onComplete {

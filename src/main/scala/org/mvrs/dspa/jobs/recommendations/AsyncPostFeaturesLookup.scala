@@ -9,18 +9,20 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class AsyncPostFeaturesLookup(nodes: ElasticSearchNode*)
+class AsyncPostFeaturesLookup(postFeaturesIndex: String, nodes: ElasticSearchNode*)
   extends AsyncElasticSearchFunction[(Long, mutable.Set[Long]), (Long, Set[String])](nodes: _*) {
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
-  override def asyncInvoke(client: ElasticClient, input: (Long, mutable.Set[Long]), resultFuture: ResultFuture[(Long, Set[String])]): Unit = {
+  override def asyncInvoke(client: ElasticClient,
+                           input: (Long, mutable.Set[Long]),
+                           resultFuture: ResultFuture[(Long, Set[String])]): Unit = {
     import scala.collection.JavaConverters._
 
     val postIds = input._2
 
     client.execute {
-      search("recommendations_posts") sourceFiltering(Seq("features"), Nil) query {
+      search(postFeaturesIndex) sourceFiltering(Seq("features"), Nil) query {
         idsQuery(postIds.map(_.toString))
       }
     }.onComplete {

@@ -19,9 +19,13 @@ object RecommendationsJob extends App {
   val recommendationsTypeName = "recommendations_type"
   val postFeaturesIndexName = "recommendations_posts"
   val postFeaturesTypeName = "recommendations_posts_type"
-  val elasticSearchNode = ElasticSearchNode("localhost")
+  val knownPersonsIndexName = "recommendation_known_persons"
+  val knownPersonsTypeName = "recommendation_known_persons_type"
+  val lshBucketsIndexName = "recommendation_lsh_buckets"
+  val personMinhashIndexName = "recommendation_person_minhash"
+  val esNode = ElasticSearchNode("localhost")
 
-  val recommendationsIndex = new RecommendationsIndex(recommendationsIndexName, recommendationsTypeName, elasticSearchNode)
+  val recommendationsIndex = new RecommendationsIndex(recommendationsIndexName, recommendationsTypeName, esNode)
   recommendationsIndex.create()
 
   implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
@@ -42,46 +46,49 @@ object RecommendationsJob extends App {
   val postsStream: DataStream[PostEvent] = streams.postsFromCsv(Settings.postStreamCsvPath, speedupFactor, randomDelay)
   val likesStream: DataStream[LikeEvent] = streams.likesFromCsv(Settings.likesStreamCsvPath, speedupFactor, randomDelay)
 
-  // gather features from user activity in sliding window
-  val postIds = postsInteractedWith(commentsStream, postsStream, likesStream, Time.hours(4), Time.minutes(60))
+  // gather the posts that the user interacted with in a sliding window
+  val postIds = collectPostsInteractedWith(
+    commentsStream, postsStream, likesStream,
+    Time.hours(4), Time.minutes(60))
 
-  val personActivityFeatures: SingleOutputStreamOperator[(Long, Set[String])] = AsyncDataStream.unorderedWait(
+  // look up the tags for these posts (from post and from the post's forum)
+  val personActivityFeatures = AsyncDataStream.unorderedWait(
     postIds.javaStream,
-    new AsyncPostFeaturesLookup(elasticSearchNode),
+    new AsyncPostFeaturesLookup(postFeaturesIndexName, esNode),
     2000L, TimeUnit.MILLISECONDS, 5)
 
+  // TODO combine with stored interests of person?
+
   // calculate minhash for person features
-  val personActivityMinHash = personActivityMinHash(personActivityFeatures, minHasher)
+  val personActivityMinHash = getPersonMinHash(personActivityFeatures, minHasher)
 
   // TODO exclude inactive users - keep last activity in this operator? would have to be broadcast to all operators
   //      alternative: keep last activity timestamp in db (both approaches might miss the most recent new activity)
   // TODO allow unit testing with mock function
   val candidates = AsyncDataStream.unorderedWait(
     personActivityMinHash.javaStream,
-    new AsyncCandidateUsersLookup(minHasher, elasticSearchNode),
-    2000L, TimeUnit.MILLISECONDS,
-    5)
+    new AsyncCandidateUsersLookup(lshBucketsIndexName, minHasher, esNode),
+    2000L, TimeUnit.MILLISECONDS,5)
 
   val filteredCandidates = AsyncDataStream.unorderedWait(
     candidates,
-    new AsyncFilterCandidates(elasticSearchNode),
-    2000L, TimeUnit.MILLISECONDS,
-    5)
+    new AsyncFilterCandidates(knownPersonsIndexName, knownPersonsTypeName, esNode),
+    2000L, TimeUnit.MILLISECONDS, 5)
 
   val recommendations = AsyncDataStream.unorderedWait(
     filteredCandidates,
-    new AsyncRecommendUsers(minHasher, elasticSearchNode),
-    2000L, TimeUnit.MILLISECONDS,
-    5
+    new AsyncRecommendUsers(personMinhashIndexName, minHasher, esNode),
+    2000L, TimeUnit.MILLISECONDS, 5
   )
 
   recommendations.addSink(recommendationsIndex.createSink(batchSize = 100))
 
   env.execute("recommendations")
 
-  def personActivityMinHash(personActivityFeatures: SingleOutputStreamOperator[(Long, Set[String])], minHasher: MinHasher32): DataStream[(Long, MinHashSignature)] = {
+  def getPersonMinHash(personFeatures: SingleOutputStreamOperator[(Long, Set[String])],
+                       minHasher: MinHasher32): DataStream[(Long, MinHashSignature)] = {
     new DataStream(
-      personActivityFeatures
+      personFeatures
         .map {
           case (personId: Long, features: Set[String]) => (
             personId,
@@ -91,11 +98,11 @@ object RecommendationsJob extends App {
         .returns(createTypeInformation[(Long, MinHashSignature)]))
   }
 
-  def postsInteractedWith(comments: DataStream[CommentEvent],
-                          posts: DataStream[PostEvent],
-                          likes: DataStream[LikeEvent],
-                          windowSize: Time,
-                          windowSlide: Time): DataStream[(Long, mutable.Set[Long])] = {
+  def collectPostsInteractedWith(comments: DataStream[CommentEvent],
+                                 posts: DataStream[PostEvent],
+                                 likes: DataStream[LikeEvent],
+                                 windowSize: Time,
+                                 windowSlide: Time): DataStream[(Long, mutable.Set[Long])] = {
     val eventStream =
       comments
         .map(_.asInstanceOf[ForumEvent])

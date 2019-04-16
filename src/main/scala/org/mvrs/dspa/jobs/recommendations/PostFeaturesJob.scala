@@ -12,6 +12,7 @@ import org.mvrs.dspa.{Settings, streams}
 object PostFeaturesJob extends App {
   val postFeaturesIndexName = "recommendations_posts"
   val postFeaturesTypeName = "recommendations_posts_type"
+  val forumFeaturesIndexName = "recommendation_forum_features"
   val elasticSearchNode = ElasticSearchNode("localhost")
 
   val postFeaturesIndex = new PostFeaturesIndex(postFeaturesIndexName, postFeaturesTypeName, elasticSearchNode)
@@ -30,7 +31,7 @@ object PostFeaturesJob extends App {
 
   val postsWithForumFeatures = AsyncDataStream.unorderedWait(
     postsStream.javaStream,
-    new AsyncForumLookup(elasticSearchNode),
+    new AsyncForumLookup(forumFeaturesIndexName, elasticSearchNode),
     2000L, TimeUnit.MILLISECONDS,
     5)
 

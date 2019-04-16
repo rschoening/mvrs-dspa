@@ -9,18 +9,20 @@ import org.mvrs.dspa.io.{AsyncElasticSearchFunction, ElasticSearchNode}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class AsyncRecommendUsers(minHasher: MinHasher32, nodes: ElasticSearchNode*)
+class AsyncRecommendUsers(personMinHashIndex: String, minHasher: MinHasher32, nodes: ElasticSearchNode*)
   extends AsyncElasticSearchFunction[(Long, MinHashSignature, Set[Long]), (Long, Seq[(Long, Double)])](nodes: _*) {
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
-  override def asyncInvoke(client: ElasticClient, input: (Long, MinHashSignature, Set[Long]), resultFuture: ResultFuture[(Long, Seq[(Long, Double)])]): Unit = {
+  override def asyncInvoke(client: ElasticClient,
+                           input: (Long, MinHashSignature, Set[Long]),
+                           resultFuture: ResultFuture[(Long, Seq[(Long, Double)])]): Unit = {
     import scala.collection.JavaConverters._
 
     val personIds: Set[Long] = input._3
 
     client.execute {
-      search("recommendation_person_minhash") query {
+      search(personMinHashIndex) query {
         idsQuery(personIds)
       }
     }.onComplete {
@@ -32,10 +34,10 @@ class AsyncRecommendUsers(minHasher: MinHasher32, nodes: ElasticSearchNode*)
   private def unpackResponse(input: (Long, MinHashSignature, Set[Long]), response: Response[SearchResponse]): List[(Long, Seq[(Long, Double)])] = {
     val candidates = response.result.hits.hits.map(hit => (hit.id.toLong, getMinHash(hit))).toList
 
+    // TODO do this outside for testability
     List((input._1, RecommendationUtils.getTopN(input._2, candidates, minHasher, 5, 0.2)))
   }
 
-  // TODO do this outside for testability
 
   private def getMinHash(hit: SearchHit) = {
     val result = hit.sourceAsMap("minhash").asInstanceOf[String]
