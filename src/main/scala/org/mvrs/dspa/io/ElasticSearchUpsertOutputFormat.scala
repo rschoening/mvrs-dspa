@@ -7,6 +7,7 @@ abstract class ElasticSearchUpsertOutputFormat[T](indexName: String, typeName: S
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
+  // TODO add support for batching and/or bounded async calls
   override def process(record: T, client: ElasticClient): Unit = {
     client.execute {
       update(getDocumentId(record)) in indexName / typeName docAsUpsert createDocument(record)

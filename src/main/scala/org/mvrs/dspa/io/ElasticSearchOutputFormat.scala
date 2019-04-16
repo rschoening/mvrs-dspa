@@ -8,8 +8,9 @@ abstract class ElasticSearchOutputFormat[T](nodes: ElasticSearchNode*) extends O
 
   private var client: Option[ElasticClient] = None
 
-  // TODO add support for batching?
-  def process(record: T, client: ElasticClient): Unit
+  protected def process(record: T, client: ElasticClient): Unit
+
+  protected def closing(client: ElasticClient): Unit = {}
 
   override def configure(parameters: Configuration): Unit = {}
 
@@ -18,7 +19,10 @@ abstract class ElasticSearchOutputFormat[T](nodes: ElasticSearchNode*) extends O
   override def writeRecord(record: T): Unit = process(record, client.get) // exception if None
 
   override def close(): Unit = {
-    client.foreach(_.close())
+    client.foreach(c => {
+      closing(c)
+      c.close()
+    })
     client = None
   }
 }
