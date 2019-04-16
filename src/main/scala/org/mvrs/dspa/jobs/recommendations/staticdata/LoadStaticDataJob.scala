@@ -2,10 +2,11 @@ package org.mvrs.dspa.jobs.recommendations.staticdata
 
 import java.nio.file.Paths
 
-import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
+import com.sksamuel.elastic4s.http.ElasticClient
 import com.twitter.algebird.{MinHashSignature, MinHasher32}
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
 import org.apache.flink.streaming.api.scala._
+import org.mvrs.dspa.io.{ElasticSearchNode, ElasticSearchUtils}
 import org.mvrs.dspa.jobs.recommendations.RecommendationUtils
 import org.mvrs.dspa.{Settings, utils}
 
@@ -21,7 +22,7 @@ object LoadStaticDataJob extends App {
   val studyAtCsv = Paths.get(rootPath, "person_studyAt_organisation.csv").toString
   val knownPersonsCsv = Paths.get(rootPath, "person_knows_person.csv").toString
 
-  val elasticSearchUri = "http://localhost:9200"
+  val elasticSearchNode = ElasticSearchNode("localhost")
 
   val bucketsIndex = "recommendation_lsh_buckets"
   val personFeaturesIndex = "recommendation_person_features"
@@ -34,12 +35,12 @@ object LoadStaticDataJob extends App {
   val knownPersonsTypeName = knownPersonsIndex + typeSuffix
   val personMinHashIndexType = personMinHashIndex + typeSuffix
 
-  val client = ElasticClient(ElasticProperties(elasticSearchUri))
+  val client = ElasticSearchUtils.createClient(elasticSearchNode)
   try {
-    utils.dropIndex(client, personFeaturesIndex)
-    utils.dropIndex(client, bucketsIndex)
-    utils.dropIndex(client, knownPersonsIndex)
-    utils.dropIndex(client, personMinHashIndex)
+    ElasticSearchUtils.dropIndex(client, personFeaturesIndex)
+    ElasticSearchUtils.dropIndex(client, bucketsIndex)
+    ElasticSearchUtils.dropIndex(client, knownPersonsIndex)
+    ElasticSearchUtils.dropIndex(client, personMinHashIndex)
 
     createFeaturesIndex(client, personFeaturesIndex, personFeaturesTypeName)
     createKnownPersonsIndex(client, knownPersonsIndex, knownPersonsTypeName)
@@ -82,10 +83,10 @@ object LoadStaticDataJob extends App {
     .groupBy(_._1)
     .reduceGroup(sortedValues[Long] _)
 
-  personFeatures.output(new FeaturesOutputFormat(elasticSearchUri, personFeaturesIndex, personFeaturesTypeName))
-  personMinHashes.output(new MinHashOutputFormat(elasticSearchUri, personMinHashIndex, personMinHashIndexType))
-  buckets.output(new BucketsOutputFormat(elasticSearchUri, bucketsIndex, bucketTypeName))
-  knownPersons.output(new KnownUsersOutputFormat(elasticSearchUri, knownPersonsIndex, knownPersonsTypeName))
+  personFeatures.output(new FeaturesOutputFormat(personFeaturesIndex, personFeaturesTypeName, elasticSearchNode))
+  personMinHashes.output(new MinHashOutputFormat(personMinHashIndex, personMinHashIndexType, elasticSearchNode))
+  buckets.output(new BucketsOutputFormat(bucketsIndex, bucketTypeName, elasticSearchNode))
+  knownPersons.output(new KnownUsersOutputFormat(knownPersonsIndex, knownPersonsTypeName, elasticSearchNode))
 
   env.execute("import static data for recommendations")
 

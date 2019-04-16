@@ -2,8 +2,8 @@ package org.mvrs.dspa.io
 
 import com.sksamuel.elastic4s.http.ElasticClient
 
-abstract class ElasticSearchUpsertOutputFormat[T](uri: String, indexName: String, typeName: String)
-  extends ElasticSearchOutputFormat[T](uri) {
+abstract class ElasticSearchUpsertOutputFormat[T](indexName: String, typeName: String, nodes: ElasticSearchNode*)
+  extends ElasticSearchOutputFormat[T](nodes: _*) {
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
 

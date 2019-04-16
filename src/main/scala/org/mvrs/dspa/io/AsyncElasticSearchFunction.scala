@@ -1,13 +1,13 @@
 package org.mvrs.dspa.io
 
-import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
+import com.sksamuel.elastic4s.http.ElasticClient
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.async.{ResultFuture, RichAsyncFunction}
 
-abstract class AsyncElasticSearchFunction[IN, OUT](elasticSearchUri: String) extends RichAsyncFunction[IN, OUT] {
+abstract class AsyncElasticSearchFunction[IN, OUT](nodes: ElasticSearchNode*) extends RichAsyncFunction[IN, OUT] {
   private var client: Option[ElasticClient] = None
 
-  override def open(parameters: Configuration): Unit = client = Some(ElasticClient(ElasticProperties(elasticSearchUri)))
+  override def open(parameters: Configuration): Unit = client = Some(ElasticSearchUtils.createClient(nodes: _*))
 
   override def close(): Unit = {
     client.foreach(_.close())

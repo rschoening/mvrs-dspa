@@ -1,10 +1,10 @@
 package org.mvrs.dspa.io
 
-import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
+import com.sksamuel.elastic4s.http.ElasticClient
 import org.apache.flink.api.common.io.OutputFormat
 import org.apache.flink.configuration.Configuration
 
-abstract class ElasticSearchOutputFormat[T](uri: String) extends OutputFormat[T] {
+abstract class ElasticSearchOutputFormat[T](nodes: ElasticSearchNode*) extends OutputFormat[T] {
 
   private var client: Option[ElasticClient] = None
 
@@ -13,7 +13,7 @@ abstract class ElasticSearchOutputFormat[T](uri: String) extends OutputFormat[T]
 
   override def configure(parameters: Configuration): Unit = {}
 
-  override def open(taskNumber: Int, numTasks: Int): Unit = client = Some(ElasticClient(ElasticProperties(uri)))
+  override def open(taskNumber: Int, numTasks: Int): Unit = client = Some(ElasticSearchUtils.createClient(nodes: _*))
 
   override def writeRecord(record: T): Unit = process(record, client.get) // exception if None
 

@@ -14,7 +14,7 @@ class RecommendationSinkFunctionITSuite {
     val indexName = "recommendations_test"
     val typeName = "recommendations_test_type"
 
-    val index = new RecommendationsIndex(List(ElasticSearchNode(elasticHostName)), indexName, typeName)
+    val index = new RecommendationsIndex(indexName, typeName, ElasticSearchNode(elasticHostName))
     index.create()
 
     val env = StreamExecutionEnvironment.getExecutionEnvironment

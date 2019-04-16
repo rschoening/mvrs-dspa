@@ -4,13 +4,13 @@ import com.sksamuel.elastic4s.http.get.GetResponse
 import com.sksamuel.elastic4s.http.{ElasticClient, Response}
 import com.twitter.algebird.MinHashSignature
 import org.apache.flink.streaming.api.functions.async.ResultFuture
-import org.mvrs.dspa.io.AsyncElasticSearchFunction
+import org.mvrs.dspa.io.{AsyncElasticSearchFunction, ElasticSearchNode}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class AsyncFilterCandidates(elasticSearchUri: String)
-  extends AsyncElasticSearchFunction[(Long, MinHashSignature, Set[Long]), (Long, MinHashSignature, Set[Long])](elasticSearchUri) {
+class AsyncFilterCandidates(nodes: ElasticSearchNode*)
+  extends AsyncElasticSearchFunction[(Long, MinHashSignature, Set[Long]), (Long, MinHashSignature, Set[Long])](nodes: _*) {
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
 

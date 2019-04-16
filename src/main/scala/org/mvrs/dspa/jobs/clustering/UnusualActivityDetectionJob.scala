@@ -10,6 +10,7 @@ import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.streaming.api.windowing.triggers.CountTrigger
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow
 import org.mvrs.dspa.events.CommentEvent
+import org.mvrs.dspa.io.ElasticSearchUtils
 import org.mvrs.dspa.{streams, utils}
 
 import scala.collection.JavaConverters._
@@ -41,7 +42,7 @@ object UnusualActivityDetectionJob extends App {
 
   val client = ElasticClient(ElasticProperties(elasticSearchUri))
   try {
-    utils.dropIndex(client, indexName) // testing: recreate the index
+    ElasticSearchUtils.dropIndex(client, indexName) // testing: recreate the index
     ActivityClassificationIndex.create(client, indexName, typeName)
   }
   finally {

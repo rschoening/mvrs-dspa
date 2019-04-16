@@ -6,8 +6,9 @@ import org.mvrs.dspa.io.{ElasticSearchIndexSink, ElasticSearchNode}
 
 import scala.collection.JavaConverters._
 
-class RecommendationsIndex(hosts: Seq[ElasticSearchNode], indexName: String, typeName: String)
-  extends ElasticSearchIndexSink[(Long, Seq[(Long, Double)])](hosts, indexName, typeName) {
+class RecommendationsIndex(indexName: String, typeName: String, hosts: ElasticSearchNode*)
+  extends ElasticSearchIndexSink[(Long, Seq[(Long, Double)])](indexName, typeName, hosts: _*) {
+
   override protected def createDocument(record: (Long, Seq[(Long, Double)])): Map[String, Any] = Map[String, Any](
     "users" -> record._2.map(createNestedDocument).toList.asJava,
     "lastUpdate" -> System.currentTimeMillis())
@@ -21,8 +22,10 @@ class RecommendationsIndex(hosts: Seq[ElasticSearchNode], indexName: String, typ
     ),
     dateField("lastUpdate"))
 
-  private def createNestedDocument(t: (Long, Double)) = Map[String, Any](
-    "uid" -> t._1,
-    "similarity" -> t._2)
-    .asJava
+  private def createNestedDocument(t: (Long, Double)) =
+    Map[String, Any](
+      "uid" -> t._1,
+      "similarity" -> t._2
+    ).asJava
 }
+

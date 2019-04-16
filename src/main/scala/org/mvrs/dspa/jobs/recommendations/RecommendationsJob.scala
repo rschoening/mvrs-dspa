@@ -14,14 +14,11 @@ import org.mvrs.dspa.{Settings, streams}
 import scala.collection.mutable
 
 object RecommendationsJob extends App {
-  val elasticHostName = "localhost"
-  val elasticPort = 9200
-  val elasticScheme = "http"
   val indexName = "recommendations"
   val typeName = "recommendations_type"
-  val elasticSearchUri = s"$elasticScheme://$elasticHostName:$elasticPort"
+  val elasticSearchNode = ElasticSearchNode("localhost")
 
-  val index = new RecommendationsIndex(List(ElasticSearchNode(elasticHostName)), indexName, typeName)
+  val index = new RecommendationsIndex(indexName, typeName, elasticSearchNode)
   index.create()
 
   implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
@@ -44,6 +41,7 @@ object RecommendationsJob extends App {
   val minHasher = RecommendationUtils.createMinHasher()
 
   // TODO write post information to ElasticSearch (postId -> tags, forum)
+  // val postFeatures = postsStream.
 
   val eventStream =
     commentsStream
@@ -62,7 +60,7 @@ object RecommendationsJob extends App {
       .timeWindow(windowSize, windowSlide)
       .aggregate(new CollectSetFunction[ForumEvent, Long, Long](key = _.personId, value = _.postId))
 
-//   postIds.print
+  //   postIds.print
 
   // TODO get tags per post, get forum of post and tags of forum
 
@@ -73,7 +71,7 @@ object RecommendationsJob extends App {
 
   val minHashes = AsyncDataStream.unorderedWait(
     eventStream.javaStream,
-    new AsyncMinHashLookup(elasticSearchUri, minHasher),
+    new AsyncMinHashLookup(minHasher, elasticSearchNode),
     2000L, TimeUnit.MILLISECONDS,
     5)
 
@@ -82,19 +80,19 @@ object RecommendationsJob extends App {
   // TODO allow unit testing with mock function
   val candidates = AsyncDataStream.unorderedWait(
     minHashes,
-    new AsyncCandidateUsersLookup(elasticSearchUri, minHasher),
+    new AsyncCandidateUsersLookup(minHasher, elasticSearchNode),
     2000L, TimeUnit.MILLISECONDS,
     5)
 
   val filteredCandidates = AsyncDataStream.unorderedWait(
     candidates,
-    new AsyncFilterCandidates(elasticSearchUri),
+    new AsyncFilterCandidates(elasticSearchNode),
     2000L, TimeUnit.MILLISECONDS,
     5)
 
   val recommendations = AsyncDataStream.unorderedWait(
     filteredCandidates,
-    new AsyncRecommendUsers(elasticSearchUri, minHasher),
+    new AsyncRecommendUsers(minHasher, elasticSearchNode),
     2000L, TimeUnit.MILLISECONDS,
     5
   )

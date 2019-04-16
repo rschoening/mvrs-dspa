@@ -8,14 +8,14 @@ import org.elasticsearch.action.update.UpdateRequest
 
 import scala.collection.JavaConverters._
 
-abstract class ElasticSearchIndexSink[T](hosts: Seq[ElasticSearchNode], indexName: String, typeName: String)
-  extends ElasticSearchIndex(hosts, indexName, typeName) {
+abstract class ElasticSearchIndexSink[T](indexName: String, typeName: String, nodes: ElasticSearchNode*)
+  extends ElasticSearchIndex(indexName, typeName, nodes: _*) {
 
   def createSink(batchSize: Int): ElasticsearchSink[T] = {
     require(batchSize > 0, s"invalid batch size: $batchSize")
 
     val builder = new ElasticsearchSink.Builder[T](
-      hosts.map(_.httpHost).asJava,
+      nodes.map(_.httpHost).asJava,
       new ElasticsearchSinkFunction[T] {
         private def createUpsertRequest(record: T): UpdateRequest = {
 

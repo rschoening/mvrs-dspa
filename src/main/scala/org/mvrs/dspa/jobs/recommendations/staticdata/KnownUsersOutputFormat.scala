@@ -1,9 +1,9 @@
 package org.mvrs.dspa.jobs.recommendations.staticdata
 
-import org.mvrs.dspa.io.ElasticSearchUpsertOutputFormat
+import org.mvrs.dspa.io.{ElasticSearchNode, ElasticSearchUpsertOutputFormat}
 
-class KnownUsersOutputFormat(uri: String, indexName: String, typeName: String)
-  extends ElasticSearchUpsertOutputFormat[(Long, List[Long])](uri, indexName, typeName) {
+class KnownUsersOutputFormat(indexName: String, typeName: String, nodes: ElasticSearchNode*)
+  extends ElasticSearchUpsertOutputFormat[(Long, List[Long])](indexName, typeName, nodes: _*) {
 
   override def getId(record: (Long, List[Long])): String = record._1.toString
 

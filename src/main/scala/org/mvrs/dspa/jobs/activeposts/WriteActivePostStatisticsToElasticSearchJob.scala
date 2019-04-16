@@ -5,6 +5,7 @@ import java.util.Properties
 import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala._
+import org.mvrs.dspa.io.ElasticSearchUtils
 import org.mvrs.dspa.utils
 
 
@@ -20,7 +21,7 @@ object WriteActivePostStatisticsToElasticSearchJob extends App {
 
   val client = ElasticClient(ElasticProperties(elasticSearchUri))
   try {
-    utils.dropIndex(client, indexName) // testing: recreate the index
+    ElasticSearchUtils.dropIndex(client, indexName) // testing: recreate the index
     ActivePostStatisticsIndex.create(client, indexName, typeName)
   }
   finally {

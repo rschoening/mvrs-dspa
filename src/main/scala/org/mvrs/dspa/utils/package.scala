@@ -4,8 +4,6 @@ import java.nio.file.Paths
 import java.time.{Instant, LocalDateTime, ZoneId}
 import java.util.{Optional, Properties}
 
-import com.sksamuel.elastic4s.http.index.admin.DeleteIndexResponse
-import com.sksamuel.elastic4s.http.{ElasticClient, Response}
 import org.apache.flink.api.common.serialization.TypeInformationSerializationSchema
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
@@ -68,15 +66,6 @@ package object utils {
   def formatTimestamp(timestamp: Long): String = dateFormat.get.format(new Date(timestamp))
 
   def formatDuration(millis: Long): String = DurationFormatUtils.formatDuration(millis, "HH:mm:ss,SSS")
-
-  def dropIndex(client: ElasticClient, indexName: String): Response[DeleteIndexResponse] = {
-    // we must import the dsl
-    import com.sksamuel.elastic4s.http.ElasticDsl._
-
-    client.execute {
-      deleteIndex(indexName)
-    }.await
-  }
 
   def readCsv[T: ClassTag](path: String)(implicit env: ExecutionEnvironment, typeInformation: TypeInformation[T]): DataSet[T] =
     env.readCsvFile[T](path, fieldDelimiter = "|", ignoreFirstLine = true)

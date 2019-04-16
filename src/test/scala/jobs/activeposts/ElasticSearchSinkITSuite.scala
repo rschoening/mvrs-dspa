@@ -5,8 +5,8 @@ import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
+import org.mvrs.dspa.io.ElasticSearchUtils
 import org.mvrs.dspa.jobs.activeposts.{ActivePostStatisticsIndex, PostStatistics}
-import org.mvrs.dspa.utils
 
 class ElasticSearchSinkITSuite extends AbstractTestBase {
 
@@ -21,7 +21,7 @@ class ElasticSearchSinkITSuite extends AbstractTestBase {
 
     val client = ElasticClient(ElasticProperties(elasticSearchUri))
     try {
-      utils.dropIndex(client, indexName) // testing: recreate the index
+      ElasticSearchUtils.dropIndex(client, indexName) // testing: recreate the index
       ActivePostStatisticsIndex.create(client, indexName, typeName)
     }
     finally {

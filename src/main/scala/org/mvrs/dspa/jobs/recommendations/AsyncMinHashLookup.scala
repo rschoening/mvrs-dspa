@@ -5,14 +5,14 @@ import com.sksamuel.elastic4s.http.{ElasticClient, Response}
 import com.twitter.algebird.{MinHashSignature, MinHasher32}
 import org.apache.flink.streaming.api.functions.async.ResultFuture
 import org.mvrs.dspa.events.ForumEvent
-import org.mvrs.dspa.io.AsyncElasticSearchFunction
+import org.mvrs.dspa.io.{AsyncElasticSearchFunction, ElasticSearchNode}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class AsyncMinHashLookup(elasticSearchUri: String, minHasher: MinHasher32)
-  extends AsyncElasticSearchFunction[ForumEvent, (Long, MinHashSignature)](elasticSearchUri) {
+class AsyncMinHashLookup(minHasher: MinHasher32, nodes: ElasticSearchNode*)
+  extends AsyncElasticSearchFunction[ForumEvent, (Long, MinHashSignature)](nodes: _*) {
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
 

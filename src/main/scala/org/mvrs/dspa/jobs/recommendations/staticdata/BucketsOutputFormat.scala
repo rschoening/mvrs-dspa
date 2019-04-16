@@ -1,12 +1,9 @@
 package org.mvrs.dspa.jobs.recommendations.staticdata
 
-import java.util.Base64
+import org.mvrs.dspa.io.{ElasticSearchNode, ElasticSearchUpsertOutputFormat}
 
-import com.twitter.algebird.MinHashSignature
-import org.mvrs.dspa.io.ElasticSearchUpsertOutputFormat
-
-class BucketsOutputFormat(uri: String, indexName: String, typeName: String)
-  extends ElasticSearchUpsertOutputFormat[(Long, List[Long])](uri, indexName, typeName) {
+class BucketsOutputFormat(indexName: String, typeName: String, nodes: ElasticSearchNode*)
+  extends ElasticSearchUpsertOutputFormat[(Long, List[Long])](indexName, typeName, nodes: _*) {
 
   override def getId(record: (Long, List[Long])): String = record._1.toString
 
