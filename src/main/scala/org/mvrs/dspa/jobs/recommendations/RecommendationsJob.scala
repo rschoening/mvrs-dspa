@@ -14,7 +14,7 @@ object RecommendationsJob extends App {
   val windowSize = Time.hours(4)
   val windowSlide = Time.hours(1)
   val activeUsersTimeout = Time.days(14)
-  var minimumRecommendationSimilarity = 0.1
+  val minimumRecommendationSimilarity = 0.1
   val maximumRecommendationCount = 5
   val speedupFactor = 0 // 0 --> read as fast as can
   val randomDelay = 0 // event time
@@ -108,19 +108,9 @@ object RecommendationsJob extends App {
 
   env.execute("recommendations")
 
-
   def getPersonMinHash(personFeatures: DataStream[(Long, Set[String])],
                        minHasher: MinHasher32): DataStream[(Long, MinHashSignature)] =
-    new DataStream(
-      personFeatures.javaStream
-        .map {
-          case (personId: Long, features: Set[String]) => (
-            personId,
-            RecommendationUtils.getMinHashSignature(features, minHasher)
-          )
-        }
-        .returns(createTypeInformation[(Long, MinHashSignature)])
-    )
+    personFeatures.map(t => (t._1, RecommendationUtils.getMinHashSignature(t._2, minHasher)))
 
   def unionForumEvents(comments: DataStream[CommentEvent],
                        posts: DataStream[PostEvent],

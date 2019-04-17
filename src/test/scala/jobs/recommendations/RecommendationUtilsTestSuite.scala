@@ -6,6 +6,8 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class RecommendationUtilsTestSuite extends FlatSpec with Matchers {
   "MinHashing" must "provide a valid approximation of the Jaccard similarity" in {
+    // NOTE this is just to exercise the basic principle, not to verify correctness of the minhash approach/twitter's implementation
+
     //noinspection RedundantDefaultArgument
     val minHasher = RecommendationUtils.createMinHasher(numHashes = 100, targetThreshold = 0.2)
     // increase value for numHashes --> reduced approximation error
@@ -32,17 +34,17 @@ class RecommendationUtilsTestSuite extends FlatSpec with Matchers {
     assert(approximationError(features, featuresSimilar, minHasher) < 0.015)
     assert(approximationError(features, featuresSuperset, minHasher) < 0.015)
     assert(approximationError(features, featuresSubset, minHasher) < 0.015)
-
-    // this would be a case for property-based testing with scalacheck, in case we mistrust twitter and/or Ullman and Rajaraman
   }
 
   "LSH" must "allow selection of similar sets for a given similarity threshold and accurracy" in {
+    // NOTE this is just to exercise the basic principle, not to verify correctness of the LSH approach/twitter's implementation
+
     //noinspection RedundantDefaultArgument
     val minHasher = RecommendationUtils.createMinHasher(numHashes = 100, targetThreshold = 0.1)
 
     // some inclusion probability values for given Jaccard similarities
     // - increasing numHashes steepens the probability curve at the target threshold
-    println("0.01: " + minHasher.probabilityOfInclusion(0.01)) // 0.004
+    println("0.01:" + minHasher.probabilityOfInclusion(0.01)) // 0.004
     println("0.02:" + minHasher.probabilityOfInclusion(0.02)) //  0.017
     println("0.05:" + minHasher.probabilityOfInclusion(0.05)) //  0.102
     println("0.1: " + minHasher.probabilityOfInclusion(0.1)) //   0.350
