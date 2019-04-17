@@ -6,7 +6,7 @@ import com.twitter.algebird.{MinHashSignature, MinHasher32}
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.io.ElasticSearchNode
-import org.mvrs.dspa.jobs.recommendations.RecommendationUtils
+import org.mvrs.dspa.jobs.recommendations.{FeaturePrefix, RecommendationUtils}
 import org.mvrs.dspa.{Settings, utils}
 
 object LoadStaticDataJob extends App {
@@ -16,7 +16,7 @@ object LoadStaticDataJob extends App {
   // TODO determine how to manage settings
 
   val rootPath = Settings.tablesDirectory
-  val hasInterestCsv = Paths.get(rootPath, "person_hasInterest_tag.csv").toString
+  val hasInterestInTagCsv = Paths.get(rootPath, "person_hasInterest_tag.csv").toString
   val forumTagsCsv = Paths.get(rootPath, "forum_hasTag_tag.csv").toString
   val worksAtCsv = Paths.get(rootPath, "person_workAt_organisation.csv").toString
   val studyAtCsv = Paths.get(rootPath, "person_studyAt_organisation.csv").toString
@@ -39,24 +39,24 @@ object LoadStaticDataJob extends App {
 
   val personFeaturesIndex = new FeaturesIndex(personFeaturesIndexName, personFeaturesTypeName, elasticSearchNode)
   val forumFeaturesIndex = new FeaturesIndex(forumFeaturesIndexName, forumFeaturesTypeName, elasticSearchNode)
-  val personMinHashIndex = new MinHashIndex(personMinHashIndexName, personMinHashIndexType, elasticSearchNode)
+  val personMinHashIndex = new PersonMinHashIndex(personMinHashIndexName, personMinHashIndexType, elasticSearchNode)
   val knownPersonsIndex = new KnownUsersIndex(knownPersonsIndexName, knownPersonsTypeName, elasticSearchNode)
-  val bucketsIndex = new BucketsIndex(bucketsIndexName, bucketTypeName, elasticSearchNode)
+  val personBucketsIndex = new PersonBucketsIndex(bucketsIndexName, bucketTypeName, elasticSearchNode)
 
   personFeaturesIndex.create()
   forumFeaturesIndex.create()
   personMinHashIndex.create()
   knownPersonsIndex.create()
-  bucketsIndex.create()
+  personBucketsIndex.create()
 
-  val personInterests = utils.readCsv[(Long, Long)](hasInterestCsv).map(toFeature(_, "T"))
-  val personWork = utils.readCsv[(Long, Long)](worksAtCsv).map(toFeature(_, "W"))
-  val personStudy = utils.readCsv[(Long, Long)](studyAtCsv).map(toFeature(_, "S"))
-  val forumTags = utils.readCsv[(Long, Long)](forumTagsCsv).map(toFeature(_, "T"))
+  val personTagInterests = utils.readCsv[(Long, Long)](hasInterestInTagCsv).map(toFeature(_, FeaturePrefix.Tag))
+  val personWork = utils.readCsv[(Long, Long)](worksAtCsv).map(toFeature(_, FeaturePrefix.Work))
+  val personStudy = utils.readCsv[(Long, Long)](studyAtCsv).map(toFeature(_, FeaturePrefix.Study))
+  val forumTags = utils.readCsv[(Long, Long)](forumTagsCsv).map(toFeature(_, FeaturePrefix.Tag))
 
   // TODO do example for hierarchy (place, tag structure) --> flatten over all levels
   val personFeatures: DataSet[(Long, List[String])] =
-    personInterests
+    personTagInterests
       .union(personWork)
       .union(personStudy)
       .groupBy(_._1)
@@ -91,7 +91,7 @@ object LoadStaticDataJob extends App {
   forumFeatures.output(forumFeaturesIndex.createUpsertFormat())
   personMinHashes.output(personMinHashIndex.createUpsertFormat())
   knownPersons.output(knownPersonsIndex.createUpsertFormat())
-  buckets.output(bucketsIndex.createUpsertFormat())
+  buckets.output(personBucketsIndex.createUpsertFormat())
 
   env.execute("import static data for recommendations")
 
@@ -102,3 +102,6 @@ object LoadStaticDataJob extends App {
 
   private def toFeature(input: (Long, Long), prefix: String): (Long, String) = (input._1, RecommendationUtils.toFeature(input._2, prefix))
 }
+
+
+

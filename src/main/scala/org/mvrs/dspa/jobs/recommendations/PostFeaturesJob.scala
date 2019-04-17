@@ -29,14 +29,13 @@ object PostFeaturesJob extends App {
   val postsWithForumFeatures = utils.asyncStream(
     postsStream, new AsyncForumLookupFunction(forumFeaturesIndexName, elasticSearchNode))
 
-  val featurePrefix = "T"
-  val postFeatures = postsWithForumFeatures.map(createPostRecord(_, featurePrefix))
+  val postFeatures = postsWithForumFeatures.map(createPostRecord _)
 
   postFeatures.addSink(postFeaturesIndex.createSink(100))
 
   env.execute("post features")
 
-  private def createPostRecord(t: (PostEvent, Set[String]), featurePrefix: String): PostFeatures = {
+  private def createPostRecord(t: (PostEvent, Set[String])): PostFeatures = {
     val postEvent = t._1
     val forumFeatures = t._2
 
@@ -47,7 +46,7 @@ object PostFeaturesJob extends App {
       postEvent.timestamp,
       postEvent.content.getOrElse(""),
       postEvent.imageFile.getOrElse(""),
-      forumFeatures ++ postEvent.tags.map(RecommendationUtils.toFeature(_, featurePrefix))
+      forumFeatures ++ postEvent.tags.map(RecommendationUtils.toFeature(_, FeaturePrefix.Tag))
     )
   }
 }

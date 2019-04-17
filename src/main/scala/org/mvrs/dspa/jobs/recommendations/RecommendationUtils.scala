@@ -5,6 +5,8 @@ import java.util.Base64
 import com.twitter.algebird.{MinHashSignature, MinHasher, MinHasher32}
 
 object RecommendationUtils {
+  val tagPrefix = "T"
+
   def getTopN(minHashSignature: MinHashSignature,
               candidates: Seq[(Long, MinHashSignature)],
               minHasher: MinHasher32,

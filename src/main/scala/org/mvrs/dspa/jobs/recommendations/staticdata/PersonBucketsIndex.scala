@@ -4,7 +4,7 @@ import com.sksamuel.elastic4s.http.ElasticDsl.{dateField, longField}
 import com.sksamuel.elastic4s.mappings.FieldDefinition
 import org.mvrs.dspa.io.{ElasticSearchIndexWithUpsertOutputFormat, ElasticSearchNode}
 
-class BucketsIndex(indexName: String, typeName: String, nodes: ElasticSearchNode*)
+class PersonBucketsIndex(indexName: String, typeName: String, nodes: ElasticSearchNode*)
   extends ElasticSearchIndexWithUpsertOutputFormat[(Long, List[Long])](indexName, typeName, nodes: _*) {
 
   override def getDocumentId(record: (Long, List[Long])): String = record._1.toString

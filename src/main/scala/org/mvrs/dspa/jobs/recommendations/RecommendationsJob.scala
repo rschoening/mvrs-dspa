@@ -14,7 +14,7 @@ object RecommendationsJob extends App {
   val windowSize = Time.hours(4)
   val windowSlide = Time.hours(1)
   val activeUsersTimeout = Time.days(14)
-  var minimumRecommendationSimilarity = 0.2
+  var minimumRecommendationSimilarity = 0.1
   val maximumRecommendationCount = 5
   val speedupFactor = 0 // 0 --> read as fast as can
   val randomDelay = 0 // event time
