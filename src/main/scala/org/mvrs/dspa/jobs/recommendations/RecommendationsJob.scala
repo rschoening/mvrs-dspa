@@ -1,15 +1,14 @@
 package org.mvrs.dspa.jobs.recommendations
 
 import com.twitter.algebird.{MinHashSignature, MinHasher32}
+import org.apache.flink.api.common.state.{MapStateDescriptor, StateTtlConfig}
 import org.apache.flink.streaming.api.TimeCharacteristic
-import org.apache.flink.streaming.api.scala._
+import org.apache.flink.streaming.api.scala.{DataStream, _}
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.mvrs.dspa.events.{CommentEvent, ForumEvent, LikeEvent, PostEvent}
 import org.mvrs.dspa.functions.CollectSetFunction
 import org.mvrs.dspa.io.ElasticSearchNode
 import org.mvrs.dspa.{Settings, streams, utils}
-
-import scala.collection.mutable
 
 object RecommendationsJob extends App {
   val windowSize = Time.hours(4)
@@ -42,59 +41,66 @@ object RecommendationsJob extends App {
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
   env.setParallelism(4)
 
+  val minHasher = RecommendationUtils.createMinHasher()
+
   // val consumerGroup = "recommendations"
   //  val commentsStream = streams.commentsFromKafka(consumerGroup, speedupFactor, randomDelay)
   //  val postsStream = streams.postsFromKafka(consumerGroup, speedupFactor, randomDelay)
   //  val likesStream = streams.likesFromKafka(consumerGroup, speedupFactor, randomDelay)
 
-  val minHasher = RecommendationUtils.createMinHasher()
-
   val commentsStream: DataStream[CommentEvent] = streams.commentsFromCsv(Settings.commentStreamCsvPath, speedupFactor, randomDelay)
   val postsStream: DataStream[PostEvent] = streams.postsFromCsv(Settings.postStreamCsvPath, speedupFactor, randomDelay)
   val likesStream: DataStream[LikeEvent] = streams.likesFromCsv(Settings.likesStreamCsvPath, speedupFactor, randomDelay)
 
-  // TODO broadcast last activity date per person id
+  val forumEvents: DataStream[ForumEvent] = unionForumEvents(commentsStream, postsStream, likesStream)
 
   // gather the posts that the user interacted with in a sliding window
-  val postIds = collectPostsInteractedWith(commentsStream, postsStream, likesStream, windowSize, windowSlide)
+  val postIds: DataStream[(Long, Set[Long])] =
+    collectPostsInteractedWith(forumEvents, windowSize, windowSlide)
 
-  // look up the tags for these posts (from post and from the post's forum)
-  val personActivityFeatures: DataStream[(Long, Set[String])] = utils.asyncStream(
-    postIds,
-    new AsyncPostFeaturesLookup(postFeaturesIndexName, esNode))
+  // look up the tags for these posts (from post and from the post's forum) => (person id -> set of features)
+  val personActivityFeatures: DataStream[(Long, Set[String])] =
+    utils.asyncStream(postIds,
+      new AsyncPostFeaturesLookup(postFeaturesIndexName, esNode))
 
-  // combine with stored interests of person
-  val allPersonFeatures = utils.asyncStream(
-    personActivityFeatures, new AsyncUnionWithPersonFeatures(personFeaturesIndexName, personFeaturesTypeName, esNode))
+  // combine with stored interests of person (person id -> set of features)
+  val allPersonFeatures: DataStream[(Long, Set[String])] =
+    utils.asyncStream(personActivityFeatures,
+      new AsyncUnionWithPersonFeatures(personFeaturesIndexName, personFeaturesTypeName, esNode))
 
-  // calculate minhash for person features
-  val personActivityMinHash = getPersonMinHash(personActivityFeatures, minHasher)
+  // calculate minhash per person id, based on person features
+  val personActivityMinHash: DataStream[(Long, MinHashSignature)] =
+    getPersonMinHash(personActivityFeatures, minHasher)
 
   // look up the persons in same lsh buckets
-  val candidates = utils.asyncStream(
-    personActivityMinHash, new AsyncCandidateUsersLookup(lshBucketsIndexName, minHasher, esNode))
+  val candidates: DataStream[(Long, MinHashSignature, Set[Long])] =
+    utils.asyncStream(personActivityMinHash,
+      new AsyncCandidateUsersLookup(lshBucketsIndexName, minHasher, esNode))
 
   // exclude already known persons from recommendations
-  val filteredCandidates = utils.asyncStream(
-    candidates, new AsyncFilterCandidates(knownPersonsIndexName, knownPersonsTypeName, esNode))
+  val candidatesWithoutKnownPersons: DataStream[(Long, MinHashSignature, Set[Long])] =
+    utils.asyncStream(candidates,
+      new AsyncExcludeKnownPersons(knownPersonsIndexName, knownPersonsTypeName, esNode))
 
-  // TODO exclude inactive users - keep last activity in this operator? would have to be broadcast to all operators
-  //      alternative: keep last activity timestamp in db (both approaches might miss the most recent new activity)
+  val candidatesWithoutInactiveUsers: DataStream[(Long, MinHashSignature, Set[Long])] =
+    filterToActiveUsers(candidatesWithoutKnownPersons, forumEvents, Time.days(14))
 
   val recommendations = utils.asyncStream(
-    filteredCandidates, new AsyncRecommendUsers(
+    candidatesWithoutInactiveUsers, new AsyncRecommendUsers(
       personMinhashIndexName, minHasher,
       maximumRecommendationCount, minimumRecommendationSimilarity,
       esNode))
 
   // debug output for selected person Ids
   if (tracedPersonIds.nonEmpty) {
-    postIds.filter(t => tracedPersonIds.contains(t._1)).print("Post Ids:".padTo(12, ' '))
-    personActivityFeatures.filter(t => tracedPersonIds.contains(t._1)).print("Activity:".padTo(12, ' '))
-    allPersonFeatures.filter(t => tracedPersonIds.contains(t._1)).print("Combined:".padTo(12, ' '))
-    candidates.filter(t => tracedPersonIds.contains(t._1)).print("Candidates:".padTo(12, ' '))
-    filteredCandidates.filter(t => tracedPersonIds.contains(t._1)).print("Filtered:".padTo(12, ' '))
-    recommendations.filter(t => tracedPersonIds.contains(t._1)).print("-> RESULT:".padTo(12, ' '))
+    val length = 15
+    postIds.filter(t => tracedPersonIds.contains(t._1)).print("Post Ids:".padTo(length, ' '))
+    personActivityFeatures.filter(t => tracedPersonIds.contains(t._1)).print("Activity:".padTo(length, ' '))
+    allPersonFeatures.filter(t => tracedPersonIds.contains(t._1)).print("Combined:".padTo(length, ' '))
+    candidates.filter(t => tracedPersonIds.contains(t._1)).print("Candidates:".padTo(length, ' '))
+    candidatesWithoutKnownPersons.filter(t => tracedPersonIds.contains(t._1)).print("Filtered:".padTo(length, ' '))
+    candidatesWithoutInactiveUsers.filter(t => tracedPersonIds.contains(t._1)).print("Active only:".padTo(length, ' '))
+    recommendations.filter(t => tracedPersonIds.contains(t._1)).print("-> RESULT:".padTo(length, ' '))
   }
 
   recommendations.addSink(recommendationsIndex.createSink(batchSize = 100))
@@ -115,23 +121,57 @@ object RecommendationsJob extends App {
         .returns(createTypeInformation[(Long, MinHashSignature)])
     )
 
-  def collectPostsInteractedWith(comments: DataStream[CommentEvent],
-                                 posts: DataStream[PostEvent],
-                                 likes: DataStream[LikeEvent],
+  def unionForumEvents(comments: DataStream[CommentEvent],
+                       posts: DataStream[PostEvent],
+                       likes: DataStream[LikeEvent]): DataStream[ForumEvent] =
+    comments
+      .map(_.asInstanceOf[ForumEvent])
+      .union(
+        posts.map(_.asInstanceOf[ForumEvent]),
+        likes.map(_.asInstanceOf[ForumEvent]))
+
+  def filterToActiveUsers(candidates: DataStream[(Long, MinHashSignature, Set[Long])],
+                          forumEvents: DataStream[ForumEvent],
+                          activityTimeout: Time) = {
+    val stateDescriptor = createActiveUsersStateDescriptor(activityTimeout)
+
+    val broadcastActivePersons =
+      forumEvents
+        .map(_.personId)
+        .broadcast(stateDescriptor)
+
+    candidatesWithoutKnownPersons
+      .connect(broadcastActivePersons)
+      .process(new FilterToActivePersons(activityTimeout.toMilliseconds, stateDescriptor))
+  }
+
+  def collectPostsInteractedWith(forumEvents: DataStream[ForumEvent],
                                  windowSize: Time,
-                                 windowSlide: Time): DataStream[(Long, mutable.Set[Long])] = {
-    val allEvents =
-      comments
-        .map(_.asInstanceOf[ForumEvent])
-        .union(
-          posts.map(_.asInstanceOf[ForumEvent]),
-          likes.map(_.asInstanceOf[ForumEvent]))
-        .keyBy(_.personId)
-
+                                 windowSlide: Time): DataStream[(Long, Set[Long])] = {
     // gather features from user activity in sliding window
-
-    allEvents
+    forumEvents
+      .keyBy(_.personId)
       .timeWindow(windowSize, windowSlide)
-      .aggregate(new CollectSetFunction[ForumEvent, Long, Long](key = _.personId, value = _.postId))
+      .aggregate(new CollectSetFunction[ForumEvent, Long, Long](
+        key = _.personId,
+        value = _.postId))
+  }
+
+  private def createActiveUsersStateDescriptor(timeout: Time) = {
+    val ttlConfig = StateTtlConfig
+      .newBuilder(org.apache.flink.api.common.time.Time.milliseconds(windowSize.toMilliseconds))
+      .setUpdateType(StateTtlConfig.UpdateType.OnReadAndWrite)
+      .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
+      .build
+
+    val descriptor: MapStateDescriptor[Long, Long] = new MapStateDescriptor(
+      "active-users",
+      createTypeInformation[Long],
+      createTypeInformation[Long])
+
+    descriptor.enableTimeToLive(ttlConfig)
+
+    descriptor
   }
 }
+

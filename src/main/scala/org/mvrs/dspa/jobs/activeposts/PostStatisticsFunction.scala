@@ -20,10 +20,10 @@ object PostStatisticsFunction {
   }
 }
 
-class PostStatisticsFunction(windowSize: Long, slide: Long)
+class PostStatisticsFunction(windowSizeMillis: Long, slide: Long)
   extends KeyedProcessFunction[Long, Event, PostStatistics] {
   require(slide > 0, "slide must be > 0")
-  require(windowSize > 0, "windowSize must be > 0")
+  require(windowSizeMillis > 0, "windowSize must be > 0")
 
   private lazy val lastActivityState = getRuntimeContext.getState(lastActivityDescriptor)
   private lazy val windowEndState = getRuntimeContext.getState(windowEndDescriptor)
@@ -33,7 +33,7 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
   private val lastActivityDescriptor = new ValueStateDescriptor("lastActivity", classOf[Long])
   private val windowEndDescriptor = new ValueStateDescriptor("windowEnd", classOf[Long])
 
-  private val scaledTtlTime = org.apache.flink.api.common.time.Time.milliseconds(windowSize) // TODO
+  private val scaledTtlTime = org.apache.flink.api.common.time.Time.milliseconds(windowSizeMillis) // TODO
   private val ttlConfig = StateTtlConfig
     .newBuilder(scaledTtlTime)
     .setUpdateType(StateTtlConfig.UpdateType.OnReadAndWrite)
@@ -55,9 +55,9 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
 
     val lastActivity = lastActivityState.value()
 
-    LOG.debug(s"onTimer: $timestamp for key: ${ctx.getCurrentKey} (last activity: $lastActivity window size: $windowSize")
+    LOG.debug(s"onTimer: $timestamp for key: ${ctx.getCurrentKey} (last activity: $lastActivity window size: $windowSizeMillis")
 
-    if (lastActivity < timestamp - windowSize) {
+    if (lastActivity < timestamp - windowSizeMillis) {
       // nothing to report, now new timer to register
       LOG.debug(s"- last activity outside of window - go to sleep until next event arrives")
       bucketMapState.clear()
@@ -88,7 +88,7 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
           if (bucketTimestamp > timestamp) {
             futureBucketCount += 1 // future bucket, ignore (count for later assertion)
           }
-          else if (bucketTimestamp <= timestamp - windowSize) bucketsToDrop += bucketTimestamp // to be evicted
+          else if (bucketTimestamp <= timestamp - windowSizeMillis) bucketsToDrop += bucketTimestamp // to be evicted
           else {
             // bucket within window
             val bucket = entry.getValue
@@ -164,7 +164,7 @@ class PostStatisticsFunction(windowSize: Long, slide: Long)
     if (value.timestamp > windowEnd) {
       LOG.debug(s"Early event, to future bucket: $value (current window: $windowEnd)")
     }
-    else if (value.timestamp < windowEnd - windowSize) {
+    else if (value.timestamp < windowEnd - windowSizeMillis) {
       LOG.debug(s"Late event, to past bucket: $value (current window: $windowEnd)")
     }
     else {

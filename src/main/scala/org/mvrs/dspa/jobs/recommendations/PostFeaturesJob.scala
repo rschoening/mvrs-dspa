@@ -1,15 +1,15 @@
 package org.mvrs.dspa.jobs.recommendations
 
-import java.util.concurrent.TimeUnit
-
 import org.apache.flink.streaming.api.TimeCharacteristic
-import org.apache.flink.streaming.api.datastream.AsyncDataStream
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.events.PostEvent
 import org.mvrs.dspa.io.ElasticSearchNode
-import org.mvrs.dspa.{Settings, streams}
+import org.mvrs.dspa.{Settings, streams, utils}
 
 object PostFeaturesJob extends App {
+  val speedupFactor = 0 // 0 --> read as fast as can
+  val randomDelay = 0 // event time
+
   val postFeaturesIndexName = "recommendations_posts"
   val postFeaturesTypeName = "recommendations_posts_type"
   val forumFeaturesIndexName = "recommendation_forum_features"
@@ -20,27 +20,18 @@ object PostFeaturesJob extends App {
 
   implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
-  env.setParallelism(5)
+  env.setParallelism(4)
 
-  val consumerGroup = "post-features"
-  val speedupFactor = 0 // 0 --> read as fast as can
-  val randomDelay = 0 // event time
-
-  //  val postsStream = streams.postsFromKafka(consumerGroup, speedupFactor, randomDelay)
+  // val consumerGroup = "post-features"
+  // val postsStream = streams.postsFromKafka(consumerGroup, speedupFactor, randomDelay)
   val postsStream = streams.postsFromCsv(Settings.postStreamCsvPath, speedupFactor, randomDelay)
 
-  val postsWithForumFeatures = AsyncDataStream.unorderedWait(
-    postsStream.javaStream,
-    new AsyncForumLookup(forumFeaturesIndexName, elasticSearchNode),
-    2000L, TimeUnit.MILLISECONDS,
-    5)
+  val postsWithForumFeatures = utils.asyncStream(
+    postsStream, new AsyncForumLookup(forumFeaturesIndexName, elasticSearchNode))
 
   val featurePrefix = "T"
+  val postFeatures = postsWithForumFeatures.map(createPostRecord(_, featurePrefix))
 
-  val postFeatures =
-    postsWithForumFeatures
-      .map(createPostRecord(_, featurePrefix))
-      .returns(createTypeInformation[PostFeatures])
   postFeatures.addSink(postFeaturesIndex.createSink(100))
 
   env.execute("post features")

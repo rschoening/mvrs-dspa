@@ -6,7 +6,7 @@ import org.mvrs.dspa.utils.Default
 import scala.collection.mutable
 
 class CollectSetFunction[IN, K: Default, E](key: IN => K, value: IN => E)
-  extends AggregateFunction[IN, (K, mutable.Set[E]), (K, mutable.Set[E])]() {
+  extends AggregateFunction[IN, (K, mutable.Set[E]), (K, Set[E])]() {
 
   type MutSet = mutable.Set[E] // type alias for readability
 
@@ -14,7 +14,7 @@ class CollectSetFunction[IN, K: Default, E](key: IN => K, value: IN => E)
 
   override def add(v: IN, acc: (K, MutSet)): (K, MutSet) = (key(v), acc._2.asInstanceOf[MutSet] += value(v))
 
-  override def getResult(accumulator: (K, MutSet)): (K, MutSet) = accumulator
+  override def getResult(accumulator: (K, MutSet)): (K, Set[E]) = (accumulator._1, accumulator._2.toSet)
 
   override def merge(a: (K, MutSet), b: (K, MutSet)): (K, MutSet) = (a._1, a._2.asInstanceOf[MutSet] ++= b._2)
 }

@@ -5,17 +5,16 @@ import com.sksamuel.elastic4s.http.{ElasticClient, Response}
 import org.apache.flink.streaming.api.functions.async.ResultFuture
 import org.mvrs.dspa.io.{AsyncElasticSearchFunction, ElasticSearchNode}
 
-import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
 class AsyncPostFeaturesLookup(postFeaturesIndex: String, nodes: ElasticSearchNode*)
-  extends AsyncElasticSearchFunction[(Long, mutable.Set[Long]), (Long, Set[String])](nodes: _*) {
+  extends AsyncElasticSearchFunction[(Long, Set[Long]), (Long, Set[String])](nodes: _*) {
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
   override def asyncInvoke(client: ElasticClient,
-                           input: (Long, mutable.Set[Long]),
+                           input: (Long, Set[Long]),
                            resultFuture: ResultFuture[(Long, Set[String])]): Unit = {
     import scala.collection.JavaConverters._
 
@@ -31,7 +30,7 @@ class AsyncPostFeaturesLookup(postFeaturesIndex: String, nodes: ElasticSearchNod
     }
   }
 
-  private def unpackResponse(input: (Long, mutable.Set[Long]), response: Response[SearchResponse]): Seq[(Long, Set[String])] = {
+  private def unpackResponse(input: (Long, Set[Long]), response: Response[SearchResponse]): Seq[(Long, Set[String])] = {
     val features: Set[String] =
       response.result.hits.hits.flatMap(
         _.sourceAsMap("features").asInstanceOf[List[String]])
