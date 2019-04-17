@@ -2,13 +2,16 @@ package org.mvrs.dspa
 
 import java.nio.file.Paths
 import java.time.{Instant, LocalDateTime, ZoneId}
+import java.util.concurrent.TimeUnit
 import java.util.{Optional, Properties}
 
 import org.apache.flink.api.common.serialization.TypeInformationSerializationSchema
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
 import org.apache.flink.configuration.{ConfigConstants, Configuration}
+import org.apache.flink.streaming.api.datastream.AsyncDataStream
 import org.apache.flink.streaming.api.functions.AssignerWithPeriodicWatermarks
+import org.apache.flink.streaming.api.functions.async.AsyncFunction
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor
 import org.apache.flink.streaming.api.windowing.time.Time
 
@@ -48,6 +51,13 @@ package object utils {
       delay = (rand.nextGaussian * x).toLong + x
     }
     delay
+  }
+
+  def asyncStream[IN, OUT](dataStream: DataStream[IN], asyncFunction: AsyncFunction[IN, OUT])
+                          (implicit timeout: Long = 5, timeUnit: TimeUnit = TimeUnit.SECONDS, capacity: Int = 5): DataStream[OUT] = {
+    new DataStream[OUT](
+      AsyncDataStream.unorderedWait(dataStream.javaStream, asyncFunction, timeout, timeUnit, capacity)
+    )
   }
 
   def createBatchExecutionEnvironment(localWithUI: Boolean = false): ExecutionEnvironment =

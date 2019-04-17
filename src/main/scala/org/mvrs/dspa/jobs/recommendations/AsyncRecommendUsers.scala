@@ -34,10 +34,8 @@ class AsyncRecommendUsers(personMinHashIndex: String, minHasher: MinHasher32, no
   private def unpackResponse(input: (Long, MinHashSignature, Set[Long]), response: Response[SearchResponse]): List[(Long, Seq[(Long, Double)])] = {
     val candidates = response.result.hits.hits.map(hit => (hit.id.toLong, getMinHash(hit))).toList
 
-    // TODO do this outside for testability
     List((input._1, RecommendationUtils.getTopN(input._2, candidates, minHasher, 5, 0.2)))
   }
-
 
   private def getMinHash(hit: SearchHit) = {
     val result = hit.sourceAsMap("minhash").asInstanceOf[String]
