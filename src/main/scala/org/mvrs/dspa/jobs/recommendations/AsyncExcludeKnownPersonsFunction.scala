@@ -9,7 +9,7 @@ import org.mvrs.dspa.io.{AsyncElasticSearchFunction, ElasticSearchNode}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class AsyncExcludeKnownPersons(knownPersonsIndex: String, knownPersonsType: String, nodes: ElasticSearchNode*)
+class AsyncExcludeKnownPersonsFunction(knownPersonsIndex: String, knownPersonsType: String, nodes: ElasticSearchNode*)
   extends AsyncElasticSearchFunction[(Long, MinHashSignature, Set[Long]), (Long, MinHashSignature, Set[Long])](nodes: _*) {
 
   import com.sksamuel.elastic4s.http.ElasticDsl._

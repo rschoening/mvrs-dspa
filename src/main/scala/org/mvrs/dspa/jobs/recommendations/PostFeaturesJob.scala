@@ -27,7 +27,7 @@ object PostFeaturesJob extends App {
   val postsStream = streams.postsFromCsv(Settings.postStreamCsvPath, speedupFactor, randomDelay)
 
   val postsWithForumFeatures = utils.asyncStream(
-    postsStream, new AsyncForumLookup(forumFeaturesIndexName, elasticSearchNode))
+    postsStream, new AsyncForumLookupFunction(forumFeaturesIndexName, elasticSearchNode))
 
   val featurePrefix = "T"
   val postFeatures = postsWithForumFeatures.map(createPostRecord(_, featurePrefix))

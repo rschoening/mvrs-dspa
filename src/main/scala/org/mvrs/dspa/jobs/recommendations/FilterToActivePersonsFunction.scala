@@ -6,8 +6,8 @@ import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.functions.co.BroadcastProcessFunction
 import org.apache.flink.util.Collector
 
-class FilterToActivePersons(activityTimeout: Time, // NOTE: flink's old Time class (streaming api) is not serializable
-                            lastActivityStateDescriptor: MapStateDescriptor[Long, Long])
+class FilterToActivePersonsFunction(activityTimeout: Time, // NOTE: flink's old Time class (streaming api) is not serializable
+                                    lastActivityStateDescriptor: MapStateDescriptor[Long, Long])
   extends BroadcastProcessFunction[(Long, MinHashSignature, Set[Long]), Long, (Long, MinHashSignature, Set[Long])] {
 
   private val timeoutMillis = activityTimeout.toMilliseconds

@@ -9,7 +9,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class AsyncUnionWithPersonFeatures(personFeaturesIndex: String, personFeaturesType: String, nodes: ElasticSearchNode*)
+class AsyncUnionWithPersonFeaturesFunction(personFeaturesIndex: String, personFeaturesType: String, nodes: ElasticSearchNode*)
   extends AsyncElasticSearchFunction[(Long, Set[String]), (Long, Set[String])](nodes: _*) {
 
   import com.sksamuel.elastic4s.http.ElasticDsl._

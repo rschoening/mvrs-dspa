@@ -8,7 +8,7 @@ import org.mvrs.dspa.io.{AsyncElasticSearchFunction, ElasticSearchNode}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class AsyncPostFeaturesLookup(postFeaturesIndex: String, nodes: ElasticSearchNode*)
+class AsyncPostFeaturesLookupFunction(postFeaturesIndex: String, nodes: ElasticSearchNode*)
   extends AsyncElasticSearchFunction[(Long, Set[Long]), (Long, Set[String])](nodes: _*) {
 
   import com.sksamuel.elastic4s.http.ElasticDsl._

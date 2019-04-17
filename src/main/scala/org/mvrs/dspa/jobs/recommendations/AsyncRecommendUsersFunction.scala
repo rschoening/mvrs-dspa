@@ -9,9 +9,9 @@ import org.mvrs.dspa.io.{AsyncElasticSearchFunction, ElasticSearchNode}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class AsyncRecommendUsers(personMinHashIndex: String, minHasher: MinHasher32,
-                          maximumRecommendationCount: Int, minimumRecommendationSimilarity: Double,
-                          nodes: ElasticSearchNode*)
+class AsyncRecommendUsersFunction(personMinHashIndex: String, minHasher: MinHasher32,
+                                  maximumRecommendationCount: Int, minimumRecommendationSimilarity: Double,
+                                  nodes: ElasticSearchNode*)
   extends AsyncElasticSearchFunction[(Long, MinHashSignature, Set[Long]), (Long, Seq[(Long, Double)])](nodes: _*) {
 
   import com.sksamuel.elastic4s.http.ElasticDsl._

@@ -62,12 +62,12 @@ object RecommendationsJob extends App {
   // look up the tags for these posts (from post and from the post's forum) => (person id -> set of features)
   val personActivityFeatures: DataStream[(Long, Set[String])] =
     utils.asyncStream(postIds,
-      new AsyncPostFeaturesLookup(postFeaturesIndexName, esNode))
+      new AsyncPostFeaturesLookupFunction(postFeaturesIndexName, esNode))
 
   // combine with stored interests of person (person id -> set of features)
   val allPersonFeatures: DataStream[(Long, Set[String])] =
     utils.asyncStream(personActivityFeatures,
-      new AsyncUnionWithPersonFeatures(personFeaturesIndexName, personFeaturesTypeName, esNode))
+      new AsyncUnionWithPersonFeaturesFunction(personFeaturesIndexName, personFeaturesTypeName, esNode))
 
   // calculate minhash per person id, based on person features
   val personActivityMinHash: DataStream[(Long, MinHashSignature)] =
@@ -76,18 +76,18 @@ object RecommendationsJob extends App {
   // look up the persons in same lsh buckets
   val candidates: DataStream[(Long, MinHashSignature, Set[Long])] =
     utils.asyncStream(personActivityMinHash,
-      new AsyncCandidateUsersLookup(lshBucketsIndexName, minHasher, esNode))
+      new AsyncCandidateUsersLookupFunction(lshBucketsIndexName, minHasher, esNode))
 
   // exclude already known persons from recommendations
   val candidatesWithoutKnownPersons: DataStream[(Long, MinHashSignature, Set[Long])] =
     utils.asyncStream(candidates,
-      new AsyncExcludeKnownPersons(knownPersonsIndexName, knownPersonsTypeName, esNode))
+      new AsyncExcludeKnownPersonsFunction(knownPersonsIndexName, knownPersonsTypeName, esNode))
 
   val candidatesWithoutInactiveUsers: DataStream[(Long, MinHashSignature, Set[Long])] =
     filterToActiveUsers(candidatesWithoutKnownPersons, forumEvents, activeUsersTimeout)
 
   val recommendations = utils.asyncStream(
-    candidatesWithoutInactiveUsers, new AsyncRecommendUsers(
+    candidatesWithoutInactiveUsers, new AsyncRecommendUsersFunction(
       personMinhashIndexName, minHasher,
       maximumRecommendationCount, minimumRecommendationSimilarity,
       esNode))
@@ -143,7 +143,7 @@ object RecommendationsJob extends App {
 
     candidatesWithoutKnownPersons
       .connect(broadcastActivePersons)
-      .process(new FilterToActivePersons(activityTimeout, stateDescriptor))
+      .process(new FilterToActivePersonsFunction(activityTimeout, stateDescriptor))
   }
 
   def collectPostsInteractedWith(forumEvents: DataStream[ForumEvent],
