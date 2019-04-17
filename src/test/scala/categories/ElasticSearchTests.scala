@@ -1,0 +1,4 @@
+package categories
+
+class ElasticSearchTests {}
+

@@ -6,11 +6,14 @@ import jobs.recommendations.RecommendationIndexITSuite._
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
+import org.junit.experimental.categories.Category
 import org.mvrs.dspa.io.{ElasticSearchNode, ElasticSearchUtils}
 import org.mvrs.dspa.jobs.recommendations.RecommendationsIndex
 import org.scalatest.Assertions._
 
+@Category(Array(classOf[categories.ElasticSearchTests]))
 class RecommendationIndexITSuite extends AbstractTestBase {
+
   @Test
   def testUpsertToElasticSearch(): Unit = {
 
