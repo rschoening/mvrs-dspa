@@ -24,8 +24,12 @@ object RecommendationUtils {
 
   def decodeMinHashSignature(base64: String) = MinHashSignature(Base64.getDecoder.decode(base64))
 
-  def createMinHasher(numHashes: Int = 100, targetThreshold: Double = 0.2): MinHasher32 =
+  def createMinHasher(numHashes: Int = 100, targetThreshold: Double = 0.2): MinHasher32 = {
+    require(numHashes > 0)
+    require(targetThreshold > 0)
+
     new MinHasher32(numHashes, MinHasher.pickBands(targetThreshold, numHashes))
+  }
 
   def toFeature(input: Long, prefix: String): String = s"$prefix$input"
 }

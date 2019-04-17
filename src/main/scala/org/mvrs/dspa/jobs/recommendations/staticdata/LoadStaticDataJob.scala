@@ -10,11 +10,9 @@ import org.mvrs.dspa.jobs.recommendations.{FeaturePrefix, RecommendationUtils}
 import org.mvrs.dspa.{Settings, utils}
 
 object LoadStaticDataJob extends App {
-  implicit val env: ExecutionEnvironment = utils.createBatchExecutionEnvironment(localWithUI = false) // TODO arg
-  env.setParallelism(4)
+  val localWithUI = false // TODO arg
 
   // TODO determine how to manage settings
-
   val rootPath = Settings.tablesDirectory
   val hasInterestInTagCsv = Paths.get(rootPath, "person_hasInterest_tag.csv").toString
   val forumTagsCsv = Paths.get(rootPath, "forum_hasTag_tag.csv").toString
@@ -49,6 +47,9 @@ object LoadStaticDataJob extends App {
   knownPersonsIndex.create()
   personBucketsIndex.create()
 
+  implicit val env: ExecutionEnvironment = utils.createBatchExecutionEnvironment(localWithUI)
+  env.setParallelism(4)
+
   val personTagInterests = utils.readCsv[(Long, Long)](hasInterestInTagCsv).map(toFeature(_, FeaturePrefix.Tag))
   val personWork = utils.readCsv[(Long, Long)](worksAtCsv).map(toFeature(_, FeaturePrefix.Work))
   val personStudy = utils.readCsv[(Long, Long)](studyAtCsv).map(toFeature(_, FeaturePrefix.Study))
@@ -70,7 +71,7 @@ object LoadStaticDataJob extends App {
   val minHasher: MinHasher32 = RecommendationUtils.createMinHasher()
 
   val personMinHashes: DataSet[(Long, MinHashSignature)] =
-    personFeatures.map(t => (t._1, minHasher.combineAll(t._2.map(minHasher.init))))
+    personFeatures.map(t => (t._1, RecommendationUtils.getMinHashSignature(t._2, minHasher)))
 
   val personMinHashBuckets: DataSet[(Long, MinHashSignature, List[Long])] =
     personMinHashes.map(t => (
@@ -100,7 +101,8 @@ object LoadStaticDataJob extends App {
     (t._1, t._2.sorted)
   }
 
-  private def toFeature(input: (Long, Long), prefix: String): (Long, String) = (input._1, RecommendationUtils.toFeature(input._2, prefix))
+  private def toFeature(input: (Long, Long), prefix: String): (Long, String) =
+    (input._1, RecommendationUtils.toFeature(input._2, prefix))
 }
 
 
