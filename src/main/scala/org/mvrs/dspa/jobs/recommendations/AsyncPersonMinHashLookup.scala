@@ -38,6 +38,6 @@ class AsyncPersonMinHashLookup(personFeaturesIndex: String, personFeaturesType: 
       )
     else Nil
 
-  def getFeatures(response: GetResponse): Seq[String] = response.source("features").asInstanceOf[List[String]]
+  def getFeatures(response: GetResponse): Iterable[String] = response.source("features").asInstanceOf[Iterable[String]]
 
 }

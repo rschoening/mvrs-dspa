@@ -14,6 +14,14 @@ import scala.collection.mutable
 object RecommendationsJob extends App {
   val windowSize = Time.hours(4)
   val windowSlide = Time.hours(1)
+  var minimumRecommendationSimilarity = 0.2
+  val maximumRecommendationCount = 5
+  val speedupFactor = 0 // 0 --> read as fast as can
+  val randomDelay = 0 // event time
+
+  val localWithUI = false
+  val tracedPersonIds: Set[Long] = Set(913L)
+
   val recommendationsIndexName = "recommendations"
   val recommendationsTypeName = "recommendations_type"
   val postFeaturesIndexName = "recommendations_posts"
@@ -25,19 +33,14 @@ object RecommendationsJob extends App {
   val personFeaturesIndexName = "recommendation_person_features"
   val personFeaturesTypeName = "recommendation_person_features_type"
 
-  val tracedPersonIds: Set[Long] = Set(913L)
-
   val esNode = ElasticSearchNode("localhost")
 
   val recommendationsIndex = new RecommendationsIndex(recommendationsIndexName, recommendationsTypeName, esNode)
   recommendationsIndex.create()
 
-  implicit val env: StreamExecutionEnvironment = utils.createStreamExecutionEnvironment(localWithUI = false)
+  implicit val env: StreamExecutionEnvironment = utils.createStreamExecutionEnvironment(localWithUI)
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
   env.setParallelism(4)
-
-  val speedupFactor = 0 // 0 --> read as fast as can
-  val randomDelay = 0 // event time
 
   // val consumerGroup = "recommendations"
   //  val commentsStream = streams.commentsFromKafka(consumerGroup, speedupFactor, randomDelay)
@@ -79,7 +82,10 @@ object RecommendationsJob extends App {
   //      alternative: keep last activity timestamp in db (both approaches might miss the most recent new activity)
 
   val recommendations = utils.asyncStream(
-    filteredCandidates, new AsyncRecommendUsers(personMinhashIndexName, minHasher, esNode))
+    filteredCandidates, new AsyncRecommendUsers(
+      personMinhashIndexName, minHasher,
+      maximumRecommendationCount, minimumRecommendationSimilarity,
+      esNode))
 
   // debug output for selected person Ids
   if (tracedPersonIds.nonEmpty) {
@@ -103,7 +109,7 @@ object RecommendationsJob extends App {
         .map {
           case (personId: Long, features: Set[String]) => (
             personId,
-            RecommendationUtils.getMinHashSignature(features.toSeq, minHasher)
+            RecommendationUtils.getMinHashSignature(features, minHasher)
           )
         }
         .returns(createTypeInformation[(Long, MinHashSignature)])

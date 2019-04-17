@@ -9,7 +9,9 @@ import org.mvrs.dspa.io.{AsyncElasticSearchFunction, ElasticSearchNode}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class AsyncRecommendUsers(personMinHashIndex: String, minHasher: MinHasher32, nodes: ElasticSearchNode*)
+class AsyncRecommendUsers(personMinHashIndex: String, minHasher: MinHasher32,
+                          maximumRecommendationCount: Int, minimumRecommendationSimilarity: Double,
+                          nodes: ElasticSearchNode*)
   extends AsyncElasticSearchFunction[(Long, MinHashSignature, Set[Long]), (Long, Seq[(Long, Double)])](nodes: _*) {
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
@@ -32,12 +34,19 @@ class AsyncRecommendUsers(personMinHashIndex: String, minHasher: MinHasher32, no
   }
 
   private def unpackResponse(input: (Long, MinHashSignature, Set[Long]), response: Response[SearchResponse]): List[(Long, Seq[(Long, Double)])] = {
-    val candidates = response.result.hits.hits.map(hit => (hit.id.toLong, getMinHash(hit))).toList
+    val candidates = response.result.hits.hits.map(hit => (hit.id.toLong, decodeMinHash(hit))).toList
 
-    List((input._1, RecommendationUtils.getTopN(input._2, candidates, minHasher, 5, 0.2)))
+    List(
+      (
+        input._1,
+        RecommendationUtils.getTopN(
+          input._2, candidates, minHasher,
+          maximumRecommendationCount, minimumRecommendationSimilarity)
+      )
+    )
   }
 
-  private def getMinHash(hit: SearchHit) = {
+  private def decodeMinHash(hit: SearchHit) = {
     val result = hit.sourceAsMap("minhash").asInstanceOf[String]
 
     RecommendationUtils.decodeMinHashSignature(result)
