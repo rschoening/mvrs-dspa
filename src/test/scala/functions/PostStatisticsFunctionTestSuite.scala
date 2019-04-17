@@ -3,7 +3,7 @@ package functions
 import org.mvrs.dspa.jobs.activeposts.PostStatisticsFunction
 import org.scalatest.{FlatSpec, Matchers}
 
-class PostStatisticsFunctionUTSuite extends FlatSpec with Matchers {
+class PostStatisticsFunctionTestSuite extends FlatSpec with Matchers {
   "bucket assigner" must "assign to expected bucket" in {
     PostStatisticsFunction.getBucketForTimestamp(5, 100, 10) should be(10)
   }

@@ -5,7 +5,7 @@ import org.mvrs.dspa.jobs.preparation.BuildReplyTreeProcessFunction
 import org.mvrs.dspa.utils
 import org.scalatest.{FlatSpec, Matchers}
 
-class BuildReplyTreeProcessFunctionUTSuite extends FlatSpec with Matchers {
+class BuildReplyTreeProcessFunctionTestSuite extends FlatSpec with Matchers {
 
   "reply resolver" must "create correct tree" in {
 

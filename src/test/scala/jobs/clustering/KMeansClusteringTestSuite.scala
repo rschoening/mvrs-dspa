@@ -6,7 +6,7 @@ import org.scalatest.{FlatSpec, Matchers}
 
 import scala.util.Random
 
-class KMeansClusteringSuite extends FlatSpec with Matchers {
+class KMeansClusteringTestSuite extends FlatSpec with Matchers {
   "kmeans" should "create expected clusters" in {
 
     val cluster1 =

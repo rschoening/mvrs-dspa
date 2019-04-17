@@ -4,7 +4,7 @@ import org.mvrs.dspa.jobs.clustering.KMeansClustering.Point
 import org.mvrs.dspa.jobs.clustering.{Cluster, ClusterModel}
 import org.scalatest.{FlatSpec, Matchers}
 
-class ClusterModelSuite extends FlatSpec with Matchers {
+class ClusterModelTestSuite extends FlatSpec with Matchers {
   "The cluster model" can "do a simple update (decay = 1, equal weights)" in {
     val model = ClusterModel(Vector(Cluster(0, Point(1.0, 1.0), weight = 1)))
     val newModel = model.update(Vector(Cluster(0, Point(2.0, 2.0), weight = 1)), decay = 1.0)

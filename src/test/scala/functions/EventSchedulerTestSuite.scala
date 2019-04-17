@@ -9,7 +9,7 @@ import org.scalatest.{FlatSpec, Matchers}
 import scala.collection.mutable
 
 //noinspection ZeroIndexToHead
-class EventSchedulerSuite extends FlatSpec with Matchers {
+class EventSchedulerTestSuite extends FlatSpec with Matchers {
   val timeTolerance = 20
 
   "the event scheduler" must "schedule correctly if no delay and no scaling" in {
