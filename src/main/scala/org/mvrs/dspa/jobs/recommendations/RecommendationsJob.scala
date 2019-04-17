@@ -78,17 +78,17 @@ object RecommendationsJob extends App {
   // TODO exclude inactive users - keep last activity in this operator? would have to be broadcast to all operators
   //      alternative: keep last activity timestamp in db (both approaches might miss the most recent new activity)
 
-
   val recommendations = utils.asyncStream(
     filteredCandidates, new AsyncRecommendUsers(personMinhashIndexName, minHasher, esNode))
 
+  // debug output for selected person Ids
   if (tracedPersonIds.nonEmpty) {
-    postIds.filter(t => tracedPersonIds.contains(t._1)).print("Post Ids")
-    personActivityFeatures.filter(t => tracedPersonIds.contains(t._1)).print("Activity features")
-    allPersonFeatures.filter(t => tracedPersonIds.contains(t._1)).print("All features")
-    candidates.filter(t => tracedPersonIds.contains(t._1)).print("Candidates")
-    filteredCandidates.filter(t => tracedPersonIds.contains(t._1)).print("Filtered candidates")
-    recommendations.filter(t => tracedPersonIds.contains(t._1)).print("Recommendations")
+    postIds.filter(t => tracedPersonIds.contains(t._1)).print("Post Ids:".padTo(12, ' '))
+    personActivityFeatures.filter(t => tracedPersonIds.contains(t._1)).print("Activity:".padTo(12, ' '))
+    allPersonFeatures.filter(t => tracedPersonIds.contains(t._1)).print("Combined:".padTo(12, ' '))
+    candidates.filter(t => tracedPersonIds.contains(t._1)).print("Candidates:".padTo(12, ' '))
+    filteredCandidates.filter(t => tracedPersonIds.contains(t._1)).print("Filtered:".padTo(12, ' '))
+    recommendations.filter(t => tracedPersonIds.contains(t._1)).print("-> RESULT:".padTo(12, ' '))
   }
 
   recommendations.addSink(recommendationsIndex.createSink(batchSize = 100))
