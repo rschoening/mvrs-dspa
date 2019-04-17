@@ -36,6 +36,15 @@ package object utils {
 
   private val dateFormat = ThreadLocal.withInitial[SimpleDateFormat](() => new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
 
+  /**
+    * Convert from flink's common Time to the old streaming Time still used for windows
+    *
+    * @param time time instance to convert
+    * @return streaming time instance
+    */
+  def convert(time: org.apache.flink.api.common.time.Time): org.apache.flink.streaming.api.windowing.time.Time =
+    org.apache.flink.streaming.api.windowing.time.Time.milliseconds(time.toMilliseconds)
+
   def toDateTime(millis: Long): LocalDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneId.of("UTC"))
 
   def toDate(millis: Long): Date = Date.from(Instant.ofEpochMilli(millis))

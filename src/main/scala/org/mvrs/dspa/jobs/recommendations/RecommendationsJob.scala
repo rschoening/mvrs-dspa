@@ -2,9 +2,9 @@ package org.mvrs.dspa.jobs.recommendations
 
 import com.twitter.algebird.{MinHashSignature, MinHasher32}
 import org.apache.flink.api.common.state.{MapStateDescriptor, StateTtlConfig}
+import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala.{DataStream, _}
-import org.apache.flink.streaming.api.windowing.time.Time
 import org.mvrs.dspa.events.{CommentEvent, ForumEvent, LikeEvent, PostEvent}
 import org.mvrs.dspa.functions.CollectSetFunction
 import org.mvrs.dspa.io.ElasticSearchNode
@@ -13,6 +13,7 @@ import org.mvrs.dspa.{Settings, streams, utils}
 object RecommendationsJob extends App {
   val windowSize = Time.hours(4)
   val windowSlide = Time.hours(1)
+  val activeUsersTimeout = Time.days(14)
   var minimumRecommendationSimilarity = 0.2
   val maximumRecommendationCount = 5
   val speedupFactor = 0 // 0 --> read as fast as can
@@ -83,7 +84,7 @@ object RecommendationsJob extends App {
       new AsyncExcludeKnownPersons(knownPersonsIndexName, knownPersonsTypeName, esNode))
 
   val candidatesWithoutInactiveUsers: DataStream[(Long, MinHashSignature, Set[Long])] =
-    filterToActiveUsers(candidatesWithoutKnownPersons, forumEvents, Time.days(14))
+    filterToActiveUsers(candidatesWithoutKnownPersons, forumEvents, activeUsersTimeout)
 
   val recommendations = utils.asyncStream(
     candidatesWithoutInactiveUsers, new AsyncRecommendUsers(
@@ -142,7 +143,7 @@ object RecommendationsJob extends App {
 
     candidatesWithoutKnownPersons
       .connect(broadcastActivePersons)
-      .process(new FilterToActivePersons(activityTimeout.toMilliseconds, stateDescriptor))
+      .process(new FilterToActivePersons(activityTimeout, stateDescriptor))
   }
 
   def collectPostsInteractedWith(forumEvents: DataStream[ForumEvent],
@@ -151,7 +152,9 @@ object RecommendationsJob extends App {
     // gather features from user activity in sliding window
     forumEvents
       .keyBy(_.personId)
-      .timeWindow(windowSize, windowSlide)
+      .timeWindow(
+        size = utils.convert(windowSize),
+        slide = utils.convert(windowSlide))
       .aggregate(new CollectSetFunction[ForumEvent, Long, Long](
         key = _.personId,
         value = _.postId))
@@ -159,7 +162,7 @@ object RecommendationsJob extends App {
 
   private def createActiveUsersStateDescriptor(timeout: Time) = {
     val ttlConfig = StateTtlConfig
-      .newBuilder(org.apache.flink.api.common.time.Time.milliseconds(windowSize.toMilliseconds))
+      .newBuilder(timeout)
       .setUpdateType(StateTtlConfig.UpdateType.OnReadAndWrite)
       .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
       .build

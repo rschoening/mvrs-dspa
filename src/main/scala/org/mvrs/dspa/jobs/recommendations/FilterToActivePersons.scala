@@ -2,12 +2,15 @@ package org.mvrs.dspa.jobs.recommendations
 
 import com.twitter.algebird.MinHashSignature
 import org.apache.flink.api.common.state.MapStateDescriptor
+import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.functions.co.BroadcastProcessFunction
 import org.apache.flink.util.Collector
 
-class FilterToActivePersons(activityTimeoutMillis: Long, // NOTE: flink's old Time class (streaming api) is not serializable
+class FilterToActivePersons(activityTimeout: Time, // NOTE: flink's old Time class (streaming api) is not serializable
                             lastActivityStateDescriptor: MapStateDescriptor[Long, Long])
   extends BroadcastProcessFunction[(Long, MinHashSignature, Set[Long]), Long, (Long, MinHashSignature, Set[Long])] {
+
+  private val timeoutMillis = activityTimeout.toMilliseconds
 
   override def processElement(value: (Long, MinHashSignature, Set[Long]),
                               ctx: BroadcastProcessFunction[(Long, MinHashSignature, Set[Long]), Long, (Long, MinHashSignature, Set[Long])]#ReadOnlyContext,
@@ -32,6 +35,6 @@ class FilterToActivePersons(activityTimeoutMillis: Long, // NOTE: flink's old Ti
   // NOTE there are cases where the last activity (from broadcast stream) is later than the current timestamp
   // (defined by the window end times on the main i.e. non-broadcast stream), due to the slower processing chain on the
   // main stream. Still safe though.
-    currentTimestamp - lastActivityTimestamp <= activityTimeoutMillis
+    currentTimestamp - lastActivityTimestamp <= timeoutMillis
 
 }
