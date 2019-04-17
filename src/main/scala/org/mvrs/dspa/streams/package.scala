@@ -3,8 +3,9 @@ package org.mvrs.dspa
 import java.util.Properties
 
 import kantan.csv.RowDecoder
+import org.apache.flink.api.common.time
+import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.scala.{DataStream, OutputTag, StreamExecutionEnvironment, createTypeInformation}
-import org.apache.flink.streaming.api.windowing.time.Time
 import org.mvrs.dspa.events.{CommentEvent, LikeEvent, PostEvent, RawCommentEvent}
 import org.mvrs.dspa.functions.{ReplayedCsvFileSourceFunction, ScaledReplayFunction}
 import org.mvrs.dspa.jobs.preparation.BuildReplyTreeProcessFunction
@@ -125,6 +126,6 @@ package object streams {
     props
   }
 
-  private def getMaxOutOfOrderness(speedupFactor: Int, randomDelay: Int) =
-    Time.milliseconds(if (speedupFactor == 0) randomDelay else randomDelay / speedupFactor)
+  private def getMaxOutOfOrderness(speedupFactor: Int, randomDelay: Int): time.Time =
+    org.apache.flink.api.common.time.Time.milliseconds(if (speedupFactor == 0) randomDelay else randomDelay / speedupFactor)
 }

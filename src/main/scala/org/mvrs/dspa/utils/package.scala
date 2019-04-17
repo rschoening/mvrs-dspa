@@ -13,7 +13,7 @@ import org.apache.flink.streaming.api.datastream.AsyncDataStream
 import org.apache.flink.streaming.api.functions.AssignerWithPeriodicWatermarks
 import org.apache.flink.streaming.api.functions.async.AsyncFunction
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor
-import org.apache.flink.streaming.api.windowing.time.Time
+// import org.apache.flink.streaming.api.windowing.time.Time
 
 import scala.reflect.ClassTag
 //import org.apache.avro.{Schema, SchemaBuilder}
@@ -147,8 +147,8 @@ package object utils {
     consumer
   }
 
-  def timeStampExtractor[T](maxOutOfOrderness: Time, extract: T => Long): AssignerWithPeriodicWatermarks[T] = {
-    new BoundedOutOfOrdernessTimestampExtractor[T](maxOutOfOrderness) {
+  def timeStampExtractor[T](maxOutOfOrderness: org.apache.flink.api.common.time.Time, extract: T => Long): AssignerWithPeriodicWatermarks[T] = {
+    new BoundedOutOfOrdernessTimestampExtractor[T](org.apache.flink.streaming.api.windowing.time.Time.milliseconds(maxOutOfOrderness.toMilliseconds)) {
       override def extractTimestamp(element: T): Long = extract(element)
     }
   }

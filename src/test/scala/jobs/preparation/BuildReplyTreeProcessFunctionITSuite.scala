@@ -6,7 +6,7 @@ import java.util.Collections
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.functions.sink.SinkFunction
 import org.apache.flink.streaming.api.scala._
-import org.apache.flink.streaming.api.windowing.time.Time
+import org.apache.flink.api.common.time.Time
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
 import org.mvrs.dspa.events.{CommentEvent, RawCommentEvent}
