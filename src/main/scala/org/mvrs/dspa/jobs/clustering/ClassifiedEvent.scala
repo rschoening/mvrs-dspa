@@ -1,6 +1,6 @@
 package org.mvrs.dspa.jobs.clustering
 
-trait ClassifiedEvent {
+sealed trait ClassifiedEvent {
   val personId: Long
   val eventId: Long
   val cluster: Cluster

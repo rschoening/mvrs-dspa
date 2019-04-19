@@ -244,7 +244,7 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
     System.currentTimeMillis() - start
   }
 
-  trait ScheduledItem
+  sealed trait ScheduledItem
 
   case class ScheduledEvent(event: String, timestamp: Long, replayTimeOffset: Long) extends ScheduledItem
 

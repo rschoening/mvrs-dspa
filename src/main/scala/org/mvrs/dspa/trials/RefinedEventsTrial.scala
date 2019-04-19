@@ -17,7 +17,7 @@ object RefinedEventsTrial extends App {
 
   //println(parseTrial("1045510|129|2012-02-02T05:17:34Z|31.96.0.7|Firefox|About Vladimir Lenin, extensive theoretic and philosophical. About Kurt Weill, of capitalism, which included the ballad.|270250||28"))
 
-  trait ForumEvent {
+  sealed trait ForumEvent {
     val personId: LongId
     val creationDate: Timestamp
 

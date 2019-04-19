@@ -8,12 +8,12 @@ import kantan.csv.{CellDecoder, RowDecoder}
 import scala.collection.Set
 
 
-trait TimestampedEvent {
+sealed trait TimestampedEvent {
   val creationDate: Date
   val timestamp: Long = creationDate.toInstant.toEpochMilli
 }
 
-trait ForumEvent extends TimestampedEvent {
+sealed trait ForumEvent extends TimestampedEvent {
   val personId: Long
   val postId: Long
 }
