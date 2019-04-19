@@ -2,7 +2,10 @@ package org.mvrs.dspa.jobs.clustering
 
 import com.google.common.base.Splitter
 import org.apache.flink.api.common.state.MapStateDescriptor
+import org.apache.flink.api.java.io.TextInputFormat
+import org.apache.flink.core.fs.Path
 import org.apache.flink.streaming.api.TimeCharacteristic
+import org.apache.flink.streaming.api.functions.source.FileProcessingMode
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows
 import org.apache.flink.streaming.api.windowing.time.Time
@@ -10,7 +13,7 @@ import org.apache.flink.streaming.api.windowing.triggers.CountTrigger
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow
 import org.mvrs.dspa.events.CommentEvent
 import org.mvrs.dspa.io.ElasticSearchNode
-import org.mvrs.dspa.{streams, utils}
+import org.mvrs.dspa.{Settings, streams, utils}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -52,7 +55,17 @@ object UnusualActivityDetectionJob extends App {
   env.setParallelism(4) // NOTE with multiple workers, the comments AND broadcast stream watermarks lag VERY much behind
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
-  val comments = streams.commentsFromKafka("activity-detection")
+  val controlMessages =
+    env.readFile(
+      new TextInputFormat(new Path(Settings.UnusualActivityControlFilePath)),
+      Settings.UnusualActivityControlFilePath,
+      FileProcessingMode.PROCESS_CONTINUOUSLY,
+      interval = 2000L)
+      .map(parseClusterParameters _)
+      .broadcast() // TODO state descriptor; how to connect to windowed cluster stream??
+
+  // val comments = streams.commentsFromKafka("activity-detection")
+  val comments = streams.commentsFromCsv(Settings.commentStreamCsvPath)
 
   val frequencyStream: DataStream[(Long, Int)] =
     comments
@@ -97,6 +110,7 @@ object UnusualActivityDetectionJob extends App {
     .timeWindow(Time.hours(24)) // update clusters at least once a day
     .trigger(CountTrigger.of[TimeWindow](2000L)) // TODO remainder in window lost, need combined end-of-window + early-firing trigger
     .process(new KMeansClusterFunction(k = 4, decay = 0.0)).name("calculate clusters").setParallelism(1)
+  // TODO to connect with control stream, the window has to be implemented in a custom process function
 
   // broadcast stream
   val clusterStateDescriptor =
@@ -143,6 +157,12 @@ object UnusualActivityDetectionJob extends App {
       buffer += tokens.count(_.forall(_.isUpper)) / tokens.size // % of all-UPPERCASE words
       buffer += tokens.count(_.length == 4) / tokens.size // % of four-letter words
     }
+  }
+
+  private def parseClusterParameters(line: String): Either[String, (String, String)] = {
+    val tokens = line.split('=')
+    if (tokens.length == 2) Right((tokens(0).trim, tokens(1).trim))
+    else Left(s"Invalid parameter line: $line")
   }
 
   /**

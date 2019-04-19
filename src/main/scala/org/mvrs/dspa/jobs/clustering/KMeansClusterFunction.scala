@@ -10,7 +10,8 @@ import org.mvrs.dspa.jobs.clustering.KMeansClustering.Point
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-class KMeansClusterFunction(k: Int, decay : Double = 0.9) extends ProcessWindowFunction[mutable.ArrayBuffer[Double], (Long, Int, ClusterModel), Int, TimeWindow] {
+class KMeansClusterFunction(k: Int, decay: Double = 0.9)
+  extends ProcessWindowFunction[mutable.ArrayBuffer[Double], (Long, Int, ClusterModel), Int, TimeWindow] {
   require(k > 1, s"invalid k: $k")
   require(decay >= 0 && decay <= 1, s"invalid decay: $decay (must be between 0 and 1)")
 
