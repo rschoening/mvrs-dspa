@@ -1,7 +1,6 @@
 package org.mvrs.dspa.jobs.clustering
 
 import com.google.common.base.Splitter
-import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
 import org.apache.flink.api.common.state.MapStateDescriptor
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
@@ -10,7 +9,7 @@ import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.streaming.api.windowing.triggers.CountTrigger
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow
 import org.mvrs.dspa.events.CommentEvent
-import org.mvrs.dspa.io.ElasticSearchUtils
+import org.mvrs.dspa.io.ElasticSearchNode
 import org.mvrs.dspa.{streams, utils}
 
 import scala.collection.JavaConverters._
@@ -32,22 +31,13 @@ object UnusualActivityDetectionJob extends App {
   // - if a cluster gets too small, split the largest cluster
   // - come up with better text features
   // - write additional information to ElasticSearch to help interpretation of activity classification
-  // - refactor index classes (instances with base class)
+  val localWithUI = false // use arg (scallop?)
   val elasticHostName = "localhost"
-  val elasticPort = 9200
-  val elasticScheme = "http"
-  val elasticSearchUri = s"$elasticScheme://$elasticHostName:$elasticPort"
   val indexName = "activity-classification"
   val typeName = "activity-classification-type"
 
-  val client = ElasticClient(ElasticProperties(elasticSearchUri))
-  try {
-    ElasticSearchUtils.dropIndex(client, indexName) // testing: recreate the index
-    ActivityClassificationIndex.create(client, indexName, typeName)
-  }
-  finally {
-    client.close()
-  }
+  val index = new ActivityClassificationIndex(indexName, typeName, ElasticSearchNode(elasticHostName))
+  index.create()
 
   // set up clustering stream:
   // - union of rooted comments and posts
@@ -57,7 +47,7 @@ object UnusualActivityDetectionJob extends App {
   // - broadcast resulting clusters
   // - NOTE: previous clusters are used as seed points for new clusters --> new clusters mapped to old clusters simply by cluster index
   // - side output: cluster center difference
-  implicit val env: StreamExecutionEnvironment = utils.createStreamExecutionEnvironment(false) // use arg (scallop?)
+  implicit val env: StreamExecutionEnvironment = utils.createStreamExecutionEnvironment(localWithUI)
 
   env.setParallelism(4) // NOTE with multiple workers, the comments AND broadcast stream watermarks lag VERY much behind
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
@@ -100,7 +90,8 @@ object UnusualActivityDetectionJob extends App {
   // To parallelize: distribute points randomly, cluster subsets, merge resulting clusters as in
   // 7.6.4 of "Mining of massive datasets"
   // TODO use global window with custom trigger: fire every n elements, but at most m hours after previous trigger
-  val clusters: DataStream[(Long, Int, ClusterModel)] = featurizedComments
+  val clusters: DataStream[(Long, Int, ClusterModel)] =
+  featurizedComments
     .map(_._3)
     .keyBy(_ => 0)
     .timeWindow(Time.hours(24)) // update clusters at least once a day
@@ -108,10 +99,11 @@ object UnusualActivityDetectionJob extends App {
     .process(new KMeansClusterFunction(k = 4, decay = 0.0)).name("calculate clusters").setParallelism(1)
 
   // broadcast stream
-  val clusterStateDescriptor = new MapStateDescriptor(
-    "ClusterBroadcastState",
-    createTypeInformation[Int],
-    createTypeInformation[(Long, Int, ClusterModel)])
+  val clusterStateDescriptor =
+    new MapStateDescriptor(
+      "ClusterBroadcastState",
+      createTypeInformation[Int],
+      createTypeInformation[(Long, Int, ClusterModel)])
 
   val broadcast = clusters.broadcast(clusterStateDescriptor)
 
@@ -129,7 +121,7 @@ object UnusualActivityDetectionJob extends App {
   // classifiedComments.map(e => s"person: ${e.personId}\tcomment: ${e.eventId}\t-> ${e.cluster.index} (${e.cluster.weight})\t(${e.cluster.centroid})").print
 
   // TODO write classification result to kafka/elasticsearch
-  classifiedComments.addSink(ActivityClassificationIndex.createSink(elasticHostName, elasticPort, elasticScheme, indexName, typeName))
+  classifiedComments.addSink(index.createSink(100))
 
   env.execute()
 
@@ -162,12 +154,6 @@ object UnusualActivityDetectionJob extends App {
       .omitEmptyStrings()
       .trimResults()
 
-  def tokenize(str: String) = {
-    splitter.split(str).asScala
-  }
+  private def tokenize(str: String): Iterable[String] = splitter.split(str).asScala
 
 }
-
-
-
-
