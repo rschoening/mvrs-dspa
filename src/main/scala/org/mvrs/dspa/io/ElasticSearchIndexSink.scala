@@ -1,6 +1,5 @@
 package org.mvrs.dspa.io
 
-import com.sksamuel.elastic4s.http.ElasticClient
 import org.apache.flink.api.common.functions.RuntimeContext
 import org.apache.flink.streaming.connectors.elasticsearch.{ElasticsearchSinkFunction, RequestIndexer}
 import org.apache.flink.streaming.connectors.elasticsearch6.ElasticsearchSink
@@ -24,8 +23,9 @@ abstract class ElasticSearchIndexSink[T](indexName: String, typeName: String, no
           val document = createDocument(record).asJava
           val id = getDocumentId(record)
 
-          val indexRequest = new IndexRequest(indexName, typeName, id).source(document)
-          new UpdateRequest(indexName, typeName, id).doc(document).upsert(indexRequest)
+          val indexRequest = new IndexRequest(indexName, id).source(document)
+          // NOTE: specifying type leads to deprecation warnings being logged. Empty string works
+          new UpdateRequest(indexName, "", id).doc(document).upsert(indexRequest)
         }
 
         override def process(record: T, runtimeContext: RuntimeContext, requestIndexer: RequestIndexer): Unit = {
