@@ -2,16 +2,16 @@ package org.mvrs.dspa.jobs.clustering
 
 import com.google.common.base.Splitter
 import org.apache.flink.api.common.state.MapStateDescriptor
+import org.apache.flink.api.common.time.Time
 import org.apache.flink.api.java.io.TextInputFormat
 import org.apache.flink.core.fs.Path
 import org.apache.flink.streaming.api.TimeCharacteristic
+import org.apache.flink.streaming.api.datastream.BroadcastStream
 import org.apache.flink.streaming.api.functions.source.FileProcessingMode
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows
-import org.apache.flink.streaming.api.windowing.time.Time
-import org.apache.flink.streaming.api.windowing.triggers.CountTrigger
-import org.apache.flink.streaming.api.windowing.windows.TimeWindow
 import org.mvrs.dspa.events.CommentEvent
+import org.mvrs.dspa.functions.ProgressMonitorFunction
 import org.mvrs.dspa.io.ElasticSearchNode
 import org.mvrs.dspa.{Settings, streams, utils}
 
@@ -55,23 +55,35 @@ object UnusualActivityDetectionJob extends App {
   env.setParallelism(4) // NOTE with multiple workers, the comments AND broadcast stream watermarks lag VERY much behind
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
-  val controlMessages =
-    env.readFile(
-      new TextInputFormat(new Path(Settings.UnusualActivityControlFilePath)),
-      Settings.UnusualActivityControlFilePath,
-      FileProcessingMode.PROCESS_CONTINUOUSLY,
-      interval = 2000L)
-      .map(parseClusterParameters _)
-      .broadcast() // TODO state descriptor; how to connect to windowed cluster stream??
+  val clusterParametersBroadcastStateDescriptor =
+    new MapStateDescriptor[String, String](
+      "cluster-parameters",
+      classOf[String],
+      classOf[String])
+
+  val controlMessages: BroadcastStream[(String, String)] =
+    env
+      .readFile(
+        new TextInputFormat(
+          new Path(Settings.UnusualActivityControlFilePath)),
+        Settings.UnusualActivityControlFilePath,
+        FileProcessingMode.PROCESS_CONTINUOUSLY,
+        interval = 2000L)
+      .setParallelism(1) // otherwise the empty splits never emit watermarks, timers never fire etc.
+      .assignTimestampsAndWatermarks(utils.timeStampExtractor[String](Time.seconds(0), _ => Long.MaxValue)) // required for downstream timers
+      .process(new ProgressMonitorFunction[String]("control", 1))
+      .map(parseClusterParameters _) // TODO parse parameters here to AGD?
+      .filter(_.isRight).map(_.toOption.get) // TODO refactor
+      .broadcast(clusterParametersBroadcastStateDescriptor)
 
   // val comments = streams.commentsFromKafka("activity-detection")
-  val comments = streams.commentsFromCsv(Settings.commentStreamCsvPath)
+  val comments = streams.commentsFromCsv(Settings.commentStreamCsvPath) // , 10000)
 
   val frequencyStream: DataStream[(Long, Int)] =
     comments
       .map(c => (c.personId, 1))
       .keyBy(_._1)
-      .timeWindow(Time.hours(12), Time.hours(1))
+      .timeWindow(utils.convert(Time.hours(12)), utils.convert(Time.hours(1)))
       .sum(1).name("calculate comment frequency per user")
 
   val commentFeaturesStream =
@@ -85,7 +97,7 @@ object UnusualActivityDetectionJob extends App {
       .join(frequencyStream)
       .where(_._1) // person id
       .equalTo(_._1) // person id
-      .window(TumblingEventTimeWindows.of(Time.hours(1)))
+      .window(TumblingEventTimeWindows.of(utils.convert(Time.hours(1))))
       .apply { (t1, t2) => {
         // append per-user frequency to (mutable) feature vector
         t1._3.append(t2._2.toDouble)
@@ -102,15 +114,19 @@ object UnusualActivityDetectionJob extends App {
   // cluster combined features (on a single worker)
   // To parallelize: distribute points randomly, cluster subsets, merge resulting clusters as in
   // 7.6.4 of "Mining of massive datasets"
-  // TODO use global window with custom trigger: fire every n elements, but at most m hours after previous trigger
+
+  // featurizedComments.process(new ProgressMonitorFunction[(Long, Long, ArrayBuffer[Double])]("FEATURIZED", 1))
+
   val clusters: DataStream[(Long, Int, ClusterModel)] =
-  featurizedComments
-    .map(_._3)
-    .keyBy(_ => 0)
-    .timeWindow(Time.hours(24)) // update clusters at least once a day
-    .trigger(CountTrigger.of[TimeWindow](2000L)) // TODO remainder in window lost, need combined end-of-window + early-firing trigger
-    .process(new KMeansClusterFunction(k = 4, decay = 0.0)).name("calculate clusters").setParallelism(1)
-  // TODO to connect with control stream, the window has to be implemented in a custom process function
+    featurizedComments
+      .map(_._3)
+      .keyBy(_ => 0)
+      .connect(controlMessages)
+      .process(
+        new KMeansClusterFunction2(
+          k = 4, decay = 0.0,
+          Time.hours(24), 10, 2000,
+          clusterParametersBroadcastStateDescriptor)).name("calculate clusters").setParallelism(1)
 
   // broadcast stream
   val clusterStateDescriptor =
@@ -128,14 +144,11 @@ object UnusualActivityDetectionJob extends App {
       .connect(broadcast)
       .process(new ClassifyEventsFunction(clusterStateDescriptor)).name("classify comments")
 
-  // TODO use an additional control stream to identify clusters that should be reported / others that can be ignored
-  // - another broadcast stream?
-
   // clusters.map(r => (r._1, r._2, r._3.clusters.map(c => (c.index, c.weight)))).print
   // classifiedComments.map(e => s"person: ${e.personId}\tcomment: ${e.eventId}\t-> ${e.cluster.index} (${e.cluster.weight})\t(${e.cluster.centroid})").print
 
   // TODO write classification result to kafka/elasticsearch
-  classifiedComments.addSink(index.createSink(100))
+  classifiedComments.addSink(index.createSink(1))
 
   env.execute()
 
