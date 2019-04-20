@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit
 import java.util.{Optional, Properties}
 
 import org.apache.flink.api.common.serialization.TypeInformationSerializationSchema
+import org.apache.flink.api.common.state.ListState
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
 import org.apache.flink.configuration.{ConfigConstants, Configuration}
@@ -28,6 +29,8 @@ import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer, FlinkKafkaProducer}
 import org.apache.kafka.clients.producer.ProducerConfig
+
+import scala.collection.JavaConverters._
 
 // NOTE this will be refactored, currently a mixed bag
 package object utils {
@@ -153,4 +156,9 @@ package object utils {
     }
   }
 
+  def toSeq[T](listState: ListState[T]): Seq[T] =
+    listState.get() match {
+      case null => Nil // no state -> null!
+      case xs@_ => xs.asScala.toSeq
+    }
 }
