@@ -24,8 +24,7 @@ abstract class ElasticSearchIndexSink[T](indexName: String, typeName: String, no
           val id = getDocumentId(record)
 
           val indexRequest = new IndexRequest(indexName, id).source(document)
-          // NOTE: specifying type leads to deprecation warnings being logged. Empty string works
-          new UpdateRequest(indexName, "", id).doc(document).upsert(indexRequest)
+          new UpdateRequest(indexName, typeName, id).doc(document).upsert(indexRequest)
         }
 
         override def process(record: T, runtimeContext: RuntimeContext, requestIndexer: RequestIndexer): Unit = {
