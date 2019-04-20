@@ -7,11 +7,21 @@ import scala.collection.mutable
 import scala.util.Random
 
 /**
+  * simple K-means implementation
+  *
   * Adapted from [[https://gist.github.com/metanet/a385d42fd2cab9f3d20e]]
   *
   */
 object KMeansClustering {
 
+  /**
+    * create random centroids
+    *
+    * @param points the points for which to generate random centroids
+    * @param k      number of clusters
+    * @param random random number generator
+    * @return k random centroids
+    */
   def createRandomCentroids(points: Seq[Point], k: Int, random: Random = new Random()): Seq[Point] = {
     require(points.nonEmpty, "empty input")
 
@@ -38,12 +48,34 @@ object KMeansClustering {
     resultSet.toSeq // to immutable
   }
 
+  /**
+    * builds the clusters based on randomly generated centroids
+    *
+    * @param points the points to cluster
+    * @param k      number of clusters
+    * @param random random number generator
+    * @return the cluster centroids with assigned points
+    */
   def buildClusters(points: Seq[Point], k: Int, random: Random = new Random()): Map[Point, Seq[Point]] =
     buildClusters(points, createRandomCentroids(points, k, random))
 
+  /**
+    * builds the clusters based on initial centroids
+    *
+    * @param points           the points to cluster
+    * @param initialCentroids the initial centroids for clustering
+    * @return the cluster centroids with assigned points
+    */
   def buildClusters(points: Seq[Point], initialCentroids: Seq[Point]): Map[Point, Seq[Point]] =
     updateClusters(points, initialCentroids.map((_, Nil)).toMap)
 
+  /**
+    * creates a random point of a given number of dimensions
+    *
+    * @param dim    number of dimensions
+    * @param random random number generator
+    * @return random point
+    */
   def randomPoint(dim: Int, random: Random): Point = Point(Vector.fill(dim)(random.nextGaussian()))
 
   @tailrec
@@ -97,7 +129,7 @@ object KMeansClustering {
     (sum / count, members)
   }
 
-  case class Point(features: Vector[Double]) {
+  final case class Point(features: Vector[Double]) {
 
     def distanceTo(that: Point): Double = sqrt(squaredDistanceTo(that))
 

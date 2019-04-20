@@ -2,7 +2,7 @@ package org.mvrs.dspa.jobs.clustering
 
 import org.mvrs.dspa.jobs.clustering.KMeansClustering.Point
 
-case class ClusterModel(clusters: Vector[Cluster]) {
+final case class ClusterModel(clusters: Vector[Cluster]) {
   require(clusters.nonEmpty, "empty cluster sequence")
 
   def update(updateClusters: Iterable[Cluster], decay: Double): ClusterModel = {
@@ -41,4 +41,4 @@ case class ClusterModel(clusters: Vector[Cluster]) {
   }
 }
 
-case class Cluster(index: Int, centroid: Point, weight: Double)
+final case class Cluster(index: Int, centroid: Point, weight: Double)
