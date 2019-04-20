@@ -1,54 +1,171 @@
 package org.mvrs.dspa.jobs.clustering
 
-import org.apache.flink.api.common.state.ValueStateDescriptor
-import org.apache.flink.streaming.api.scala.function.ProcessWindowFunction
-import org.apache.flink.streaming.api.windowing.windows.TimeWindow
+import org.apache.flink.api.common.state._
+import org.apache.flink.api.common.time.Time
+import org.apache.flink.streaming.api.TimerService
+import org.apache.flink.streaming.api.functions.co.KeyedBroadcastProcessFunction
 import org.apache.flink.util.Collector
 import org.mvrs.dspa.jobs.clustering.KMeansClusterFunction._
 import org.mvrs.dspa.jobs.clustering.KMeansClustering.Point
+import org.mvrs.dspa.utils
+import org.slf4j.LoggerFactory
 
+import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-class KMeansClusterFunction(k: Int, decay: Double = 0.9)
-  extends ProcessWindowFunction[mutable.ArrayBuffer[Double], (Long, Int, ClusterModel), Int, TimeWindow] {
+class KMeansClusterFunction(var k: Int, var decay: Double = 0.9,
+                            windowSize: Time, minElementCount: Int, maxElementCount: Int,
+                            broadcastStateDescriptor: MapStateDescriptor[String, String])
+  extends KeyedBroadcastProcessFunction[Int, mutable.ArrayBuffer[Double], (String, String), (Long, Int, ClusterModel)] {
   require(k > 1, s"invalid k: $k")
+  require(windowSize.toMilliseconds > 0, s"invalid window size: $windowSize")
+  require(minElementCount >= 0, s"invalid minimum element count: $minElementCount")
+  require(maxElementCount > 0, s"invalid maximum element count: $maxElementCount")
   require(decay >= 0 && decay <= 1, s"invalid decay: $decay (must be between 0 and 1)")
 
   private val clusterStateDescriptor = new ValueStateDescriptor("cluster-model", classOf[ClusterModel])
+  private val nextTimerStateDescriptor = new ValueStateDescriptor("next-timer", classOf[Long])
+  private val windowExceededStateDescriptor = new ValueStateDescriptor("window-exceeded", classOf[Boolean])
+  private val elementCountStateDescriptor = new ValueStateDescriptor("element-count", classOf[Int])
 
-  override def process(key: Int,
-                       context: Context,
-                       elements: Iterable[ArrayBuffer[Double]],
-                       out: Collector[(Long, Int, ClusterModel)]): Unit = {
-    val clusterState = getRuntimeContext.getState(clusterStateDescriptor)
+  private val elementsStateDescriptor = new ListStateDescriptor("elements", classOf[Element])
+  private val nextElementsStateDescriptor = new ListStateDescriptor("next-elements", classOf[Element])
 
-    val points = elements.map(features => Point(features.toVector)).toSeq
+  private val LOG = LoggerFactory.getLogger(classOf[KMeansClusterFunction])
 
-    if (points.isEmpty) {
-      // don't emit anything, as the clusters are stored in broadcast state downstream, and there is no reliance on
-      // watermark updates from the broadcast stream
-      return
+  override def processElement(value: ArrayBuffer[Double],
+                              ctx: KeyedBroadcastProcessFunction[Int, ArrayBuffer[Double], (String, String), (Long, Int, ClusterModel)]#ReadOnlyContext,
+                              out: Collector[(Long, Int, ClusterModel)]): Unit = {
+    var nextTimer = getRuntimeContext.getState(nextTimerStateDescriptor).value()
+    val windowExceeded = getRuntimeContext.getState(windowExceededStateDescriptor).value()
+    val elementsListState = getRuntimeContext.getListState(elementsStateDescriptor)
+    val nextElementsListState: ListState[Element] = getRuntimeContext.getListState(nextElementsStateDescriptor)
+    val elementCountState = getRuntimeContext.getState(elementCountStateDescriptor)
+
+    if (nextTimer == 0) {
+      // register the first timer
+      nextTimer = ctx.timestamp() + windowSize.toMilliseconds
+      registerTimer(nextTimer, ctx.timerService(), ctx.getCurrentKey)
     }
 
-    // TODO take in control stream for value of K and decay
-    // - source: config file read using FileProcessingMode.PROCESS_CONTINUOUSLY -> re-emit on any change
+    if (ctx.timestamp() > nextTimer && !windowExceeded) {
+      // element with timestamp after next timer, but delivered before the timer
+      // (the timer fires only after watermark for its timestamp has passed, so there can be "early" elements
+      // belonging to the next window)
+      nextElementsListState.add(Element(value))
+    }
+    else {
+      // regular element, add to list state
+      elementsListState.add(Element(value))
+      elementCountState.update(elementCountState.value + 1)
+    }
 
-    val previousClusterModel = Option(clusterState.value())
+    if (elementCountState.value() >= maxElementCount ||
+      (windowExceeded && elementCountState.value() >= minElementCount)) {
+      // early firing or extended window:
+      // - early: maximum element count within window reached
+      // - extended window: minimum size was not reached on regular window end time, is reached now
 
-    val newClusterModel = cluster(points, previousClusterModel, decay, k)
+      // if there is an existing timer registration, delete it
+      if (nextTimer > 0) {
+        ctx.timerService().deleteEventTimeTimer(nextTimer)
+      }
 
-    clusterState.update(newClusterModel)
+      emitClusters(elementsListState, nextElementsListState, elementCountState, out, ctx.timestamp())
 
-    out.collect((context.window.maxTimestamp(), points.size, newClusterModel))
-
-    // TODO emit information about cluster movement
-    //   - as metric?
-    //   - on side output stream?
-    // - metric seems more appropriate; however the metric will have to be an aggregate (maximum and average distances?)
+      registerTimer(ctx.timestamp() + windowSize.toMilliseconds, ctx.timerService(), ctx.getCurrentKey)
+    }
   }
 
+  override def onTimer(timestamp: Long,
+                       ctx: KeyedBroadcastProcessFunction[Int, ArrayBuffer[Double], (String, String), (Long, Int, ClusterModel)]#OnTimerContext,
+                       out: Collector[(Long, Int, ClusterModel)]): Unit = {
+    val elementsListState = getRuntimeContext.getListState(elementsStateDescriptor)
+    val nextElementsListState: ListState[Element] = getRuntimeContext.getListState(nextElementsStateDescriptor)
+    val elementCountState = getRuntimeContext.getState(elementCountStateDescriptor)
+
+    val elementCount = elementCountState.value()
+
+    LOG.debug("onTimer: {} ({} elements)", timestamp, elementCount)
+
+    if (elementCount > minElementCount) {
+      emitClusters(elementsListState, nextElementsListState, elementCountState, out, timestamp)
+
+      registerTimer(timestamp + windowSize.toMilliseconds, ctx.timerService(), ctx.getCurrentKey)
+    }
+    else {
+      getRuntimeContext.getState(windowExceededStateDescriptor).update(true)
+    }
+  }
+
+  override def processBroadcastElement(value: (String, String),
+                                       ctx: KeyedBroadcastProcessFunction[Int, ArrayBuffer[Double], (String, String), (Long, Int, ClusterModel)]#Context,
+                                       out: Collector[(Long, Int, ClusterModel)]): Unit = {
+    ctx.getBroadcastState(broadcastStateDescriptor).put(value._1, value._2)
+
+    // TODO parse/validate earlier in stream - pass ADT "ClusteringParameter" here, pattern-match on it
+    value match {
+      case ("k", v) => k = v.toInt
+      case ("decay", v) => decay = v.toDouble
+      case _ => // ignore
+    }
+  }
+
+  private def emitClusters(elementsState: ListState[Element],
+                           nextElementsState: ListState[Element],
+                           elementCount: ValueState[Int],
+                           out: Collector[(Long, Int, ClusterModel)],
+                           timestamp: Long): Unit = {
+    val points = elementsState.get.asScala.map(e => Point(e.features.toVector)).toSeq
+
+    if (points.isEmpty) {
+      // no need to emit anything, as the clusters are stored in broadcast state downstream, and there is no reliance on
+      // watermark updates from the broadcast stream
+      // NOTE maybe this should be changed, signal empty update to ensure progress
+    }
+    else {
+      val clusterState = getRuntimeContext.getState(clusterStateDescriptor)
+
+      val newClusterModel = cluster(points, Option(clusterState.value()), decay, k)
+
+      out.collect((timestamp, points.size, newClusterModel))
+
+      // update state
+
+      clusterState.update(newClusterModel)
+
+      elementsState.clear()
+      elementCount.update(0)
+
+      val nextElements = utils.toSeq(nextElementsState)
+
+      if (nextElements.nonEmpty) {
+        elementsState.addAll(nextElements.asJava)
+        elementCount.update(nextElements.size)
+        nextElementsState.clear()
+      }
+
+      // TODO emit information about cluster movement
+      //   - as metric?
+      //   - on side output stream?
+      // - metric seems more appropriate; however the metric will have to be an aggregate (maximum and average distances?)
+    }
+  }
+
+  private def registerTimer(nextTimer: Long, timerService: TimerService, key: Int): Unit = {
+    LOG.debug("Registering timer for {}: {}", key, utils.formatTimestamp(nextTimer))
+
+    timerService.registerEventTimeTimer(nextTimer)
+
+    getRuntimeContext.getState(nextTimerStateDescriptor).update(nextTimer)
+    getRuntimeContext.getState(windowExceededStateDescriptor).update(false)
+  }
+
+  final case class Element(features: mutable.ArrayBuffer[Double])
+
 }
+
 
 object KMeansClusterFunction {
   /**
@@ -63,10 +180,11 @@ object KMeansClusterFunction {
   def cluster(points: Seq[Point], previousModel: Option[ClusterModel], decay: Double, k: Int): ClusterModel = {
     val initialCentroids =
       previousModel
-        .map(_.clusters.map(_.centroid))
+        .map(_.clusters.map(_.centroid).take(k))
         .getOrElse(KMeansClustering.createRandomCentroids(points, k))
 
-    assert(initialCentroids.size == k)
+    // TODO with small point sets the size can become < k - check why
+    assert(initialCentroids.size == k, s"unexpected centroid count: ${initialCentroids.size} - expected: $k")
 
     val clusters =
       KMeansClustering

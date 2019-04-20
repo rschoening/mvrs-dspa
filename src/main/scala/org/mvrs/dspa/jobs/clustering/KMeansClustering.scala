@@ -22,7 +22,7 @@ object KMeansClustering {
     * @param random random number generator
     * @return k random centroids
     */
-  def createRandomCentroids(points: Seq[Point], k: Int, random: Random = new Random()): Seq[Point] = {
+  def createRandomCentroids(points: Iterable[Point], k: Int, random: Random = new Random()): Seq[Point] = {
     require(points.nonEmpty, "empty input")
 
     val uniquePoints = points.toSet

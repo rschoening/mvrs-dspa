@@ -11,6 +11,7 @@ import org.elasticsearch.action.index.IndexRequest
 
 import scala.collection.JavaConverters._
 
+// TODO convert to
 object ActivePostStatisticsIndex {
   def create(client: ElasticClient, indexName: String, typeName: String): Unit = {
     import com.sksamuel.elastic4s.http.ElasticDsl._

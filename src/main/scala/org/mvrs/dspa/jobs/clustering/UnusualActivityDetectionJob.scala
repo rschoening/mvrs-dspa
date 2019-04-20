@@ -11,7 +11,6 @@ import org.apache.flink.streaming.api.functions.source.FileProcessingMode
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows
 import org.mvrs.dspa.events.CommentEvent
-import org.mvrs.dspa.functions.ProgressMonitorFunction
 import org.mvrs.dspa.io.ElasticSearchNode
 import org.mvrs.dspa.{Settings, streams, utils}
 
@@ -35,6 +34,9 @@ object UnusualActivityDetectionJob extends App {
   // - come up with better text features
   // - write additional information to ElasticSearch to help interpretation of activity classification
   val localWithUI = false // use arg (scallop?)
+  val speedupFactor = 0 // 0 --> read as fast as can
+  val randomDelay = 0 // event time
+
   val elasticHostName = "localhost"
   val indexName = "activity-classification"
   val typeName = "activity-classification-type"
@@ -71,13 +73,12 @@ object UnusualActivityDetectionJob extends App {
         interval = 2000L)
       .setParallelism(1) // otherwise the empty splits never emit watermarks, timers never fire etc.
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[String](Time.seconds(0), _ => Long.MaxValue)) // required for downstream timers
-      .process(new ProgressMonitorFunction[String]("control", 1))
       .map(parseClusterParameters _) // TODO parse parameters here to AGD?
       .filter(_.isRight).map(_.toOption.get) // TODO refactor
       .broadcast(clusterParametersBroadcastStateDescriptor)
 
   // val comments = streams.commentsFromKafka("activity-detection")
-  val comments = streams.commentsFromCsv(Settings.commentStreamCsvPath) // , 10000)
+  val comments = streams.commentsFromCsv(Settings.commentStreamCsvPath, speedupFactor, randomDelay)
 
   val frequencyStream: DataStream[(Long, Int)] =
     comments
@@ -123,12 +124,12 @@ object UnusualActivityDetectionJob extends App {
       .keyBy(_ => 0)
       .connect(controlMessages)
       .process(
-        new KMeansClusterFunction2(
-          k = 4, decay = 0.0,
-          Time.hours(24), 10, 2000,
+        new KMeansClusterFunction(
+          k = 4, decay = 0.2,
+          Time.hours(24), 100, 20000,
           clusterParametersBroadcastStateDescriptor)).name("calculate clusters").setParallelism(1)
 
-  // broadcast stream
+  // broadcast stream for clusters
   val clusterStateDescriptor =
     new MapStateDescriptor(
       "ClusterBroadcastState",
@@ -138,7 +139,7 @@ object UnusualActivityDetectionJob extends App {
   val broadcast = clusters.broadcast(clusterStateDescriptor)
 
   // connect feature stream with cluster broadcast, classify featurized comments
-  val classifiedComments =
+  val classifiedComments: DataStream[ClassifiedEvent] =
     featurizedComments
       .keyBy(_._1)
       .connect(broadcast)
