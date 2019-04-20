@@ -16,8 +16,8 @@ import scala.collection.mutable.ArrayBuffer
 
 class KMeansClusterFunction(var k: Int, var decay: Double = 0.9,
                             windowSize: Time, minElementCount: Int, maxElementCount: Int,
-                            broadcastStateDescriptor: MapStateDescriptor[String, String])
-  extends KeyedBroadcastProcessFunction[Int, mutable.ArrayBuffer[Double], (String, String), (Long, Int, ClusterModel)] {
+                            broadcastStateDescriptor: MapStateDescriptor[ClusteringParameter, String])
+  extends KeyedBroadcastProcessFunction[Int, mutable.ArrayBuffer[Double], ClusteringParameter, (Long, Int, ClusterModel)] {
   require(k > 1, s"invalid k: $k")
   require(windowSize.toMilliseconds > 0, s"invalid window size: $windowSize")
   require(minElementCount >= 0, s"invalid minimum element count: $minElementCount")
@@ -35,7 +35,7 @@ class KMeansClusterFunction(var k: Int, var decay: Double = 0.9,
   private val LOG = LoggerFactory.getLogger(classOf[KMeansClusterFunction])
 
   override def processElement(value: ArrayBuffer[Double],
-                              ctx: KeyedBroadcastProcessFunction[Int, ArrayBuffer[Double], (String, String), (Long, Int, ClusterModel)]#ReadOnlyContext,
+                              ctx: KeyedBroadcastProcessFunction[Int, ArrayBuffer[Double], ClusteringParameter, (Long, Int, ClusterModel)]#ReadOnlyContext,
                               out: Collector[(Long, Int, ClusterModel)]): Unit = {
     var nextTimer = getRuntimeContext.getState(nextTimerStateDescriptor).value()
     val windowExceeded = getRuntimeContext.getState(windowExceededStateDescriptor).value()
@@ -79,7 +79,7 @@ class KMeansClusterFunction(var k: Int, var decay: Double = 0.9,
   }
 
   override def onTimer(timestamp: Long,
-                       ctx: KeyedBroadcastProcessFunction[Int, ArrayBuffer[Double], (String, String), (Long, Int, ClusterModel)]#OnTimerContext,
+                       ctx: KeyedBroadcastProcessFunction[Int, ArrayBuffer[Double], ClusteringParameter, (Long, Int, ClusterModel)]#OnTimerContext,
                        out: Collector[(Long, Int, ClusterModel)]): Unit = {
     val elementsListState = getRuntimeContext.getListState(elementsStateDescriptor)
     val nextElementsListState: ListState[Element] = getRuntimeContext.getListState(nextElementsStateDescriptor)
@@ -99,16 +99,16 @@ class KMeansClusterFunction(var k: Int, var decay: Double = 0.9,
     }
   }
 
-  override def processBroadcastElement(value: (String, String),
-                                       ctx: KeyedBroadcastProcessFunction[Int, ArrayBuffer[Double], (String, String), (Long, Int, ClusterModel)]#Context,
+  override def processBroadcastElement(value: ClusteringParameter,
+                                       ctx: KeyedBroadcastProcessFunction[Int, ArrayBuffer[Double], ClusteringParameter, (Long, Int, ClusterModel)]#Context,
                                        out: Collector[(Long, Int, ClusterModel)]): Unit = {
-    ctx.getBroadcastState(broadcastStateDescriptor).put(value._1, value._2)
+    ctx.getBroadcastState(broadcastStateDescriptor).put(value, "")  // TODO rethink structure
 
-    // TODO parse/validate earlier in stream - pass ADT "ClusteringParameter" here, pattern-match on it
+    // TODO always read from map state, otherwise checkpointing that state is of no use
     value match {
-      case ("k", v) => k = v.toInt
-      case ("decay", v) => decay = v.toDouble
-      case _ => // ignore
+      case ClusteringParameterK(v) => k = v
+      case ClusteringParameterDecay(v) => decay = v
+      case ClusteringParameterLabel(_, _) => // TODO
     }
   }
 

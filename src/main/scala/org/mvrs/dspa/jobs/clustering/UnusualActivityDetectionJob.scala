@@ -58,24 +58,35 @@ object UnusualActivityDetectionJob extends App {
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
   val clusterParametersBroadcastStateDescriptor =
-    new MapStateDescriptor[String, String](
+    new MapStateDescriptor[ClusteringParameter, String](
       "cluster-parameters",
-      classOf[String],
+      classOf[ClusteringParameter],
       classOf[String])
 
-  val controlMessages: BroadcastStream[(String, String)] =
+  val controlParameters: DataStream[Either[Throwable, ClusteringParameter]] =
     env
       .readFile(
         new TextInputFormat(
-          new Path(Settings.UnusualActivityControlFilePath)),
-        Settings.UnusualActivityControlFilePath,
+          new Path(Settings.UnusualActivityControlFilePath)), Settings.UnusualActivityControlFilePath,
         FileProcessingMode.PROCESS_CONTINUOUSLY,
         interval = 2000L)
       .setParallelism(1) // otherwise the empty splits never emit watermarks, timers never fire etc.
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[String](Time.seconds(0), _ => Long.MaxValue)) // required for downstream timers
-      .map(parseClusterParameters _) // TODO parse parameters here to AGD?
-      .filter(_.isRight).map(_.toOption.get) // TODO refactor
+      .flatMap(ClusteringParameter.parse _)
+      .setParallelism(1)
+
+  val controlParameterBroadcast: BroadcastStream[ClusteringParameter] =
+    controlParameters
+      .filter(_.isRight)
+      .map(_.right.get) // on account of there being no "collect()"
       .broadcast(clusterParametersBroadcastStateDescriptor)
+
+
+  val controlParameterParseErrors =
+    controlParameters
+      .filter(_.isLeft)
+      .map(_.left.get)
+      .print("CONTROL PARAMETER PARSE ERRORS")
 
   // val comments = streams.commentsFromKafka("activity-detection")
   val comments = streams.commentsFromCsv(Settings.commentStreamCsvPath, speedupFactor, randomDelay)
@@ -122,12 +133,13 @@ object UnusualActivityDetectionJob extends App {
     featurizedComments
       .map(_._3)
       .keyBy(_ => 0)
-      .connect(controlMessages)
+      .connect(controlParameterBroadcast)
       .process(
         new KMeansClusterFunction(
           k = 4, decay = 0.2,
           Time.hours(24), 100, 20000,
-          clusterParametersBroadcastStateDescriptor)).name("calculate clusters").setParallelism(1)
+          clusterParametersBroadcastStateDescriptor)).name("calculate clusters")
+      .setParallelism(1)
 
   // broadcast stream for clusters
   val clusterStateDescriptor =
@@ -164,6 +176,8 @@ object UnusualActivityDetectionJob extends App {
     if (tokens.isEmpty) buffer ++= List.fill(dim)(0.0) // zero vector
     else {
       // TODO how to scale/normalize features?
+      // TODO do this in windowing function?
+
       // buffer += math.log(tokens.size)
       // buffer += math.log(tokens.map(_.toLowerCase()).distinct.size) // distinct word count
       buffer += 10 * tokens.map(_.toLowerCase()).distinct.size / tokens.size // proportion of distinct words
@@ -171,12 +185,6 @@ object UnusualActivityDetectionJob extends App {
       buffer += tokens.count(_.forall(_.isUpper)) / tokens.size // % of all-UPPERCASE words
       buffer += tokens.count(_.length == 4) / tokens.size // % of four-letter words
     }
-  }
-
-  private def parseClusterParameters(line: String): Either[String, (String, String)] = {
-    val tokens = line.split('=')
-    if (tokens.length == 2) Right((tokens(0).trim, tokens(1).trim))
-    else Left(s"Invalid parameter line: $line")
   }
 
   /**
