@@ -46,7 +46,7 @@ class KMeansClusteringTestSuite extends FlatSpec with Matchers {
       Point(2, 2)
     )
 
-    val clusters = KMeansClustering.buildClusters(List[Point](), centroids)
+    val clusters = KMeansClustering.buildClusters(List[Point](), centroids, centroids.size)
 
     println(clusters.mkString("\n"))
 
@@ -62,7 +62,7 @@ class KMeansClusteringTestSuite extends FlatSpec with Matchers {
       Point(2, 2)
     )
 
-    val clusters = KMeansClustering.buildClusters(points, centroids)
+    val clusters = KMeansClustering.buildClusters(points, centroids, centroids.size)
 
     println(clusters.mkString("\n"))
 

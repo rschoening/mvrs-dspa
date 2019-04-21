@@ -57,7 +57,7 @@ object KMeansClustering {
     * @return the cluster centroids with assigned points
     */
   def buildClusters(points: Seq[Point], k: Int, random: Random = new Random()): Map[Point, Seq[Point]] =
-    buildClusters(points, createRandomCentroids(points, k, random))
+    buildClusters(points, createRandomCentroids(points, k, random), k)
 
   /**
     * builds the clusters based on initial centroids
@@ -66,8 +66,12 @@ object KMeansClustering {
     * @param initialCentroids the initial centroids for clustering
     * @return the cluster centroids with assigned points
     */
-  def buildClusters(points: Seq[Point], initialCentroids: Seq[Point]): Map[Point, Seq[Point]] =
-    updateClusters(points, initialCentroids.map((_, Nil)).toMap)
+  def buildClusters(points: Seq[Point], initialCentroids: Seq[Point], k: Int): Map[Point, Seq[Point]] =
+    updateClusters(
+      points,
+      initialCentroids.map((_, Nil)).toMap, // NOTE duplicates eliminated here -> k can shrink --> add random points?
+      k
+    )
 
   /**
     * creates a random point of a given number of dimensions
@@ -79,8 +83,8 @@ object KMeansClustering {
   def randomPoint(dim: Int, random: Random): Point = Point(Vector.fill(dim)(random.nextGaussian()))
 
   @tailrec
-  private def updateClusters(points: Seq[Point], prevClusters: Map[Point, Seq[Point]]): Map[Point, Seq[Point]] = {
-    val k = prevClusters.size
+  private def updateClusters(points: Seq[Point], prevClusters: Map[Point, Seq[Point]], k: Int): Map[Point, Seq[Point]] = {
+    require(k == prevClusters.size)
 
     // assign points to existing clusters
     val nextClusters =
@@ -104,7 +108,7 @@ object KMeansClustering {
       // point assignment has changed - update cluster centroids
       val nextClustersWithBetterCentroids = nextClusters.map { case (_, members) => updateCentroid(members) }
 
-      updateClusters(points, nextClustersWithBetterCentroids) // iterate until centroids don't change
+      updateClusters(points, nextClustersWithBetterCentroids, k) // iterate until centroids don't change
     } else prevClusters
   }
 

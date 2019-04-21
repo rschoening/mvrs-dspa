@@ -186,7 +186,7 @@ object KMeansClusterFunction {
 
     val clusters =
       KMeansClustering
-        .buildClusters(points, initialCentroids)
+        .buildClusters(points, initialCentroids, params.k)
         .zipWithIndex
         .map { case ((centroid, clusterPoints), index) => Cluster(index, centroid, clusterPoints.size) }
 
