@@ -13,10 +13,11 @@ import org.slf4j.LoggerFactory
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.reflect.{ClassTag, _}
 
-class KMeansClusterFunction(var k: Int, var decay: Double = 0.9,
+class KMeansClusterFunction(k: Int, decay: Double = 0.9,
                             windowSize: Time, minElementCount: Int, maxElementCount: Int,
-                            broadcastStateDescriptor: MapStateDescriptor[ClusteringParameter, String])
+                            broadcastStateDescriptor: MapStateDescriptor[ClusteringParameter, Unit])
   extends KeyedBroadcastProcessFunction[Int, mutable.ArrayBuffer[Double], ClusteringParameter, (Long, Int, ClusterModel)] {
   require(k > 1, s"invalid k: $k")
   require(windowSize.toMilliseconds > 0, s"invalid window size: $windowSize")
@@ -72,7 +73,9 @@ class KMeansClusterFunction(var k: Int, var decay: Double = 0.9,
         ctx.timerService().deleteEventTimeTimer(nextTimer)
       }
 
-      emitClusters(elementsListState, nextElementsListState, elementCountState, out, ctx.timestamp())
+      val params = new Parameters(ctx.getBroadcastState(broadcastStateDescriptor), k, decay)
+
+      emitClusters(elementsListState, nextElementsListState, elementCountState, out, ctx.timestamp(), params)
 
       registerTimer(ctx.timestamp() + windowSize.toMilliseconds, ctx.timerService(), ctx.getCurrentKey)
     }
@@ -90,7 +93,9 @@ class KMeansClusterFunction(var k: Int, var decay: Double = 0.9,
     LOG.debug("onTimer: {} ({} elements)", timestamp, elementCount)
 
     if (elementCount > minElementCount) {
-      emitClusters(elementsListState, nextElementsListState, elementCountState, out, timestamp)
+      val params = new Parameters(ctx.getBroadcastState(broadcastStateDescriptor), k, decay)
+
+      emitClusters(elementsListState, nextElementsListState, elementCountState, out, timestamp, params)
 
       registerTimer(timestamp + windowSize.toMilliseconds, ctx.timerService(), ctx.getCurrentKey)
     }
@@ -102,21 +107,17 @@ class KMeansClusterFunction(var k: Int, var decay: Double = 0.9,
   override def processBroadcastElement(value: ClusteringParameter,
                                        ctx: KeyedBroadcastProcessFunction[Int, ArrayBuffer[Double], ClusteringParameter, (Long, Int, ClusterModel)]#Context,
                                        out: Collector[(Long, Int, ClusterModel)]): Unit = {
-    ctx.getBroadcastState(broadcastStateDescriptor).put(value, "")  // TODO rethink structure
-
-    // TODO always read from map state, otherwise checkpointing that state is of no use
-    value match {
-      case ClusteringParameterK(v) => k = v
-      case ClusteringParameterDecay(v) => decay = v
-      case ClusteringParameterLabel(_, _) => // TODO
-    }
+    ctx.getBroadcastState(broadcastStateDescriptor).put(value, ())
   }
 
   private def emitClusters(elementsState: ListState[Element],
                            nextElementsState: ListState[Element],
                            elementCount: ValueState[Int],
                            out: Collector[(Long, Int, ClusterModel)],
-                           timestamp: Long): Unit = {
+                           timestamp: Long,
+                           params: Parameters): Unit = {
+    require(!timestamp.isNaN && timestamp > 0)
+
     val points = elementsState.get.asScala.map(e => Point(e.features.toVector)).toSeq
 
     if (points.isEmpty) {
@@ -127,7 +128,7 @@ class KMeansClusterFunction(var k: Int, var decay: Double = 0.9,
     else {
       val clusterState = getRuntimeContext.getState(clusterStateDescriptor)
 
-      val newClusterModel = cluster(points, Option(clusterState.value()), decay, k)
+      val newClusterModel = cluster(points, Option(clusterState.value()), params)
 
       out.collect((timestamp, points.size, newClusterModel))
 
@@ -162,8 +163,6 @@ class KMeansClusterFunction(var k: Int, var decay: Double = 0.9,
     getRuntimeContext.getState(windowExceededStateDescriptor).update(false)
   }
 
-  final case class Element(features: mutable.ArrayBuffer[Double])
-
 }
 
 
@@ -173,18 +172,17 @@ object KMeansClusterFunction {
     *
     * @param points        the points to cluster
     * @param previousModel the previous cluster model (optional)
-    * @param decay         the decay factor for the previous cluster model
-    * @param k             the number of clusters
+    * @param params        parameters for the cluster operation
     * @return the new cluster model
     */
-  def cluster(points: Seq[Point], previousModel: Option[ClusterModel], decay: Double, k: Int): ClusterModel = {
+  def cluster(points: Seq[Point], previousModel: Option[ClusterModel], params: Parameters): ClusterModel = {
     val initialCentroids =
       previousModel
-        .map(_.clusters.map(_.centroid).take(k))
-        .getOrElse(KMeansClustering.createRandomCentroids(points, k))
+        .map(_.clusters.map(_.centroid).take(params.k))
+        .getOrElse(KMeansClustering.createRandomCentroids(points, params.k))
 
     // TODO with small point sets the size can become < k - check why
-    assert(initialCentroids.size == k, s"unexpected centroid count: ${initialCentroids.size} - expected: $k")
+    assert(initialCentroids.size == params.k, s"unexpected centroid count: ${initialCentroids.size} - expected: ${params.k}")
 
     val clusters =
       KMeansClustering
@@ -193,7 +191,56 @@ object KMeansClusterFunction {
         .map { case ((centroid, clusterPoints), index) => Cluster(index, centroid, clusterPoints.size) }
 
     previousModel
-      .map(_.update(clusters, decay))
+      .map(_.update(clusters, params.decay))
       .getOrElse(ClusterModel(clusters.toVector))
   }
+
+  final case class Element(features: mutable.ArrayBuffer[Double])
+
+  class Parameters(mapState: ReadOnlyBroadcastState[ClusteringParameter, Unit], defaultK: Int, defaultDecay: Double) {
+    private val params: Iterable[ClusteringParameter] = mapState.immutableEntries().asScala.map(_.getKey)
+
+    /**
+      * the number of clusters
+      *
+      * @return
+      */
+    def k: Int = {
+      get[ClusteringParameterK]() match {
+        case p :: Nil => p.k
+        case _ => defaultK
+      }
+    }
+
+    /**
+      * The decay factor for the previous cluster model
+      *
+      * @return
+      */
+    def decay: Double = {
+      get[ClusteringParameterDecay]() match {
+        case p :: Nil => p.decay
+        case _ => defaultDecay
+      }
+    }
+
+    /**
+      * labels to associate with clusters
+      *
+      * @return
+      */
+    //noinspection ScalaUnusedSymbol - not yet used - example for multi-valued paramter
+    def labels: Map[Int, String] = {
+      get[ClusteringParameterLabel]()
+        .map(p => (p.clusterIndex, p.label))
+        .toMap
+    }
+
+    private def get[T: ClassTag](): List[T] =
+      params
+        .filter(_.getClass == classTag[T].runtimeClass)
+        .map(_.asInstanceOf[T])
+        .toList
+  }
+
 }

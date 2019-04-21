@@ -33,7 +33,7 @@ object UnusualActivityDetectionJob extends App {
   // - if a cluster gets too small, split the largest cluster
   // - come up with better text features
   // - write additional information to ElasticSearch to help interpretation of activity classification
-  val localWithUI = false // use arg (scallop?)
+  val localWithUI = true // use arg (scallop?)
   val speedupFactor = 0 // 0 --> read as fast as can
   val randomDelay = 0 // event time
 
@@ -58,10 +58,10 @@ object UnusualActivityDetectionJob extends App {
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
   val clusterParametersBroadcastStateDescriptor =
-    new MapStateDescriptor[ClusteringParameter, String](
+    new MapStateDescriptor[ClusteringParameter, Unit](
       "cluster-parameters",
       classOf[ClusteringParameter],
-      classOf[String])
+      classOf[Unit])
 
   val controlParameters: DataStream[Either[Throwable, ClusteringParameter]] =
     env
@@ -69,24 +69,26 @@ object UnusualActivityDetectionJob extends App {
         new TextInputFormat(
           new Path(Settings.UnusualActivityControlFilePath)), Settings.UnusualActivityControlFilePath,
         FileProcessingMode.PROCESS_CONTINUOUSLY,
-        interval = 2000L)
+        interval = 2000L).name("Read clustering parameters")
       .setParallelism(1) // otherwise the empty splits never emit watermarks, timers never fire etc.
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[String](Time.seconds(0), _ => Long.MaxValue)) // required for downstream timers
-      .flatMap(ClusteringParameter.parse _)
+      .flatMap(ClusteringParameter.parse _).name("Parse parameters")
       .setParallelism(1)
 
   val controlParameterBroadcast: BroadcastStream[ClusteringParameter] =
     controlParameters
-      .filter(_.isRight)
-      .map(_.right.get) // on account of there being no "collect()"
+      .filter(_.isRight).setParallelism(1)
+      .map(_.right.get).setParallelism(1)
+      .name("Control stream for clustering parameters")
       .broadcast(clusterParametersBroadcastStateDescriptor)
 
 
   val controlParameterParseErrors =
     controlParameters
-      .filter(_.isLeft)
-      .map(_.left.get)
-      .print("CONTROL PARAMETER PARSE ERRORS")
+      .filter(_.isLeft).setParallelism(1)
+      .map(_.left.get).setParallelism(1)
+      .name("Parameter parse errors")
+      .print("Parameter parse error").setParallelism(1) // TODO write to rolling log file
 
   // val comments = streams.commentsFromKafka("activity-detection")
   val comments = streams.commentsFromCsv(Settings.commentStreamCsvPath, speedupFactor, randomDelay)
