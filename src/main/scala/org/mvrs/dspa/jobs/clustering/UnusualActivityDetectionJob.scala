@@ -19,20 +19,17 @@ import scala.collection.mutable
 
 object UnusualActivityDetectionJob extends App {
   // TODO
+  // - allow adapting K -> grow also
+  //   - revise why currently, the number of centroids can decrease
   // - add side output stream and/or metrics on cluster evolution
   //   - maximum cluster movement distance? cluster index for maximum?
-  // - allow controlling replay speed
-  //   - read directly from csv?
-  //   - or read from kafka, with wrapped source?
-  //   - or read from kafka, with scaledreplayfunction?
-  // - add textfile-based control stream to control
-  //   - K
-  //   - which clusters to flag as "unusual"
+  // - revise ES index structure/kibana graph (counts based on cluster sizes???)
+  // - write additional information to ElasticSearch to help interpretation of activity classification
+  // - add integration tests, refactor for testability
   // - use connect instead of join for connecting to frequency?
-  // - create custom trigger that fires at end of window with count-based early firing
+  // - extract features within clustering operator (more flexibility to standardize/normalize features)
   // - if a cluster gets too small, split the largest cluster
   // - come up with better text features
-  // - write additional information to ElasticSearch to help interpretation of activity classification
   val localWithUI = true // use arg (scallop?)
   val speedupFactor = 0 // 0 --> read as fast as can
   val randomDelay = 0 // event time
@@ -162,7 +159,8 @@ object UnusualActivityDetectionJob extends App {
   // clusters.map(r => (r._1, r._2, r._3.clusters.map(c => (c.index, c.weight)))).print
   // classifiedComments.map(e => s"person: ${e.personId}\tcomment: ${e.eventId}\t-> ${e.cluster.index} (${e.cluster.weight})\t(${e.cluster.centroid})").print
 
-  // TODO write classification result to kafka/elasticsearch
+  // write classification result to kafka/elasticsearch
+  // TODO via kafka?
   classifiedComments.addSink(index.createSink(1))
 
   env.execute()
