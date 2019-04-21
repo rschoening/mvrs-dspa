@@ -25,7 +25,7 @@ class KMeansClusteringTestSuite extends FlatSpec with Matchers {
     val points = cluster1 ++ cluster2
 
     val k = 2
-    val clusters = KMeansClustering.buildClusters(points, k, new Random(137))
+    val clusters = KMeansClustering.buildClusters(points, k)(new Random(137))
 
     println(clusters.mkString("\n"))
 
@@ -36,7 +36,7 @@ class KMeansClusteringTestSuite extends FlatSpec with Matchers {
 
   it should "produce an exception when generating random clusters based on empty input" in {
     assertThrows[IllegalArgumentException] {
-      KMeansClustering.buildClusters(List[Point](), k = 2, new Random(137))
+      KMeansClustering.buildClusters(List[Point](), k = 2)(new Random(137))
     }
   }
 
@@ -46,7 +46,7 @@ class KMeansClusteringTestSuite extends FlatSpec with Matchers {
       Point(2, 2)
     )
 
-    val clusters = KMeansClustering.buildClusters(List[Point](), centroids, centroids.size)
+    val clusters = KMeansClustering.buildClusters(List[Point](), centroids, centroids.size)(new Random(137))
 
     println(clusters.mkString("\n"))
 
@@ -62,11 +62,29 @@ class KMeansClusteringTestSuite extends FlatSpec with Matchers {
       Point(2, 2)
     )
 
-    val clusters = KMeansClustering.buildClusters(points, centroids, centroids.size)
+    val clusters = KMeansClustering.buildClusters(points, centroids, centroids.size)(new Random(137))
 
     println(clusters.mkString("\n"))
 
     assertResult(centroids.toSet)(clusters.keys)
+    assert(clusters(Point(1, 1)).isEmpty)
+    assertResult(List(Point(5, 5)))(clusters(Point(2, 2)))
+  }
+
+  it should "handle duplicate centroids" in {
+    val points = List(Point(5, 5))
+
+    val centroids = List(
+      Point(1, 1),
+      Point(2, 2),
+      Point(2, 2)
+    )
+
+    val clusters = KMeansClustering.buildClusters(points, centroids, centroids.size)(new Random(137))
+
+    println(clusters.mkString("\n"))
+
+    assertResult(Set(Point(2.0, 2.0), Point(1.0, 1.0), Point(0.06418278364647693, -0.11561306036009286)))(clusters.keys)
     assert(clusters(Point(1, 1)).isEmpty)
     assertResult(List(Point(5, 5)))(clusters(Point(2, 2)))
   }
@@ -85,7 +103,7 @@ class KMeansClusteringTestSuite extends FlatSpec with Matchers {
 
   it should "create unique points also with points < k" in {
     val k = 4
-    val points = List(Point(1, 1), Point(2,2))
+    val points = List(Point(1, 1), Point(2, 2))
 
     val centroids = KMeansClustering.createRandomCentroids(points, k, new Random(137)).toSet
 

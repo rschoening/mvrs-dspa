@@ -30,7 +30,7 @@ object UnusualActivityDetectionJob extends App {
   // - extract features within clustering operator (more flexibility to standardize/normalize features)
   // - if a cluster gets too small, split the largest cluster
   // - come up with better text features
-  val localWithUI = true // use arg (scallop?)
+  val localWithUI = false // use arg (scallop?)
   val speedupFactor = 0 // 0 --> read as fast as can
   val randomDelay = 0 // event time
 
@@ -55,10 +55,10 @@ object UnusualActivityDetectionJob extends App {
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
   val clusterParametersBroadcastStateDescriptor =
-    new MapStateDescriptor[ClusteringParameter, Unit](
+    new MapStateDescriptor[String, ClusteringParameter](
       "cluster-parameters",
-      classOf[ClusteringParameter],
-      classOf[Unit])
+      classOf[String],
+      classOf[ClusteringParameter])
 
   val controlParameters: DataStream[Either[Throwable, ClusteringParameter]] =
     env

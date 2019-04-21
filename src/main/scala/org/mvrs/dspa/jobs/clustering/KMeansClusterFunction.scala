@@ -13,11 +13,11 @@ import org.slf4j.LoggerFactory
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.reflect.{ClassTag, _}
+import scala.util.Random
 
 class KMeansClusterFunction(k: Int, decay: Double = 0.9,
                             windowSize: Time, minElementCount: Int, maxElementCount: Int,
-                            broadcastStateDescriptor: MapStateDescriptor[ClusteringParameter, Unit])
+                            broadcastStateDescriptor: MapStateDescriptor[String, ClusteringParameter])
   extends KeyedBroadcastProcessFunction[Int, mutable.ArrayBuffer[Double], ClusteringParameter, (Long, Int, ClusterModel)] {
   require(k > 1, s"invalid k: $k")
   require(windowSize.toMilliseconds > 0, s"invalid window size: $windowSize")
@@ -107,7 +107,7 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
   override def processBroadcastElement(value: ClusteringParameter,
                                        ctx: KeyedBroadcastProcessFunction[Int, ArrayBuffer[Double], ClusteringParameter, (Long, Int, ClusterModel)]#Context,
                                        out: Collector[(Long, Int, ClusterModel)]): Unit = {
-    ctx.getBroadcastState(broadcastStateDescriptor).put(value, ())
+    ctx.getBroadcastState(broadcastStateDescriptor).put(value.key, value)
   }
 
   private def emitClusters(elementsState: ListState[Element],
@@ -167,6 +167,8 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
 
 
 object KMeansClusterFunction {
+  implicit private val random: Random = new Random()
+
   /**
     * calculate cluster model based on new points, the previous model and the decay factor
     *
@@ -182,7 +184,7 @@ object KMeansClusterFunction {
         .getOrElse(KMeansClustering.createRandomCentroids(points, params.k))
 
     // TODO with small point sets the size can become < k - check why
-    assert(initialCentroids.size == params.k, s"unexpected centroid count: ${initialCentroids.size} - expected: ${params.k}")
+    // assert(initialCentroids.size == params.k, s"unexpected centroid count: ${initialCentroids.size} - expected: ${params.k}")
 
     val clusters =
       KMeansClustering
@@ -197,32 +199,22 @@ object KMeansClusterFunction {
 
   final case class Element(features: mutable.ArrayBuffer[Double])
 
-  class Parameters(mapState: ReadOnlyBroadcastState[ClusteringParameter, Unit], defaultK: Int, defaultDecay: Double) {
-    private val params: Iterable[ClusteringParameter] = mapState.immutableEntries().asScala.map(_.getKey)
+  class Parameters(mapState: ReadOnlyBroadcastState[String, ClusteringParameter], defaultK: Int, defaultDecay: Double) {
+    // TODO avoid the downcasts
 
     /**
       * the number of clusters
       *
       * @return
       */
-    def k: Int = {
-      get[ClusteringParameterK]() match {
-        case p :: Nil => p.k
-        case _ => defaultK
-      }
-    }
+    def k: Int = Option(mapState.get("k")).map(_.asInstanceOf[ClusteringParameterK].k).getOrElse(defaultK)
 
     /**
       * The decay factor for the previous cluster model
       *
       * @return
       */
-    def decay: Double = {
-      get[ClusteringParameterDecay]() match {
-        case p :: Nil => p.decay
-        case _ => defaultDecay
-      }
-    }
+    def decay: Double = Option(mapState.get("decay")).map(_.asInstanceOf[ClusteringParameterDecay].decay).getOrElse(defaultDecay)
 
     /**
       * labels to associate with clusters
@@ -230,17 +222,7 @@ object KMeansClusterFunction {
       * @return
       */
     //noinspection ScalaUnusedSymbol - not yet used - example for multi-valued paramter
-    def labels: Map[Int, String] = {
-      get[ClusteringParameterLabel]()
-        .map(p => (p.clusterIndex, p.label))
-        .toMap
-    }
-
-    private def get[T: ClassTag](): List[T] =
-      params
-        .filter(_.getClass == classTag[T].runtimeClass)
-        .map(_.asInstanceOf[T])
-        .toList
+    def label(index: Int): Option[String] = Option(mapState.get(s"label$index")).map(_.asInstanceOf[ClusteringParameterLabel].label)
   }
 
 }
