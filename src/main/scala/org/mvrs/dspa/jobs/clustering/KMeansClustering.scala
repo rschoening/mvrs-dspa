@@ -104,28 +104,29 @@ object KMeansClustering {
     assert(k == clusterWeightsK.size)
 
     // assign points to existing clusters
-    val pointAssignment = assignPoints(points, clusterWeightsK.keys)
+    val oldCentroidsWithPoints = assignPoints(points, clusterWeightsK.keys)
 
-    if (pointAssignment.size < k) {
-      // TODO REVISE just recurse?
+    if (oldCentroidsWithPoints.size < k) {
+      // TODO REVISE just recurse? NO infinite loop in (should handle points < k)
 
       // less points than clusters - add omitted centroids with empty point lists and return
-      val result = pointAssignment.map(t => (t._1, t._2.size.toDouble)) ++
+      val result = oldCentroidsWithPoints.map(t => (t._1, t._2.size.toDouble)) ++
         clusterWeightsK
-          .filter(t => !pointAssignment.contains(t._1))
+          .filter(t => !oldCentroidsWithPoints.contains(t._1))
           .map(t => (t._1, 0.0))
 
       assert(result.size == k)
       result
     }
     else {
-      val updatedCentroids = pointAssignment.map {
-        case (c, members) => if (members.isEmpty) (c, Nil) else (updateCentroid(members), members)
-      }
-      val updatedWeights = updatedCentroids.map { case (c, members) => (c, members.size.toDouble) }
+      val newCentroidsWithPoints = oldCentroidsWithPoints.map { case (c, ps) => (if (ps.isEmpty) c else updateCentroid(ps), ps) }
 
-      if (pointAssignment != updatedCentroids) updateClusters(points, updatedWeights, k) // iterate until centroids don't change
-      else updatedWeights
+      val newCentroidsWithWeights = newCentroidsWithPoints.map { case (c, ps) => (c, ps.size.toDouble) }
+
+      if (oldCentroidsWithPoints != newCentroidsWithPoints)
+        updateClusters(points, newCentroidsWithWeights, k) // iterate until centroids don't change
+      else
+        newCentroidsWithWeights
     }
   }
 
