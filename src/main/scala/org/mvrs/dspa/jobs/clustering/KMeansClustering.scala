@@ -60,8 +60,8 @@ object KMeansClustering {
     * @param random random number generator
     * @return the cluster centroids with assigned points
     */
-  def buildClusters(points: Seq[Point], k: Int)(implicit random: Random): Map[Point, Seq[Point]] =
-    buildClusters(points, createRandomCentroids(points, k, random), k)
+  def buildClusters(points: Seq[Point], k: Int)(implicit random: Random): Map[Point, Double] =
+    buildClusters(points, createRandomCentroids(points, k, random).map((_, 0.0)), k)
 
   /**
     * builds the clusters based on initial centroids
@@ -70,10 +70,10 @@ object KMeansClustering {
     * @param initialCentroids the initial centroids for clustering
     * @return the cluster centroids with assigned points
     */
-  def buildClusters(points: Seq[Point], initialCentroids: Seq[Point], k: Int)(implicit random: Random): Map[Point, Seq[Point]] =
+  def buildClusters(points: Seq[Point], initialCentroids: Seq[(Point, Double)], k: Int)(implicit random: Random): Map[Point, Double] =
     updateClusters(
       points,
-      initialCentroids.map((_, Nil)).toMap, // NOTE duplicates eliminated here -> k can shrink -> handled in updateClusters
+      initialCentroids.toMap, // NOTE duplicates eliminated here -> k can shrink -> handled in updateClusters
       k
     )
 
@@ -87,46 +87,70 @@ object KMeansClustering {
   def randomPoint(dim: Int, random: Random): Point = Point(Vector.fill(dim)(random.nextGaussian()))
 
   @tailrec
-  private def ensureK(points: Seq[Point], prevClusters: Map[Point, Seq[Point]], k: Int)(implicit random: Random): Map[Point, Seq[Point]] =
+  private def ensureK(points: Seq[Point], prevClusters: Map[Point, Double], k: Int, iteration: Int)(implicit random: Random): Map[Point, Double] =
     if (prevClusters.size == k) prevClusters
     else if (prevClusters.size < k) {
-      val dim = getDimensions(points)
-      // TODO: split the largest clusters recursively up to k
-      ensureK(points, prevClusters ++ (0 until k - prevClusters.size).map(_ => (randomPoint(dim, random), Nil)), k)
+
+      // split the largest clusters recursively up to k
+      val largestCluster: (Point, Double) = prevClusters.maxBy(_._2)
+      val newClusters = (prevClusters - largestCluster._1) ++ splitCluster(largestCluster, offsetFactor = iteration)
+      ensureK(points, newClusters, k, iteration + 1)
     }
-    else prevClusters.toSeq.sortBy(t => t._2.size * -1).take(k).toMap // keep k largest clusters
+    else prevClusters.toSeq.sortBy(t => t._2 * -1).take(k).toMap // keep k largest clusters
 
   @tailrec
-  private def updateClusters(points: Seq[Point], prevClusters: Map[Point, Seq[Point]], k: Int)(implicit random: Random): Map[Point, Seq[Point]] = {
-
-    val prevClustersK = ensureK(points, prevClusters, k) // add/remove centroids if prevClusters differs from k
-    assert(k == prevClustersK.size)
+  private def updateClusters(points: Seq[Point], clusterWeights: Map[Point, Double], k: Int)(implicit random: Random): Map[Point, Double] = {
+    val clusterWeightsK = ensureK(points, clusterWeights, k, iteration = 1) // add/remove centroids if clusterWeights.size differs from k
+    assert(k == clusterWeightsK.size)
 
     // assign points to existing clusters
-    val nextClusters =
-      if (points.isEmpty) prevClustersK
-      else points
-        .map { point => (point, getNearestCentroid(point, prevClustersK.keys)) }
-        .groupBy { case (_, centroid) => centroid }
-        .map { case (centroid, members) => (centroid, members.map { case (p, _) => p }) }
+    val pointAssignment = assignPoints(points, clusterWeightsK.keys)
 
-    if (nextClusters.size < k) {
+    if (pointAssignment.size < k) {
+      // TODO REVISE just recurse?
+
       // less points than clusters - add omitted centroids with empty point lists and return
-      val result = nextClusters ++
-        prevClustersK
-          .filter(t => !nextClusters.contains(t._1))
-          .map(t => (t._1, Nil))
+      val result = pointAssignment.map(t => (t._1, t._2.size.toDouble)) ++
+        clusterWeightsK
+          .filter(t => !pointAssignment.contains(t._1))
+          .map(t => (t._1, 0.0))
 
       assert(result.size == k)
       result
     }
-    else if (prevClustersK != nextClusters) {
-      // point assignment has changed - update cluster centroids
-      val nextClustersWithBetterCentroids = nextClusters.map { case (_, members) => updateCentroid(members) }
+    else {
+      val updatedCentroids = pointAssignment.map {
+        case (c, members) => if (members.isEmpty) (c, Nil) else (updateCentroid(members), members)
+      }
+      val updatedWeights = updatedCentroids.map { case (c, members) => (c, members.size.toDouble) }
 
-      updateClusters(points, nextClustersWithBetterCentroids, k) // iterate until centroids don't change
-    } else prevClustersK
+      if (pointAssignment != updatedCentroids) updateClusters(points, updatedWeights, k) // iterate until centroids don't change
+      else updatedWeights
+    }
   }
+
+  private def assignPoints(points: Seq[Point], centroids: Iterable[Point]): Map[Point, Seq[Point]] = {
+    if (points.isEmpty) centroids.map((_, Nil)).toMap
+    else points
+      .map { point => (point, getNearestCentroid(point, centroids)) }
+      .groupBy { case (_, centroid) => centroid }
+      .map { case (centroid, members) => (centroid, members.map { case (p, _) => p }) }
+  }
+
+  private def splitCluster(largestCluster: (Point, Double), offsetFactor: Int): Iterable[(Point, Double)] = {
+    // NOTE clusters may have no points assigned at this time - have to work with centroid alone
+    val centroid = largestCluster._1
+    val weight = largestCluster._2
+    val dims = centroid.features.indices.toVector
+    val fs: Vector[Double] = centroid.features
+
+    List(
+      (Point(dims.map(d => fs(d) - valueOffset(fs(d), offsetFactor))), weight / 2),
+      (Point(dims.map(d => fs(d) + valueOffset(fs(d), offsetFactor))), weight / 2),
+    )
+  }
+
+  private def valueOffset(value: Double, factor: Int): Double = factor * 1e-14 * math.max(value, 1.0)
 
   private def getNearestCentroid(point: Point, centroids: Iterable[Point]): Point = {
     val byDistanceToPoint = new Ordering[Point] {
@@ -136,7 +160,7 @@ object KMeansClustering {
     centroids min byDistanceToPoint
   }
 
-  private def updateCentroid(members: Seq[Point]): (Point, Seq[Point]) = {
+  private def updateCentroid(members: Seq[Point]): Point = {
     assert(members.nonEmpty)
 
     val dim = members.head.features.size // NOTE: assumes all points have equal dimensions
@@ -146,7 +170,7 @@ object KMeansClustering {
       case ((cur_sum, cur_count), point) => (cur_sum + point, cur_count + 1)
     }
 
-    (sum / count, members)
+    sum / count
   }
 
   final case class Point(features: Vector[Double]) {

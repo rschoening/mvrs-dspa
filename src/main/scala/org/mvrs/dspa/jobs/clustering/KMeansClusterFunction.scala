@@ -178,10 +178,10 @@ object KMeansClusterFunction {
     * @return the new cluster model
     */
   def cluster(points: Seq[Point], previousModel: Option[ClusterModel], params: Parameters): ClusterModel = {
-    val initialCentroids =
+    val initialCentroids: Seq[(Point, Double)] =
       previousModel
-        .map(_.clusters.map(_.centroid).take(params.k))
-        .getOrElse(KMeansClustering.createRandomCentroids(points, params.k))
+        .map(_.clusters.map(c => (c.centroid, c.weight)))
+        .getOrElse(KMeansClustering.createRandomCentroids(points, params.k).map((_, 0.0)))
 
     // TODO with small point sets the size can become < k - check why
     // assert(initialCentroids.size == params.k, s"unexpected centroid count: ${initialCentroids.size} - expected: ${params.k}")
@@ -190,7 +190,7 @@ object KMeansClusterFunction {
       KMeansClustering
         .buildClusters(points, initialCentroids, params.k)
         .zipWithIndex
-        .map { case ((centroid, clusterPoints), index) => Cluster(index, centroid, clusterPoints.size) }
+        .map { case ((centroid, weight), index) => Cluster(index, centroid, weight) }
 
     previousModel
       .map(_.update(clusters, params.decay))
