@@ -7,6 +7,7 @@ import java.util.{Optional, Properties}
 
 import org.apache.flink.api.common.serialization.TypeInformationSerializationSchema
 import org.apache.flink.api.common.state.ListState
+import org.apache.flink.api.common.time.Time
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
 import org.apache.flink.configuration.{ConfigConstants, Configuration}
@@ -35,9 +36,26 @@ import scala.collection.JavaConverters._
 // NOTE this will be refactored, currently a mixed bag
 package object utils {
 
-  val kafkaBrokers = "localhost:9092" // TODO move to centralized configuration
-
   private val dateFormat = ThreadLocal.withInitial[SimpleDateFormat](() => new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
+
+  /**
+    * Calculates time-to-live based on a time in event time, a replay speedup factor and a minimum time (in processing time) to cover late events
+    *
+    * @param time              time-to-live in event time
+    * @param speedupFactor     replay speedup factor - if 0 (infinite speedup, i.e. read as fast as possible): the minimum time is returned
+    * @param minimumTimeMillis the minimum time-to-live in processing time (milliseconds). Without this lower bound,
+    *                          the time-to-live in event time can get very small with high speedup factors, with the
+    *                          effect that even slightly late events miss the state that has been set up for them.
+    * @return the time-to-live in processing time
+    */
+  def getTtl(time: Time, speedupFactor: Int = 0, minimumTimeMillis: Long = 60000): Time =
+    Time.of(
+      if (speedupFactor > 0)
+        math.max(time.toMilliseconds.toDouble / speedupFactor, minimumTimeMillis).toLong
+      else
+        minimumTimeMillis,
+      TimeUnit.MILLISECONDS
+    )
 
   /**
     * Convert from flink's common Time to the old streaming Time still used for windows

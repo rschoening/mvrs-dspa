@@ -1,5 +1,7 @@
 package org.mvrs.dspa.jobs.clustering
 
+import java.util.concurrent.TimeUnit
+
 import com.google.common.base.Splitter
 import org.apache.flink.api.common.state.MapStateDescriptor
 import org.apache.flink.api.common.time.Time
@@ -20,7 +22,6 @@ import scala.collection.mutable
 object UnusualActivityDetectionJob extends App {
   // TODO
   // - add integration tests, refactor for testability
-  // - use connect instead of join for connecting to frequency?
   // - extract features within clustering operator (more flexibility to standardize/normalize features)
   // - if a cluster gets too small, split the largest cluster
   // - come up with better text features
@@ -117,10 +118,11 @@ object UnusualActivityDetectionJob extends App {
       .name("calculate comment frequency per user")
       .keyBy(_._1)
 
+
   val aggregatedFeaturesStream: DataStream[FeaturizedEvent] =
     eventFeaturesStream
       .connect(frequencyStream) // both keyed on person id
-      .process(new AggregateFeatures()) // join event with latest known frequency for the person
+      .process(new AggregateFeaturesFunction(utils.getTtl(Time.of(3, TimeUnit.HOURS), speedupFactor))) // join event with latest known frequency for the person
       .name("aggregate features")
 
   // cluster combined features (on a single worker)
