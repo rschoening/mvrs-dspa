@@ -1,11 +1,6 @@
 package org.mvrs.dspa.jobs.clustering
 
-sealed trait ClassifiedEvent {
-  val personId: Long
-  val eventId: Long
-  val cluster: Cluster
-  val timestamp: Long
-}
+import org.mvrs.dspa.events.EventType.EventType
 
-final case class ClassifiedComment(override val personId: Long, override val eventId: Long, override val cluster: Cluster, override val timestamp: Long)
-  extends ClassifiedEvent
+
+final case class ClassifiedEvent(personId: Long, eventType: EventType, eventId: Long, cluster: Cluster, timestamp: Long)

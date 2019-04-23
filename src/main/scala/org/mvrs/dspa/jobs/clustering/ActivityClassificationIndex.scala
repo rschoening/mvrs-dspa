@@ -13,6 +13,7 @@ class ActivityClassificationIndex(indexName: String, typeName: String, esNode: E
 
   override protected def createDocument(record: ClassifiedEvent): Map[String, Any] = Map[String, Any](
     "personId" -> record.personId,
+    "eventType" -> record.eventType,
     "eventId" -> record.eventId,
     "clusterIndex" -> record.cluster.index,
     "clusterLabel" -> record.cluster.labelText,
@@ -24,6 +25,7 @@ class ActivityClassificationIndex(indexName: String, typeName: String, esNode: E
   override protected def createFields(): Iterable[FieldDefinition] =
     Iterable(
       longField("personId"),
+      keywordField(name = "eventType"),
       longField(name = "eventId"),
       intField(name = "clusterIndex"),
       keywordField(name = "clusterLabel"),

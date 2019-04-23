@@ -7,6 +7,10 @@ import kantan.csv.{CellDecoder, RowDecoder}
 
 import scala.collection.Set
 
+object EventType extends Enumeration {
+  type EventType = Value
+  val Post, Comment, Reply, Like = Value
+}
 
 sealed trait TimestampedEvent {
   val creationDate: Date
@@ -45,6 +49,7 @@ final case class CommentEvent(commentId: Long,
                               postId: Long,
                               replyToCommentId: Option[Long],
                               placeId: Int) extends ForumEvent {
+  val isReply: Boolean = replyToCommentId.isDefined
 }
 
 final case class RawCommentEvent(commentId: Long,

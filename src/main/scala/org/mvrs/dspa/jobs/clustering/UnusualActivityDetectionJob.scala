@@ -10,7 +10,8 @@ import org.apache.flink.streaming.api.datastream.BroadcastStream
 import org.apache.flink.streaming.api.functions.source.FileProcessingMode
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows
-import org.mvrs.dspa.events.CommentEvent
+import org.mvrs.dspa.events.EventType
+import org.mvrs.dspa.events.EventType.EventType
 import org.mvrs.dspa.io.ElasticSearchNode
 import org.mvrs.dspa.jobs.clustering.KMeansClusterFunction.ClusterMetadata
 import org.mvrs.dspa.{Settings, streams, utils}
@@ -91,6 +92,7 @@ object UnusualActivityDetectionJob extends App {
 
   // val comments = streams.commentsFromKafka("activity-detection")
   val comments = streams.commentsFromCsv(Settings.commentStreamCsvPath, speedupFactor, randomDelay)
+  val posts = streams.postsFromCsv(Settings.postStreamCsvPath, speedupFactor, randomDelay)
 
   val frequencyStream: DataStream[(Long, Int)] =
     comments
@@ -102,26 +104,33 @@ object UnusualActivityDetectionJob extends App {
   val commentFeaturesStream =
     comments
       .keyBy(_.personId)
-      .map(c => (c.personId, c.commentId, extractFeatures(c))).name("extract comment features")
+      .map(c => (c.personId, if (c.isReply) EventType.Reply else EventType.Comment, c.commentId, extractTextFeatures(c.content)))
+      .name("extract comment features")
 
-  // TODO union with post events
+  val postFeaturesStream =
+    posts
+      .keyBy(_.personId)
+      .map(c => (c.personId, EventType.Post, c.postId, extractTextFeatures(c.content))).name("extract post features")
+
+  val eventFeaturesStream = commentFeaturesStream.union(postFeaturesStream)
 
   // TODO use connect instead of join (and store frequency in value state), to get the *latest* per-user frequency at each comment?
-  val featurizedComments: DataStream[(Long, Long, mutable.ArrayBuffer[Double])] =
-    commentFeaturesStream
+  val featurizedEvents: DataStream[(Long, EventType, Long, mutable.ArrayBuffer[Double])] =
+    eventFeaturesStream
       .join(frequencyStream)
       .where(_._1) // person id
       .equalTo(_._1) // person id
       .window(TumblingEventTimeWindows.of(utils.convert(Time.hours(1))))
       .apply { (t1, t2) => {
         // append per-user frequency to (mutable) feature vector
-        t1._3.append(t2._2.toDouble)
+        t1._4.append(t2._2.toDouble)
 
         // return tuple
         (
           t1._1, // person id
-          t1._2, // comment id
-          t1._3, // feature vector
+          t1._2, // event type
+          t1._3, // comment id
+          t1._4, // feature vector
         )
       }
       }.name("aggregate features")
@@ -135,8 +144,8 @@ object UnusualActivityDetectionJob extends App {
   val outputTagClusterMetadata = new OutputTag[ClusterMetadata]("cluster metadata")
 
   val clusters: DataStream[(Long, Int, ClusterModel)] =
-    featurizedComments
-      .map(_._3) // feature vector
+    featurizedEvents
+      .map(_._4) // feature vector
       .keyBy(_ => 0) // all to same worker
       .connect(controlParameterBroadcast)
       .process(
@@ -164,7 +173,7 @@ object UnusualActivityDetectionJob extends App {
 
   // connect feature stream with cluster broadcast, classify featurized comments
   val classifiedComments: DataStream[ClassifiedEvent] =
-    featurizedComments
+    featurizedEvents
       .keyBy(_._1)
       .connect(broadcast)
       .process(new ClassifyEventsFunction(clusterStateDescriptor)).name("classify comments")
@@ -180,10 +189,11 @@ object UnusualActivityDetectionJob extends App {
 
   env.execute()
 
-  def extractFeatures(comment: CommentEvent): mutable.ArrayBuffer[Double] = {
-    val tokens = comment.content
-      .map(tokenize(_).toVector)
-      .getOrElse(Vector.empty[String])
+  def extractTextFeatures(content: Option[String]): mutable.ArrayBuffer[Double] = {
+    val tokens =
+      content
+        .map(tokenize(_).toVector)
+        .getOrElse(Vector.empty[String])
 
     val dim = 3
     val buffer = new mutable.ArrayBuffer[Double](dim)

@@ -1,12 +1,13 @@
 package functions
 
+import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.datastream.DataStreamUtils
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
-import org.apache.flink.api.common.time.Time
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
-import org.mvrs.dspa.jobs.activeposts.{Event, EventType, PostStatisticsFunction}
+import org.mvrs.dspa.events.EventType
+import org.mvrs.dspa.jobs.activeposts.{Event, PostStatisticsFunction}
 import org.mvrs.dspa.utils
 import org.scalatest.Assertions._
 
@@ -57,7 +58,7 @@ class PostStatisticsFunctionITSuite extends AbstractTestBase {
 
     // create a stream of custom elements and apply transformations
 
-    // TODO check if property-based testing can somehow be used in conjunction with Flink's AbstractTestBase
+    // TODO check if property-based testing using scalacheck can somehow be used in conjunction with Flink's AbstractTestBase
     val events: List[Event] = List(
       Event(EventType.Comment, postId = 1, personId = 100, timestamp = 0),
       Event(EventType.Comment, postId = 2, personId = 100, timestamp = 0),
