@@ -217,21 +217,23 @@ object KMeansClusterFunction {
       *
       * @return
       */
-    def k: Int = Option(mapState.get("k")).map(_.asInstanceOf[ClusteringParameterK].k).getOrElse(defaultK)
+    def k: Int = getValue[ClusteringParameterK, Int]("k", _.k).getOrElse(defaultK)
 
     /**
       * The decay factor for the previous cluster model
       *
       * @return
       */
-    def decay: Double = Option(mapState.get("decay")).map(_.asInstanceOf[ClusteringParameterDecay].decay).getOrElse(defaultDecay)
+    def decay: Double = getValue[ClusteringParameterDecay, Double]("decay", _.decay).getOrElse(defaultDecay)
 
     /**
       * labels to associate with clusters
       *
       * @return
       */
-    def label(index: Int): Option[String] = Option(mapState.get(s"label$index")).map(_.asInstanceOf[ClusteringParameterLabel].label)
+    def label(index: Int): Option[String] = getValue[ClusteringParameterLabel, String](s"label$index", _.label)
+
+    private def getValue[P, V](name: String, value: P => V): Option[V] = Option(mapState.get(name)).map(p => value(p.asInstanceOf[P]))
   }
 
 }
