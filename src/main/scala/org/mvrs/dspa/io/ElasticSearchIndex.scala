@@ -11,7 +11,7 @@ import com.sksamuel.elastic4s.mappings.FieldDefinition
   * @param indexName name of the elasticsearch index
   * @param typeName  name of the elasticsearch type
   */
-abstract class ElasticSearchIndex(indexName: String, typeName: String, nodes: ElasticSearchNode*) extends Serializable {
+abstract class ElasticSearchIndex(val indexName: String, val typeName: String, nodes: ElasticSearchNode*) extends Serializable {
   def create(dropFirst: Boolean = true): Unit = {
     val client = ElasticSearchUtils.createClient(nodes: _*)
     try {
