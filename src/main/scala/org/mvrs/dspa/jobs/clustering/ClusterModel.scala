@@ -27,8 +27,9 @@ final case class ClusterModel(clusters: Vector[Cluster]) {
   private def update(oldCluster: Cluster, updateCluster: Cluster, decay: Double): Cluster = {
     val newWeight = oldCluster.weight * decay + updateCluster.weight
 
+    val index = oldCluster.index
     Cluster(
-      oldCluster.index,
+      index,
       Point(
         oldCluster.centroid.features
           .zip(updateCluster.centroid.features) // same dimensions assumed; otherwise output reduced to minimum dim.
@@ -37,8 +38,10 @@ final case class ClusterModel(clusters: Vector[Cluster]) {
             (newValue * updateCluster.weight + oldValue * oldCluster.weight * decay) / newWeight
         }
       ),
-      newWeight)
+      newWeight,
+      updateCluster.label
+    )
   }
 }
 
-final case class Cluster(index: Int, centroid: Point, weight: Double)
+final case class Cluster(index: Int, centroid: Point, weight: Double, label: Option[String] = None)

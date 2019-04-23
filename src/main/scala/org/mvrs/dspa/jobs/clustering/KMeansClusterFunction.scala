@@ -200,7 +200,7 @@ object KMeansClusterFunction {
       KMeansClustering
         .buildClusters(points, initialCentroids, params.k)
         .zipWithIndex
-        .map { case ((centroid, weight), index) => Cluster(index, centroid, weight) }
+        .map { case ((centroid, weight), index) => Cluster(index, centroid, weight, params.label(index)) }
 
     previousModel
       .map(_.update(clusters, params.decay))
@@ -231,7 +231,6 @@ object KMeansClusterFunction {
       *
       * @return
       */
-    //noinspection ScalaUnusedSymbol - not yet used - example for multi-valued paramter
     def label(index: Int): Option[String] = Option(mapState.get(s"label$index")).map(_.asInstanceOf[ClusteringParameterLabel].label)
   }
 
