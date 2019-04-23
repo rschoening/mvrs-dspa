@@ -188,19 +188,19 @@ object KMeansClusterFunction {
     * @return the new cluster model
     */
   def cluster(points: Seq[Point], previousModel: Option[ClusterModel], params: Parameters): ClusterModel = {
-    val initialCentroids: Seq[(Point, Double)] =
+    val initialCentroids: Seq[(Point, (Int, Double))] =
       previousModel
-        .map(_.clusters.map(c => (c.centroid, c.weight)))
-        .getOrElse(KMeansClustering.createRandomCentroids(points, params.k).map((_, 0.0)))
-
-    // TODO with small point sets the size can become < k - check why
-    // assert(initialCentroids.size == params.k, s"unexpected centroid count: ${initialCentroids.size} - expected: ${params.k}")
+        .map(_.clusters.map(c => (c.centroid, (c.index, c.weight))))
+        .getOrElse(
+          KMeansClustering
+            .createRandomCentroids(points, params.k)
+            .zipWithIndex // initialize cluster index
+            .map{ case (centroid, index) => (centroid, (index, 0.0)) } )
 
     val clusters =
       KMeansClustering
         .buildClusters(points, initialCentroids, params.k)
-        .zipWithIndex
-        .map { case ((centroid, weight), index) => Cluster(index, centroid, weight, params.label(index)) }
+        .map { case (centroid, (index, weight)) => Cluster(index, centroid, weight, params.label(index)) }
 
     previousModel
       .map(_.update(clusters, params.decay))
@@ -209,9 +209,9 @@ object KMeansClusterFunction {
 
   final case class Element(features: mutable.ArrayBuffer[Double])
 
-  class Parameters(mapState: ReadOnlyBroadcastState[String, ClusteringParameter], defaultK: Int, defaultDecay: Double) {
-    // TODO avoid the downcasts
+  final case class ClusteringResult(timestamp: Long, clusters: List[(Cluster, ArrayBuffer[Double])])
 
+  class Parameters(mapState: ReadOnlyBroadcastState[String, ClusteringParameter], defaultK: Int, defaultDecay: Double) {
     /**
       * the number of clusters
       *

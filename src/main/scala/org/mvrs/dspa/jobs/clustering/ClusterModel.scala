@@ -3,18 +3,17 @@ package org.mvrs.dspa.jobs.clustering
 import org.mvrs.dspa.jobs.clustering.KMeansClustering.Point
 
 final case class ClusterModel(clusters: Vector[Cluster]) {
+  private val clustersByIndex = clusters.map(c => (c.index, c)).toMap
+
   require(clusters.nonEmpty, "empty cluster sequence")
 
   def update(updateClusters: Iterable[Cluster], decay: Double): ClusterModel = {
     val newClusters =
       updateClusters
-        .view
-        .zipWithIndex
-        .map {
-          case (cluster, index) =>
-            if (index >= clusters.size) cluster // no matching old cluster, use as is
-            else update(clusters(index), cluster, decay)
-        }
+        .map(cluster =>
+          if (!clustersByIndex.contains(cluster.index)) cluster // no matching old cluster, use as is
+          else update(clustersByIndex(cluster.index), cluster, decay)
+        )
         .toVector
 
     // NOTE cluster weights can get very small if no points are assigned to a cluster - split largest cluster in this case
@@ -27,21 +26,20 @@ final case class ClusterModel(clusters: Vector[Cluster]) {
   private def update(oldCluster: Cluster, updateCluster: Cluster, decay: Double): Cluster = {
     val newWeight = oldCluster.weight * decay + updateCluster.weight
 
-    val index = oldCluster.index
     Cluster(
-      index,
-      Point(
-        oldCluster.centroid.features
-          .zip(updateCluster.centroid.features) // same dimensions assumed; otherwise output reduced to minimum dim.
-          .map {
-          case (oldValue, newValue) =>
-            (newValue * updateCluster.weight + oldValue * oldCluster.weight * decay) / newWeight
-        }
-      ),
+      updateCluster.index,
+      updateCentroid(oldCluster, updateCluster, decay, newWeight),
       newWeight,
       updateCluster.label
     )
   }
+
+  private def updateCentroid(oldCluster: Cluster, updateCluster: Cluster, decay: Double, newWeight: Double): Point =
+    Point(
+      oldCluster.centroid.features
+        .zip(updateCluster.centroid.features) // same dimensions assumed; otherwise output reduced to minimum dim.
+        .map { case (oldValue, newValue) => (newValue * updateCluster.weight + oldValue * oldCluster.weight * decay) / newWeight }
+    )
 }
 
 final case class Cluster(index: Int, centroid: Point, weight: Double, label: Option[String] = None)
