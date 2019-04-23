@@ -20,16 +20,13 @@ import scala.collection.mutable
 
 object UnusualActivityDetectionJob extends App {
   // TODO
-  // - add side output stream and/or metrics on cluster evolution
-  //   - maximum cluster movement distance? cluster index for maximum?
-  // - write additional information to ElasticSearch to help interpretation of activity classification
   // - add integration tests, refactor for testability
   // - use connect instead of join for connecting to frequency?
   // - extract features within clustering operator (more flexibility to standardize/normalize features)
   // - if a cluster gets too small, split the largest cluster
   // - come up with better text features
 
-  val localWithUI = false // use arg (scallop?)
+  val localWithUI = true // use arg (scallop?)
   val speedupFactor = 0 // 0 --> read as fast as can
   val randomDelay = 0 // event time
 
@@ -71,6 +68,7 @@ object UnusualActivityDetectionJob extends App {
           new Path(Settings.UnusualActivityControlFilePath)), Settings.UnusualActivityControlFilePath,
         FileProcessingMode.PROCESS_CONTINUOUSLY,
         interval = 2000L).name("Read clustering parameters")
+      .name("control stream source")
       .setParallelism(1) // otherwise the empty splits never emit watermarks, timers never fire etc.
       .assignTimestampsAndWatermarks(utils.timeStampExtractor[String](Time.seconds(0), _ => Long.MaxValue)) // required for downstream timers
       .flatMap(ClusteringParameter.parse _).name("Parse parameters")
@@ -105,6 +103,8 @@ object UnusualActivityDetectionJob extends App {
     comments
       .keyBy(_.personId)
       .map(c => (c.personId, c.commentId, extractFeatures(c))).name("extract comment features")
+
+  // TODO union with post events
 
   // TODO use connect instead of join (and store frequency in value state), to get the *latest* per-user frequency at each comment?
   val featurizedComments: DataStream[(Long, Long, mutable.ArrayBuffer[Double])] =
@@ -149,7 +149,9 @@ object UnusualActivityDetectionJob extends App {
 
   val clusterMetadata = clusters.getSideOutput(outputTagClusterMetadata)
 
-  clusterMetadata.addSink(metadataIndex.createSink(5))
+  clusterMetadata
+    .addSink(metadataIndex.createSink(5))
+    .name(s"elastic search: ${metadataIndex.indexName}")
 
   // broadcast stream for clusters
   val clusterStateDescriptor =
@@ -172,7 +174,9 @@ object UnusualActivityDetectionJob extends App {
 
   // write classification result to kafka/elasticsearch
   // TODO via kafka?
-  classifiedComments.addSink(classificationIndex.createSink(1))
+  classifiedComments
+    .addSink(classificationIndex.createSink(1))
+    .name(s"elastic search: ${classificationIndex.indexName}")
 
   env.execute()
 
@@ -187,7 +191,7 @@ object UnusualActivityDetectionJob extends App {
     if (tokens.isEmpty) buffer ++= List.fill(dim)(0.0) // zero vector
     else {
       // TODO how to scale/normalize features?
-      // TODO do this in windowing function?
+      // TODO do this in windowing function to allow normalization/standardizaation?
 
       // buffer += math.log(tokens.size)
       // buffer += math.log(tokens.map(_.toLowerCase()).distinct.size) // distinct word count
