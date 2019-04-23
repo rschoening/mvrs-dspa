@@ -4,7 +4,7 @@ import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, createTypeInformation}
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.mvrs.dspa.events.{CommentEvent, EventType, LikeEvent, PostEvent}
-import org.mvrs.dspa.{streams, utils}
+import org.mvrs.dspa.{Settings, streams, utils}
 
 object ActivePostStatisticsJob extends App {
 
@@ -27,7 +27,7 @@ object ActivePostStatisticsJob extends App {
 
   statsStream
     .keyBy(_.postId)
-    .addSink(utils.createKafkaProducer("poststatistics", utils.kafkaBrokers, createTypeInformation[PostStatistics]))
+    .addSink(utils.createKafkaProducer("poststatistics", Settings.kafkaBrokers, createTypeInformation[PostStatistics]))
 
   env.execute("write post statistics to elastic search")
 
