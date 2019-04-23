@@ -9,9 +9,7 @@ import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.datastream.BroadcastStream
 import org.apache.flink.streaming.api.functions.source.FileProcessingMode
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
-import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows
 import org.mvrs.dspa.events.EventType
-import org.mvrs.dspa.events.EventType.EventType
 import org.mvrs.dspa.io.ElasticSearchNode
 import org.mvrs.dspa.jobs.clustering.KMeansClusterFunction.ClusterMetadata
 import org.mvrs.dspa.{Settings, streams, utils}
@@ -94,46 +92,36 @@ object UnusualActivityDetectionJob extends App {
   val comments = streams.commentsFromCsv(Settings.commentStreamCsvPath, speedupFactor, randomDelay)
   val posts = streams.postsFromCsv(Settings.postStreamCsvPath, speedupFactor, randomDelay)
 
-  val frequencyStream: DataStream[(Long, Int)] =
-    comments
-      .map(c => (c.personId, 1))
-      .keyBy(_._1)
-      .timeWindow(utils.convert(Time.hours(12)), utils.convert(Time.hours(1)))
-      .sum(1).name("calculate comment frequency per user")
-
   val commentFeaturesStream =
     comments
-      .keyBy(_.personId)
-      .map(c => (c.personId, if (c.isReply) EventType.Reply else EventType.Comment, c.commentId, extractTextFeatures(c.content)))
+      .map(c => FeaturizedEvent(c.personId, if (c.isReply) EventType.Reply else EventType.Comment, c.commentId, extractTextFeatures(c.content)))
       .name("extract comment features")
 
   val postFeaturesStream =
     posts
+      .map(c => FeaturizedEvent(c.personId, EventType.Post, c.postId, extractTextFeatures(c.content)))
+      .name("extract post features")
+
+  val eventFeaturesStream =
+    commentFeaturesStream
+      .union(postFeaturesStream)
+      //      .name("union featurized events")
       .keyBy(_.personId)
-      .map(c => (c.personId, EventType.Post, c.postId, extractTextFeatures(c.content))).name("extract post features")
 
-  val eventFeaturesStream = commentFeaturesStream.union(postFeaturesStream)
-
-  // TODO use connect instead of join (and store frequency in value state), to get the *latest* per-user frequency at each comment?
-  val featurizedEvents: DataStream[(Long, EventType, Long, mutable.ArrayBuffer[Double])] =
+  val frequencyStream: DataStream[(Long, Int)] =
     eventFeaturesStream
-      .join(frequencyStream)
-      .where(_._1) // person id
-      .equalTo(_._1) // person id
-      .window(TumblingEventTimeWindows.of(utils.convert(Time.hours(1))))
-      .apply { (t1, t2) => {
-        // append per-user frequency to (mutable) feature vector
-        t1._4.append(t2._2.toDouble)
+      .map(c => (c.personId, 1))
+      .keyBy(_._1)
+      .timeWindow(utils.convert(Time.hours(12)), utils.convert(Time.hours(1)))
+      .sum(1)
+      .name("calculate comment frequency per user")
+      .keyBy(_._1)
 
-        // return tuple
-        (
-          t1._1, // person id
-          t1._2, // event type
-          t1._3, // comment id
-          t1._4, // feature vector
-        )
-      }
-      }.name("aggregate features")
+  val aggregatedFeaturesStream: DataStream[FeaturizedEvent] =
+    eventFeaturesStream
+      .connect(frequencyStream) // both keyed on person id
+      .process(new AggregateFeatures()) // join event with latest known frequency for the person
+      .name("aggregate features")
 
   // cluster combined features (on a single worker)
   // To parallelize: distribute points randomly, cluster subsets, merge resulting clusters as in
@@ -144,8 +132,8 @@ object UnusualActivityDetectionJob extends App {
   val outputTagClusterMetadata = new OutputTag[ClusterMetadata]("cluster metadata")
 
   val clusters: DataStream[(Long, Int, ClusterModel)] =
-    featurizedEvents
-      .map(_._4) // feature vector
+    aggregatedFeaturesStream
+      .map(_.features) // feature vector
       .keyBy(_ => 0) // all to same worker
       .connect(controlParameterBroadcast)
       .process(
@@ -169,12 +157,13 @@ object UnusualActivityDetectionJob extends App {
       createTypeInformation[Int],
       createTypeInformation[(Long, Int, ClusterModel)])
 
+  // broadcast the cluster state
   val broadcast = clusters.broadcast(clusterStateDescriptor)
 
   // connect feature stream with cluster broadcast, classify featurized comments
   val classifiedComments: DataStream[ClassifiedEvent] =
-    featurizedEvents
-      .keyBy(_._1)
+    aggregatedFeaturesStream
+      .keyBy(_.personId)
       .connect(broadcast)
       .process(new ClassifyEventsFunction(clusterStateDescriptor)).name("classify comments")
 
@@ -224,3 +213,6 @@ object UnusualActivityDetectionJob extends App {
   private def tokenize(str: String): Iterable[String] = splitter.split(str).asScala
 
 }
+
+
+
