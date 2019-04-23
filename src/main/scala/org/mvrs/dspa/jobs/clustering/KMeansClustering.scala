@@ -191,6 +191,11 @@ object KMeansClustering {
         .zip(that.features)
         .map { case (x0, x1) => x0 + x1 })
 
+    def -(that: Point) = Point(
+      features
+        .zip(that.features)
+        .map { case (x0, x1) => x0 - x1 })
+
     def /(number: Int) = Point(features.map(_ / number))
 
     override def toString = s"Point(${features.mkString(", ")})"

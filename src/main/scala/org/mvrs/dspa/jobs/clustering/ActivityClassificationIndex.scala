@@ -9,13 +9,13 @@ import scala.collection.JavaConverters._
 class ActivityClassificationIndex(indexName: String, typeName: String, esNode: ElasticSearchNode)
   extends ElasticSearchIndexSink[ClassifiedEvent](indexName, typeName, esNode) {
 
-  override protected def getDocumentId(record: ClassifiedEvent): String = s"${record.eventId}#${record.timestamp}"
+  override protected def getDocumentId(record: ClassifiedEvent): String = s"${record.eventId}"
 
   override protected def createDocument(record: ClassifiedEvent): Map[String, Any] = Map[String, Any](
     "personId" -> record.personId,
     "eventId" -> record.eventId,
     "clusterIndex" -> record.cluster.index,
-    "clusterLabel" -> record.cluster.label.map(s => s"${record.cluster.index}: $s").getOrElse(s"${record.cluster.index}"),
+    "clusterLabel" -> record.cluster.labelText,
     "clusterWeight" -> record.cluster.weight,
     "clusterCentroid" -> record.cluster.centroid.features.asJava, // Note: conversion to Java collection required
     "timestamp" -> record.timestamp
@@ -32,3 +32,5 @@ class ActivityClassificationIndex(indexName: String, typeName: String, esNode: E
       dateField("timestamp")
     )
 }
+
+

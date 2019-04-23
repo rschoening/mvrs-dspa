@@ -4,6 +4,7 @@ import org.apache.flink.api.common.state._
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.TimerService
 import org.apache.flink.streaming.api.functions.co.KeyedBroadcastProcessFunction
+import org.apache.flink.streaming.api.scala.OutputTag
 import org.apache.flink.util.Collector
 import org.mvrs.dspa.jobs.clustering.KMeansClusterFunction._
 import org.mvrs.dspa.jobs.clustering.KMeansClustering.Point
@@ -17,7 +18,8 @@ import scala.util.Random
 
 class KMeansClusterFunction(k: Int, decay: Double = 0.9,
                             windowSize: Time, minElementCount: Int, maxElementCount: Int,
-                            broadcastStateDescriptor: MapStateDescriptor[String, ClusteringParameter])
+                            broadcastStateDescriptor: MapStateDescriptor[String, ClusteringParameter],
+                            outputTagClusters: Option[OutputTag[ClusterMetadata]] = None)
   extends KeyedBroadcastProcessFunction[Int, mutable.ArrayBuffer[Double], ClusteringParameter, (Long, Int, ClusterModel)] {
   require(k > 1, s"invalid k: $k")
   require(windowSize.toMilliseconds > 0, s"invalid window size: $windowSize")
@@ -84,11 +86,15 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
 
       val params = new Parameters(ctx.getBroadcastState(broadcastStateDescriptor), k, decay)
 
-      emitClusters(elementsListState, nextElementsListState, elementCountState, out, ctx.timestamp(), params)
+      emitClusters(elementsListState, nextElementsListState, elementCountState, out, ctx.timestamp(), params,
+        emitClusterMetadata(_, (tag, metadata) => ctx.output(tag, metadata)))
 
       registerTimer(ctx.timestamp() + windowSize.toMilliseconds, ctx.timerService(), ctx.getCurrentKey)
     }
   }
+
+  private def emitClusterMetadata(metadata: ClusterMetadata, output: (OutputTag[ClusterMetadata], ClusterMetadata) => Unit): Unit =
+    outputTagClusters.foreach(output(_, metadata))
 
   override def onTimer(timestamp: Long,
                        ctx: KeyedBroadcastProcessFunction[Int, ArrayBuffer[Double], ClusteringParameter, (Long, Int, ClusterModel)]#OnTimerContext,
@@ -104,7 +110,8 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
     if (elementCount > minElementCount) {
       val params = new Parameters(ctx.getBroadcastState(broadcastStateDescriptor), k, decay)
 
-      emitClusters(elementsListState, nextElementsListState, elementCountState, out, timestamp, params)
+      emitClusters(elementsListState, nextElementsListState, elementCountState, out, timestamp, params,
+        emitClusterMetadata(_, (tag, metadata) => ctx.output(tag, metadata)))
 
       registerTimer(timestamp + windowSize.toMilliseconds, ctx.timerService(), ctx.getCurrentKey)
     }
@@ -125,8 +132,11 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
                            elementCount: ValueState[Int],
                            out: Collector[(Long, Int, ClusterModel)],
                            timestamp: Long,
-                           params: Parameters): Unit = {
+                           params: Parameters,
+                           emitClusters: ClusterMetadata => Unit): Unit = {
     require(!timestamp.isNaN && timestamp > 0)
+
+    val startMillis = System.currentTimeMillis()
 
     val points = elementsState.get.asScala.map(e => Point(e.features.toVector)).toSeq
 
@@ -137,8 +147,9 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
     }
     else {
       val clusterState = getRuntimeContext.getState(clusterStateDescriptor)
+      val previousModel = Option(clusterState.value())
 
-      val newClusterModel = cluster(points, Option(clusterState.value()), params)
+      val newClusterModel = cluster(points, previousModel, params)
 
       out.collect((timestamp, points.size, newClusterModel))
 
@@ -157,11 +168,12 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
         nextElementsState.clear()
       }
 
-      // TODO emit information about cluster movement
-      //   - as metric?
-      //   - on side output stream?
-      // - metric seems more appropriate; however the metric will have to be an aggregate (maximum and average distances?)
+      emitClusters(createResult(newClusterModel, previousModel, timestamp))
     }
+
+    val endMillis = System.currentTimeMillis()
+
+    println(s"cluster duration: ${endMillis - startMillis} ms for ${points.size} points")
   }
 
   private def registerTimer(nextTimer: Long, timerService: TimerService, key: Int): Unit = {
@@ -195,7 +207,7 @@ object KMeansClusterFunction {
           KMeansClustering
             .createRandomCentroids(points, params.k)
             .zipWithIndex // initialize cluster index
-            .map{ case (centroid, index) => (centroid, (index, 0.0)) } )
+            .map { case (centroid, index) => (centroid, (index, 0.0)) })
 
     val clusters =
       KMeansClustering
@@ -207,9 +219,44 @@ object KMeansClusterFunction {
       .getOrElse(ClusterModel(clusters.toVector))
   }
 
+  def createResult(newClusterModel: ClusterModel, previousModel: Option[ClusterModel], timestamp: Long): ClusterMetadata = {
+    val prevByIndex: Map[Int, Cluster] = previousModel.map(_.clusters.map(c => (c.index, c)).toMap).getOrElse(Map())
+
+    val newClustersWithDifferences: Vector[(Cluster, Vector[Double], Double, Double)] = newClusterModel.clusters.map(
+      cluster => prevByIndex.get(cluster.index) match {
+        // return tuple (cluster, difference vector, difference vector length)
+        case Some(prevCluster) =>
+          val diff = (cluster.centroid - prevCluster.centroid).features
+          (
+            cluster,
+            diff,
+            math.sqrt(diff.map(d => d * d).sum),
+            cluster.weight - prevCluster.weight
+          )
+        case None => (cluster, cluster.centroid.features, 0.0, cluster.weight)
+      }
+    )
+
+    val avgVectorDifference = newClustersWithDifferences.map { case (_, _, length, _) => length }.sum / newClustersWithDifferences.size
+    val avgWeightDifference = newClustersWithDifferences.map { case (_, _, _, weight) => weight }.sum / newClustersWithDifferences.size
+    val kDifference = newClusterModel.clusters.size - previousModel.map(_.clusters.size).getOrElse(0)
+
+    ClusterMetadata(
+      timestamp,
+      newClustersWithDifferences,
+      avgVectorDifference,
+      avgWeightDifference,
+      kDifference
+    )
+  }
+
   final case class Element(features: mutable.ArrayBuffer[Double])
 
-  final case class ClusteringResult(timestamp: Long, clusters: List[(Cluster, ArrayBuffer[Double])])
+  final case class ClusterMetadata(timestamp: Long,
+                                   clusters: Vector[(Cluster, Vector[Double], Double, Double)],
+                                   averageVectorDistance: Double,
+                                   averageWeightDifference: Double,
+                                   kDifference: Int)
 
   class Parameters(mapState: ReadOnlyBroadcastState[String, ClusteringParameter], defaultK: Int, defaultDecay: Double) {
     /**

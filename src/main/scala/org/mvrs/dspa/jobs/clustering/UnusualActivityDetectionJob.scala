@@ -12,6 +12,7 @@ import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows
 import org.mvrs.dspa.events.CommentEvent
 import org.mvrs.dspa.io.ElasticSearchNode
+import org.mvrs.dspa.jobs.clustering.KMeansClusterFunction.ClusterMetadata
 import org.mvrs.dspa.{Settings, streams, utils}
 
 import scala.collection.JavaConverters._
@@ -19,27 +20,30 @@ import scala.collection.mutable
 
 object UnusualActivityDetectionJob extends App {
   // TODO
-  // - allow adapting K -> grow also
-  //   - revise why currently, the number of centroids can decrease
   // - add side output stream and/or metrics on cluster evolution
   //   - maximum cluster movement distance? cluster index for maximum?
-  // - revise ES index structure/kibana graph (counts based on cluster sizes???)
   // - write additional information to ElasticSearch to help interpretation of activity classification
   // - add integration tests, refactor for testability
   // - use connect instead of join for connecting to frequency?
   // - extract features within clustering operator (more flexibility to standardize/normalize features)
   // - if a cluster gets too small, split the largest cluster
   // - come up with better text features
+
   val localWithUI = false // use arg (scallop?)
   val speedupFactor = 0 // 0 --> read as fast as can
   val randomDelay = 0 // event time
 
   val elasticHostName = "localhost"
-  val indexName = "activity-classification"
-  val typeName = "activity-classification-type"
+  val classificationIndexName = "activity-classification"
+  val classificationTypeName = "activity-classification-type"
+  val metadataIndexName = "activity-cluster-metadata"
+  val metadataTypeName = "activity-cluster-metadata-type"
 
-  val index = new ActivityClassificationIndex(indexName, typeName, ElasticSearchNode(elasticHostName))
-  index.create()
+  val classificationIndex = new ActivityClassificationIndex(classificationIndexName, classificationTypeName, ElasticSearchNode(elasticHostName))
+  val metadataIndex = new ClusterMetadataIndex(metadataIndexName, metadataTypeName, ElasticSearchNode(elasticHostName))
+
+  classificationIndex.create()
+  metadataIndex.create()
 
   // set up clustering stream:
   // - union of rooted comments and posts
@@ -128,22 +132,29 @@ object UnusualActivityDetectionJob extends App {
 
   // featurizedComments.process(new ProgressMonitorFunction[(Long, Long, ArrayBuffer[Double])]("FEATURIZED", 1))
 
+  val outputTagClusterMetadata = new OutputTag[ClusterMetadata]("cluster metadata")
+
   val clusters: DataStream[(Long, Int, ClusterModel)] =
     featurizedComments
-      .map(_._3)
-      .keyBy(_ => 0)
+      .map(_._3) // feature vector
+      .keyBy(_ => 0) // all to same worker
       .connect(controlParameterBroadcast)
       .process(
         new KMeansClusterFunction(
           k = 4, decay = 0.2,
           Time.hours(24), 100, 20000,
-          clusterParametersBroadcastStateDescriptor)).name("calculate clusters")
+          clusterParametersBroadcastStateDescriptor,
+          Some(outputTagClusterMetadata))).name("calculate clusters")
       .setParallelism(1)
+
+  val clusterMetadata = clusters.getSideOutput(outputTagClusterMetadata)
+
+  clusterMetadata.addSink(metadataIndex.createSink(5))
 
   // broadcast stream for clusters
   val clusterStateDescriptor =
     new MapStateDescriptor(
-      "ClusterBroadcastState",
+      "cluster-broadcast-state",
       createTypeInformation[Int],
       createTypeInformation[(Long, Int, ClusterModel)])
 
@@ -161,7 +172,7 @@ object UnusualActivityDetectionJob extends App {
 
   // write classification result to kafka/elasticsearch
   // TODO via kafka?
-  classifiedComments.addSink(index.createSink(1))
+  classifiedComments.addSink(classificationIndex.createSink(1))
 
   env.execute()
 

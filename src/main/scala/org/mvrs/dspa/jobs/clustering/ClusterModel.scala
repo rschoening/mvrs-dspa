@@ -42,4 +42,6 @@ final case class ClusterModel(clusters: Vector[Cluster]) {
     )
 }
 
-final case class Cluster(index: Int, centroid: Point, weight: Double, label: Option[String] = None)
+final case class Cluster(index: Int, centroid: Point, weight: Double, label: Option[String] = None) {
+  def labelText: String = label.map(s => s"$index: $s").getOrElse(s"$index")
+}
