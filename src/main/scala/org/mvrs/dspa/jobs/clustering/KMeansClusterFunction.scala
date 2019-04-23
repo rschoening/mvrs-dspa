@@ -27,7 +27,7 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
 
   private val clusterStateDescriptor = new ValueStateDescriptor("cluster-model", classOf[ClusterModel])
   private val nextTimerStateDescriptor = new ValueStateDescriptor("next-timer", classOf[Long])
-  private val windowExceededStateDescriptor = new ValueStateDescriptor("window-exceeded", classOf[Boolean])
+  private val windowExtendedStateDescriptor = new ValueStateDescriptor("window-extended", classOf[Boolean])
   private val elementCountStateDescriptor = new ValueStateDescriptor("element-count", classOf[Int])
 
   private val elementsStateDescriptor = new ListStateDescriptor("elements", classOf[Element])
@@ -39,7 +39,7 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
                               ctx: KeyedBroadcastProcessFunction[Int, ArrayBuffer[Double], ClusteringParameter, (Long, Int, ClusterModel)]#ReadOnlyContext,
                               out: Collector[(Long, Int, ClusterModel)]): Unit = {
     var nextTimer = getRuntimeContext.getState(nextTimerStateDescriptor).value()
-    val windowExceeded = getRuntimeContext.getState(windowExceededStateDescriptor).value()
+    val windowExtended = getRuntimeContext.getState(windowExtendedStateDescriptor).value()
     val elementsListState = getRuntimeContext.getListState(elementsStateDescriptor)
     val nextElementsListState: ListState[Element] = getRuntimeContext.getListState(nextElementsStateDescriptor)
     val elementCountState = getRuntimeContext.getState(elementCountStateDescriptor)
@@ -50,7 +50,16 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
       registerTimer(nextTimer, ctx.timerService(), ctx.getCurrentKey)
     }
 
-    if (ctx.timestamp() > nextTimer && !windowExceeded) {
+    val windowStartTime = nextTimer - windowSize.toMilliseconds
+
+    if (ctx.timestamp() < windowStartTime) {
+      LOG.warn(
+        s"Late event ($value): ${utils.formatTimestamp(ctx.timestamp())}, received in window starting at " +
+          s"${utils.formatTimestamp(windowStartTime)} (late by " +
+          s"${utils.formatDuration(windowStartTime - ctx.timestamp())})")
+      // TODO write to side output?
+    }
+    else if (ctx.timestamp() > nextTimer && !windowExtended) {
       // element with timestamp after next timer, but delivered before the timer
       // (the timer fires only after watermark for its timestamp has passed, so there can be "early" elements
       // belonging to the next window)
@@ -63,7 +72,7 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
     }
 
     if (elementCountState.value() >= maxElementCount ||
-      (windowExceeded && elementCountState.value() >= minElementCount)) {
+      (windowExtended && elementCountState.value() >= minElementCount)) {
       // early firing or extended window:
       // - early: maximum element count within window reached
       // - extended window: minimum size was not reached on regular window end time, is reached now
@@ -100,7 +109,8 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
       registerTimer(timestamp + windowSize.toMilliseconds, ctx.timerService(), ctx.getCurrentKey)
     }
     else {
-      getRuntimeContext.getState(windowExceededStateDescriptor).update(true)
+      // indicate that the window has to be extended since minimum element count for clustering is not reached
+      getRuntimeContext.getState(windowExtendedStateDescriptor).update(true)
     }
   }
 
@@ -160,7 +170,7 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
     timerService.registerEventTimeTimer(nextTimer)
 
     getRuntimeContext.getState(nextTimerStateDescriptor).update(nextTimer)
-    getRuntimeContext.getState(windowExceededStateDescriptor).update(false)
+    getRuntimeContext.getState(windowExtendedStateDescriptor).update(false)
   }
 
 }
