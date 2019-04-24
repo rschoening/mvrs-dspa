@@ -3,10 +3,10 @@ package org.mvrs.dspa.jobs.recommendations
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.events.PostEvent
 import org.mvrs.dspa.io.ElasticSearchNode
-import org.mvrs.dspa.utils.FlinkJob
+import org.mvrs.dspa.utils.FlinkStreamingJob
 import org.mvrs.dspa.{Settings, streams, utils}
 
-object PostFeaturesJob extends FlinkJob(parallelism = 4) {
+object PostFeaturesJob extends FlinkStreamingJob(parallelism = 4) {
   val postFeaturesIndexName = "recommendations_posts"
   val postFeaturesTypeName = "recommendations_posts_type"
   val forumFeaturesIndexName = "recommendation_forum_features"

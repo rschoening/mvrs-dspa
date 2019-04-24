@@ -4,14 +4,10 @@ import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, createTypeInformation}
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.mvrs.dspa.events.{CommentEvent, EventType, LikeEvent, PostEvent}
+import org.mvrs.dspa.utils.FlinkStreamingJob
 import org.mvrs.dspa.{Settings, streams, utils}
 
-object ActivePostStatisticsJob extends App {
-
-  implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
-  env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
-  env.setParallelism(4)
-
+object ActivePostStatisticsJob extends FlinkStreamingJob {
   val consumerGroup = "activePostStatistics"
 
   val commentsStream = streams.comments(Some(consumerGroup))

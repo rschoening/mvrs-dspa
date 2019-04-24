@@ -12,13 +12,13 @@ import org.apache.flink.streaming.api.functions.source.FileProcessingMode
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.events.EventType
 import org.mvrs.dspa.jobs.clustering.KMeansClusterFunction.ClusterMetadata
-import org.mvrs.dspa.utils.FlinkJob
+import org.mvrs.dspa.utils.FlinkStreamingJob
 import org.mvrs.dspa.{Settings, streams, utils}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
-object UnusualActivityDetectionJob extends FlinkJob {
+object UnusualActivityDetectionJob extends FlinkStreamingJob {
   // TODO
   // - add integration tests, refactor for testability
   // - extract features within clustering operator (more flexibility to standardize/normalize features)
@@ -98,7 +98,6 @@ object UnusualActivityDetectionJob extends FlinkJob {
   val eventFeaturesStream =
     commentFeaturesStream
       .union(postFeaturesStream)
-      //      .name("union featurized events")
       .keyBy(_.personId)
 
   val frequencyStream: DataStream[(Long, Int)] =

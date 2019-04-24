@@ -7,10 +7,10 @@ import org.apache.flink.streaming.api.scala.{DataStream, _}
 import org.mvrs.dspa.events.{CommentEvent, ForumEvent, LikeEvent, PostEvent}
 import org.mvrs.dspa.functions.CollectSetFunction
 import org.mvrs.dspa.io.ElasticSearchNode
-import org.mvrs.dspa.utils.FlinkJob
+import org.mvrs.dspa.utils.FlinkStreamingJob
 import org.mvrs.dspa.{Settings, streams, utils}
 
-object RecommendationsJob extends FlinkJob {
+object RecommendationsJob extends FlinkStreamingJob {
   val windowSize = Time.hours(4)
   val windowSlide = Time.hours(1)
   val activeUsersTimeout = Time.days(14)

@@ -1,12 +1,11 @@
 package jobs.activeposts
 
-import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
 import org.junit.experimental.categories.Category
-import org.mvrs.dspa.io.ElasticSearchUtils
+import org.mvrs.dspa.Settings
 import org.mvrs.dspa.jobs.activeposts.{ActivePostStatisticsIndex, PostStatistics}
 
 @Category(Array(classOf[categories.ElasticSearchTests]))
@@ -14,21 +13,11 @@ class ElasticSearchSinkITSuite extends AbstractTestBase {
 
   @Test
   def baselinePerformance(): Unit = {
-    val elasticHostName = "localhost"
-    val elasticPort = 9200
-    val elasticScheme = "http"
-    val elasticSearchUri = s"$elasticScheme://$elasticHostName:$elasticPort"
-    val indexName = "poststatistics_test"
-    val typeName = "poststatistics_type_test"
+    val indexName = "post-statistics_test"
+    val typeName = "post-statistics-test-type"
 
-    val client = ElasticClient(ElasticProperties(elasticSearchUri))
-    try {
-      ElasticSearchUtils.dropIndex(client, indexName) // testing: recreate the index
-      ActivePostStatisticsIndex.create(client, indexName, typeName)
-    }
-    finally {
-      client.close()
-    }
+    val index = new ActivePostStatisticsIndex(indexName, typeName, Settings.elasticSearchNodes(): _*)
+    index.create()
 
     // set up the streaming execution environment
     implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
@@ -37,7 +26,7 @@ class ElasticSearchSinkITSuite extends AbstractTestBase {
 
     env.generateSequence(1, 10000)
       .map(i => PostStatistics(i, System.currentTimeMillis, 1, 1, 1, 3, newPost = false))
-      .addSink(ActivePostStatisticsIndex.createSink(elasticHostName, elasticPort, elasticScheme, indexName, typeName))
+      .addSink(index.createSink(100))
 
     val startTime = System.currentTimeMillis
 
