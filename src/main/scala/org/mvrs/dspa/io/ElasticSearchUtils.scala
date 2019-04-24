@@ -14,5 +14,6 @@ object ElasticSearchUtils {
     }.await
   }
 
-  private def createEndpoint(node: ElasticSearchNode) = ElasticNodeEndpoint(node.scheme, node.hostname, node.port, None)
+  private def createEndpoint(node: ElasticSearchNode) =
+    ElasticNodeEndpoint(node.scheme, node.hostname, node.port, None)
 }

@@ -4,9 +4,9 @@ import com.twitter.algebird.{MinHashSignature, MinHasher32}
 import org.apache.flink.api.common.state.{MapStateDescriptor, StateTtlConfig}
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.scala.{DataStream, _}
+import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.events.{CommentEvent, ForumEvent, LikeEvent, PostEvent}
 import org.mvrs.dspa.functions.CollectSetFunction
-import org.mvrs.dspa.io.ElasticSearchNode
 import org.mvrs.dspa.utils.FlinkStreamingJob
 import org.mvrs.dspa.{Settings, streams, utils}
 
@@ -17,26 +17,7 @@ object RecommendationsJob extends FlinkStreamingJob {
 
   val tracedPersonIds: Set[Long] = Set(913L)
 
-  val recommendationsIndexName = "recommendations"
-  val recommendationsTypeName = "recommendations_type"
-  val postFeaturesIndexName = "recommendations_posts"
-  val postFeaturesTypeName = "recommendations_posts_type"
-  val knownPersonsIndexName = "recommendation_known_persons"
-  val knownPersonsTypeName = "recommendation_known_persons_type"
-  val lshBucketsIndexName = "recommendation_lsh_buckets"
-  val personMinhashIndexName = "recommendation_person_minhash"
-  val personFeaturesIndexName = "recommendation_person_features"
-  val personFeaturesTypeName = "recommendation_person_features_type"
-
-  val esNode = ElasticSearchNode("localhost")
-
-  val recommendationsIndex = new RecommendationsIndex(recommendationsIndexName, Settings.elasticSearchNodes(): _*)
-  recommendationsIndex.create()
-
-  val minHasher = RecommendationUtils.createMinHasher(
-    Settings.config.getInt("jobs.recommendation.minhash-num-hashes"),
-    Settings.config.getDouble("jobs.recommendation.lsh-target-threshold")
-  )
+  ElasticSearchIndexes.recommendations.create()
 
   // val consumerGroup = "recommendations"
   //  val commentsStream = streams.commentsFromKafka(consumerGroup, speedupFactor, randomDelay)
@@ -47,7 +28,11 @@ object RecommendationsJob extends FlinkStreamingJob {
   val postsStream: DataStream[PostEvent] = streams.posts()
   val likesStream: DataStream[LikeEvent] = streams.likes()
 
-  val forumEvents: DataStream[ForumEvent] = unionForumEvents(commentsStream, postsStream, likesStream)
+  val forumEvents: DataStream[ForumEvent] = unionForumEvents(
+    commentsStream,
+    postsStream,
+    likesStream
+  )
 
   // gather the posts that the user interacted with in a sliding window
   val postIds: DataStream[(Long, Set[Long])] =
@@ -55,37 +40,54 @@ object RecommendationsJob extends FlinkStreamingJob {
 
   // look up the tags for these posts (from post and from the post's forum) => (person id -> set of features)
   val personActivityFeatures: DataStream[(Long, Set[String])] =
-    utils.asyncStream(postIds,
-      new AsyncPostFeaturesLookupFunction(postFeaturesIndexName, esNode))
+    utils.asyncStream(
+      postIds,
+      new AsyncPostFeaturesLookupFunction(
+        ElasticSearchIndexes.postFeatures.indexName,
+        Settings.elasticSearchNodes: _*))
 
   // combine with stored interests of person (person id -> set of features)
   val allPersonFeatures: DataStream[(Long, Set[String])] =
-    utils.asyncStream(personActivityFeatures,
-      new AsyncUnionWithPersonFeaturesFunction(personFeaturesIndexName, personFeaturesTypeName, esNode))
+    utils.asyncStream(
+      personActivityFeatures,
+      new AsyncUnionWithPersonFeaturesFunction(
+        ElasticSearchIndexes.personFeatures.indexName,
+        ElasticSearchIndexes.personFeatures.typeName,
+        Settings.elasticSearchNodes: _*))
 
   // calculate minhash per person id, based on person features
   val personActivityMinHash: DataStream[(Long, MinHashSignature)] =
-    getPersonMinHash(personActivityFeatures, minHasher)
+    getPersonMinHash(personActivityFeatures, RecommendationUtils.minHasher)
 
   // look up the persons in same lsh buckets
   val candidates: DataStream[(Long, MinHashSignature, Set[Long])] =
-    utils.asyncStream(personActivityMinHash,
-      new AsyncCandidateUsersLookupFunction(lshBucketsIndexName, minHasher, esNode))
+    utils.asyncStream(
+      personActivityMinHash,
+      new AsyncCandidateUsersLookupFunction(
+        ElasticSearchIndexes.lshBuckets.indexName,
+        RecommendationUtils.minHasher,
+        Settings.elasticSearchNodes: _*))
 
   // exclude already known persons from recommendations
   val candidatesWithoutKnownPersons: DataStream[(Long, MinHashSignature, Set[Long])] =
-    utils.asyncStream(candidates,
-      new AsyncExcludeKnownPersonsFunction(knownPersonsIndexName, knownPersonsTypeName, esNode))
+    utils.asyncStream(
+      candidates,
+      new AsyncExcludeKnownPersonsFunction(
+        ElasticSearchIndexes.knownPersons.indexName,
+        ElasticSearchIndexes.knownPersons.typeName,
+        Settings.elasticSearchNodes: _*))
 
   val candidatesWithoutInactiveUsers: DataStream[(Long, MinHashSignature, Set[Long])] =
     filterToActiveUsers(candidatesWithoutKnownPersons, forumEvents, activeUsersTimeout)
 
   val recommendations = utils.asyncStream(
-    candidatesWithoutInactiveUsers, new AsyncRecommendUsersFunction(
-      personMinhashIndexName, minHasher,
+    candidatesWithoutInactiveUsers,
+    new AsyncRecommendUsersFunction(
+      ElasticSearchIndexes.personMinHashes.indexName,
+      RecommendationUtils.minHasher,
       Settings.config.getInt("jobs.recommendation.max-recommendation-count"),
       Settings.config.getInt("jobs.recommendation.min-recommendation-similarity"),
-      esNode))
+      Settings.elasticSearchNodes: _*))
 
   // debug output for selected person Ids
   if (tracedPersonIds.nonEmpty) {
@@ -99,7 +101,7 @@ object RecommendationsJob extends FlinkStreamingJob {
     recommendations.filter(t => tracedPersonIds.contains(t._1)).print("-> RESULT:".padTo(length, ' '))
   }
 
-  recommendations.addSink(recommendationsIndex.createSink(batchSize = 100))
+  recommendations.addSink(ElasticSearchIndexes.recommendations.createSink(batchSize = 100))
 
   env.execute("recommendations")
 

@@ -1,6 +1,6 @@
-package org.mvrs.dspa.jobs.recommendations
+package org.mvrs.dspa.db
 
-case class PostFeatures(postId: Long, 
+case class PostFeatures(postId: Long,
                         personId: Long,
                         forumId: Long,
                         timestamp: Long,

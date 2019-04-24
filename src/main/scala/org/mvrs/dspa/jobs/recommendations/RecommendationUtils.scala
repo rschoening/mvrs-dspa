@@ -3,9 +3,15 @@ package org.mvrs.dspa.jobs.recommendations
 import java.util.Base64
 
 import com.twitter.algebird.{MinHashSignature, MinHasher, MinHasher32}
+import org.mvrs.dspa.Settings
 
 object RecommendationUtils {
   val tagPrefix = "T"
+
+  lazy val minHasher: MinHasher32 = createMinHasher(
+    Settings.config.getInt("jobs.recommendation.minhash-num-hashes"),
+    Settings.config.getDouble("jobs.recommendation.lsh-target-threshold")
+  )
 
   def getTopN(minHashSignature: MinHashSignature,
               candidates: Seq[(Long, MinHashSignature)],
@@ -24,7 +30,7 @@ object RecommendationUtils {
 
   def decodeMinHashSignature(base64: String) = MinHashSignature(Base64.getDecoder.decode(base64))
 
-  def createMinHasher(numHashes: Int = 100, targetThreshold: Double = 0.2): MinHasher32 = {
+  def createMinHasher(numHashes: Int, targetThreshold: Double): MinHasher32 = {
     require(numHashes > 0)
     require(targetThreshold > 0)
 

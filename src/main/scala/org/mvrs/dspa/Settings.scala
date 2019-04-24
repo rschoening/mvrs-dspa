@@ -6,11 +6,9 @@ import org.mvrs.dspa.io.ElasticSearchNode
 import scala.collection.JavaConverters._
 
 object Settings {
-  val UnusualActivityControlFilePath = "c:\\temp\\activity-classification.txt"
-
   val config: Config = ConfigFactory.load()
 
-  def elasticSearchNodes(): Seq[ElasticSearchNode] = {
+  val elasticSearchNodes: Seq[ElasticSearchNode] =
     config.getObjectList("elasticsearch.hosts").asScala
       .map(_.toConfig)
       .map(cfg =>
@@ -19,5 +17,4 @@ object Settings {
           cfg.getInt("port"),
           cfg.getString("scheme")
         ))
-  }
 }

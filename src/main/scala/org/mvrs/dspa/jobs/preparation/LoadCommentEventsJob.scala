@@ -6,7 +6,7 @@ import org.mvrs.dspa.streams
 import org.mvrs.dspa.utils.FlinkStreamingJob
 
 object LoadCommentEventsJob extends FlinkStreamingJob {
-  val kafkaTopic = "comments"
+  val kafkaTopic = "mvrs_comments"
   val comments = streams.comments()
 
   comments.map(c => s"${c.commentId};-1;${c.postId};${c.creationDate}")

@@ -156,7 +156,7 @@ class PostStatisticsFunction(windowSizeMillis: Long, slide: Long)
     value.eventType match {
       case EventType.Comment => updateBucket(bucketTimestamp, _.addComment(value.personId))
       case EventType.Reply => updateBucket(bucketTimestamp, _.addReply(value.personId))
-      case EventType.Like => updateBucket(bucketTimestamp, _.addReply(value.personId))
+      case EventType.Like => updateBucket(bucketTimestamp, _.addLike(value.personId))
       case EventType.Post => updateBucket(bucketTimestamp, _.registerPost(value.personId))
 
       case _ => // do nothing with posts and likes

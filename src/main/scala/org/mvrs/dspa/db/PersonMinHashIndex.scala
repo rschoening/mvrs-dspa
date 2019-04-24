@@ -1,4 +1,4 @@
-package org.mvrs.dspa.jobs.recommendations.staticdata
+package org.mvrs.dspa.db
 
 import java.util.Base64
 

@@ -1,29 +1,27 @@
 package org.mvrs.dspa.jobs.recommendations
 
 import org.apache.flink.streaming.api.scala._
+import org.mvrs.dspa.db.{ElasticSearchIndexes, PostFeatures}
 import org.mvrs.dspa.events.PostEvent
-import org.mvrs.dspa.io.ElasticSearchNode
 import org.mvrs.dspa.utils.FlinkStreamingJob
 import org.mvrs.dspa.{Settings, streams, utils}
 
 object PostFeaturesJob extends FlinkStreamingJob(parallelism = 4) {
-  val postFeaturesIndexName = "recommendations_posts"
-  val forumFeaturesIndexName = "recommendation_forum_features"
-  val elasticSearchNode = ElasticSearchNode("localhost")
-
-  val esNodes = Settings.elasticSearchNodes()
-  val postFeaturesIndex = new PostFeaturesIndex(postFeaturesIndexName, esNodes: _*)
-  postFeaturesIndex.create()
+  ElasticSearchIndexes.postFeatures.create()
 
   // val postsStream = streams.posts(Some("post-features"))
   val postsStream = streams.posts()
 
-  val postsWithForumFeatures = utils.asyncStream(
-    postsStream, new AsyncForumLookupFunction(forumFeaturesIndexName, esNodes: _*))
+  val postsWithForumFeatures =
+    utils.asyncStream(
+      postsStream,
+      new AsyncForumLookupFunction(
+        ElasticSearchIndexes.forumFeatures.indexName,
+        Settings.elasticSearchNodes: _*))
 
   val postFeatures = postsWithForumFeatures.map(createPostRecord _)
 
-  postFeatures.addSink(postFeaturesIndex.createSink(100))
+  postFeatures.addSink(ElasticSearchIndexes.postFeatures.createSink(100))
 
   env.execute("post features")
 
@@ -34,7 +32,7 @@ object PostFeaturesJob extends FlinkStreamingJob(parallelism = 4) {
     PostFeatures(
       postEvent.postId,
       postEvent.personId,
-      postEvent.forumId,
+      postEvent.forumId, // TODO add forum name also
       postEvent.timestamp,
       postEvent.content.getOrElse(""),
       postEvent.imageFile.getOrElse(""),

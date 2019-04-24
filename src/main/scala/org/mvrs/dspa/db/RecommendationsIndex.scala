@@ -1,4 +1,4 @@
-package org.mvrs.dspa.jobs.recommendations
+package org.mvrs.dspa.db
 
 import com.sksamuel.elastic4s.http.ElasticDsl.{dateField, doubleField, longField, nestedField}
 import com.sksamuel.elastic4s.mappings.FieldDefinition

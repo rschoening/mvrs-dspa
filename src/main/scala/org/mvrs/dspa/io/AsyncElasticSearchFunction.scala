@@ -5,6 +5,8 @@ import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.async.{ResultFuture, RichAsyncFunction}
 
 abstract class AsyncElasticSearchFunction[IN, OUT](nodes: ElasticSearchNode*) extends RichAsyncFunction[IN, OUT] {
+  require(nodes.nonEmpty, "at least one node must be provided")
+
   private var client: Option[ElasticClient] = None
 
   override def open(parameters: Configuration): Unit = client = Some(ElasticSearchUtils.createClient(nodes: _*))

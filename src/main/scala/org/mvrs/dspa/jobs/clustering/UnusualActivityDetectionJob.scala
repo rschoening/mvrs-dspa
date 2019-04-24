@@ -30,8 +30,8 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
   val classificationIndexName = "activity-classification"
   val metadataIndexName = "activity-cluster-metadata"
 
-  val classificationIndex = new ActivityClassificationIndex(classificationIndexName, Settings.elasticSearchNodes(): _*)
-  val metadataIndex = new ClusterMetadataIndex(metadataIndexName, Settings.elasticSearchNodes(): _*)
+  val classificationIndex = new ActivityClassificationIndex(classificationIndexName, Settings.elasticSearchNodes: _*)
+  val metadataIndex = new ClusterMetadataIndex(metadataIndexName, Settings.elasticSearchNodes: _*)
 
   classificationIndex.create()
   metadataIndex.create()

@@ -7,7 +7,7 @@ import org.mvrs.dspa.{Settings, streams, utils}
 
 
 object LoadLikeEventsJob extends FlinkStreamingJob {
-  val kafkaTopic = "likes"
+  val kafkaTopic = "mvrs_likes"
   val stream = streams.likes()
 
   stream.addSink(utils.createKafkaProducer(kafkaTopic, Settings.config.getString("kafka.brokers"), createTypeInformation[LikeEvent]))

@@ -1,18 +1,17 @@
 package org.mvrs.dspa.jobs.activeposts
 
-import org.apache.flink.streaming.api.TimeCharacteristic
-import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment, createTypeInformation}
+import org.apache.flink.streaming.api.scala.{DataStream, createTypeInformation}
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.mvrs.dspa.events.{CommentEvent, EventType, LikeEvent, PostEvent}
 import org.mvrs.dspa.utils.FlinkStreamingJob
 import org.mvrs.dspa.{Settings, streams, utils}
 
 object ActivePostStatisticsJob extends FlinkStreamingJob {
-  val consumerGroup = "activePostStatistics"
+  val consumerGroup = "active-post-statistics"
 
-  val commentsStream = streams.comments(Some(consumerGroup))
-  val postsStream = streams.posts(Some(consumerGroup))
-  val likesStream = streams.likes(Option(consumerGroup))
+  val commentsStream = streams.comments() // Some(consumerGroup))
+  val postsStream = streams.posts() //Some(consumerGroup))
+  val likesStream = streams.likes() //Option(consumerGroup))
 
   val statsStream = statisticsStream(
     commentsStream, postsStream, likesStream,
@@ -22,7 +21,7 @@ object ActivePostStatisticsJob extends FlinkStreamingJob {
   statsStream
     .keyBy(_.postId)
     .addSink(utils.createKafkaProducer(
-      "poststatistics",
+      "mvrs_poststatistics",
       Settings.config.getString("kafka.brokers"),
       createTypeInformation[PostStatistics]))
 

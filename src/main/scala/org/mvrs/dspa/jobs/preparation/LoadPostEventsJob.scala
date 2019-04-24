@@ -6,7 +6,7 @@ import org.mvrs.dspa.utils.FlinkStreamingJob
 import org.mvrs.dspa.{Settings, streams, utils}
 
 object LoadPostEventsJob extends FlinkStreamingJob {
-  val kafkaTopic = "posts"
+  val kafkaTopic = "mvrs_posts"
   val stream = streams.posts()
 
   stream.addSink(utils.createKafkaProducer(kafkaTopic, Settings.config.getString("kafka.brokers"), createTypeInformation[PostEvent]))

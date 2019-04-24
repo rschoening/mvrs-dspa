@@ -8,8 +8,8 @@ import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
 import org.junit.experimental.categories.Category
 import org.mvrs.dspa.Settings
+import org.mvrs.dspa.db.RecommendationsIndex
 import org.mvrs.dspa.io.ElasticSearchUtils
-import org.mvrs.dspa.jobs.recommendations.RecommendationsIndex
 import org.scalatest.Assertions._
 
 @Category(Array(classOf[categories.ElasticSearchTests]))
@@ -19,8 +19,7 @@ class RecommendationIndexITSuite extends AbstractTestBase {
   def testUpsertToElasticSearch(): Unit = {
 
     // NOTE this requires elasticsearch to run on localhost:9200
-    val esNodes = Settings.elasticSearchNodes()
-    val index = new RecommendationsIndex("recommendations_test", esNodes: _*)
+    val index = new RecommendationsIndex("mvrs-test-recommendations", Settings.elasticSearchNodes: _*)
     index.create()
 
     val env = StreamExecutionEnvironment.getExecutionEnvironment
@@ -37,7 +36,7 @@ class RecommendationIndexITSuite extends AbstractTestBase {
     env.execute("test")
 
     // read back the last inserted record
-    val client = ElasticSearchUtils.createClient(esNodes: _*)
+    val client = ElasticSearchUtils.createClient(Settings.elasticSearchNodes: _*)
 
     import com.sksamuel.elastic4s.http.ElasticDsl._
     val response: Response[GetResponse] = client.execute {

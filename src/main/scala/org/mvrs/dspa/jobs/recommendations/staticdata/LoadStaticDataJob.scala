@@ -2,17 +2,15 @@ package org.mvrs.dspa.jobs.recommendations.staticdata
 
 import java.nio.file.Paths
 
-import com.twitter.algebird.{MinHashSignature, MinHasher32}
-import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
+import com.twitter.algebird.MinHashSignature
+import org.apache.flink.api.scala.DataSet
 import org.apache.flink.streaming.api.scala._
-import org.mvrs.dspa.io.ElasticSearchNode
+import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.jobs.recommendations.{FeaturePrefix, RecommendationUtils}
+import org.mvrs.dspa.utils.FlinkBatchJob
 import org.mvrs.dspa.{Settings, utils}
 
-object LoadStaticDataJob extends App {
-  val localWithUI = false // TODO arg
-
-  // TODO determine how to manage settings
+object LoadStaticDataJob extends FlinkBatchJob {
   val rootPath = Settings.config.getString("data.tables-directory")
   val hasInterestInTagCsv = Paths.get(rootPath, "person_hasInterest_tag.csv").toString
   val forumTagsCsv = Paths.get(rootPath, "forum_hasTag_tag.csv").toString
@@ -20,28 +18,11 @@ object LoadStaticDataJob extends App {
   val studyAtCsv = Paths.get(rootPath, "person_studyAt_organisation.csv").toString
   val knownPersonsCsv = Paths.get(rootPath, "person_knows_person.csv").toString
 
-  val elasticSearchNode = ElasticSearchNode("localhost")
-
-  val bucketsIndexName = "recommendation_lsh_buckets"
-  val personFeaturesIndexName = "recommendation_person_features"
-  val forumFeaturesIndexName = "recommendation_forum_features"
-  val knownPersonsIndexName = "recommendation_known_persons"
-  val personMinHashIndexName = "recommendation_person_minhash"
-
-  val personFeaturesIndex = new FeaturesIndex(personFeaturesIndexName, elasticSearchNode)
-  val forumFeaturesIndex = new FeaturesIndex(forumFeaturesIndexName, elasticSearchNode)
-  val personMinHashIndex = new PersonMinHashIndex(personMinHashIndexName, elasticSearchNode)
-  val knownPersonsIndex = new KnownUsersIndex(knownPersonsIndexName, elasticSearchNode)
-  val personBucketsIndex = new PersonBucketsIndex(bucketsIndexName, elasticSearchNode)
-
-  personFeaturesIndex.create()
-  forumFeaturesIndex.create()
-  personMinHashIndex.create()
-  knownPersonsIndex.create()
-  personBucketsIndex.create()
-
-  implicit val env: ExecutionEnvironment = utils.createBatchExecutionEnvironment(localWithUI)
-  env.setParallelism(4)
+  ElasticSearchIndexes.personFeatures.create()
+  ElasticSearchIndexes.forumFeatures.create()
+  ElasticSearchIndexes.personMinHashes.create()
+  ElasticSearchIndexes.knownPersons.create()
+  ElasticSearchIndexes.lshBuckets.create()
 
   val personTagInterests = utils.readCsv[(Long, Long)](hasInterestInTagCsv).map(toFeature(_, FeaturePrefix.Tag))
   val personWork = utils.readCsv[(Long, Long)](worksAtCsv).map(toFeature(_, FeaturePrefix.Work))
@@ -61,31 +42,31 @@ object LoadStaticDataJob extends App {
       .groupBy(_._1)
       .reduceGroup(sortedValues[String] _)
 
-  val minHasher: MinHasher32 = RecommendationUtils.createMinHasher()
-
   val personMinHashes: DataSet[(Long, MinHashSignature)] =
-    personFeatures.map(t => (t._1, RecommendationUtils.getMinHashSignature(t._2, minHasher)))
+    personFeatures.map(t => (t._1, RecommendationUtils.getMinHashSignature(t._2, RecommendationUtils.minHasher)))
 
   val personMinHashBuckets: DataSet[(Long, MinHashSignature, List[Long])] =
     personMinHashes.map(t => (
       t._1, // person id
       t._2, // minhash
-      minHasher.buckets(t._2)))
+      RecommendationUtils.minHasher.buckets(t._2)))
 
-  val buckets: DataSet[(Long, List[Long])] = personMinHashBuckets
-    .flatMap((t: (Long, MinHashSignature, List[Long])) => t._3.map(bucket => (bucket, t._1)))
-    .groupBy(_._1) // group by bucket id
-    .reduceGroup(_.foldLeft[(Long, List[Long])]((0L, Nil))((z, t) => (t._1, t._2 :: z._2)))
+  val buckets: DataSet[(Long, List[Long])] =
+    personMinHashBuckets
+      .flatMap((t: (Long, MinHashSignature, List[Long])) => t._3.map(bucket => (bucket, t._1)))
+      .groupBy(_._1) // group by bucket id
+      .reduceGroup(_.foldLeft[(Long, List[Long])]((0L, Nil))((z, t) => (t._1, t._2 :: z._2)))
 
-  val knownPersons = utils.readCsv[(Long, Long)](knownPersonsCsv)
-    .groupBy(_._1)
-    .reduceGroup(sortedValues[Long] _)
+  val knownPersons =
+    utils.readCsv[(Long, Long)](knownPersonsCsv)
+      .groupBy(_._1)
+      .reduceGroup(sortedValues[Long] _)
 
-  personFeatures.output(personFeaturesIndex.createUpsertFormat())
-  forumFeatures.output(forumFeaturesIndex.createUpsertFormat())
-  personMinHashes.output(personMinHashIndex.createUpsertFormat())
-  knownPersons.output(knownPersonsIndex.createUpsertFormat())
-  buckets.output(personBucketsIndex.createUpsertFormat())
+  personFeatures.output(ElasticSearchIndexes.personFeatures.createUpsertFormat())
+  forumFeatures.output(ElasticSearchIndexes.forumFeatures.createUpsertFormat())
+  personMinHashes.output(ElasticSearchIndexes.personMinHashes.createUpsertFormat())
+  knownPersons.output(ElasticSearchIndexes.knownPersons.createUpsertFormat())
+  buckets.output(ElasticSearchIndexes.lshBuckets.createUpsertFormat())
 
   env.execute("import static data for recommendations")
 

@@ -1,4 +1,4 @@
-package org.mvrs.dspa.jobs.recommendations
+package org.mvrs.dspa.db
 
 import com.sksamuel.elastic4s.http.ElasticDsl.{longField, _}
 import com.sksamuel.elastic4s.mappings.FieldDefinition
@@ -20,12 +20,13 @@ class PostFeaturesIndex(indexName: String, nodes: ElasticSearchNode*)
       "timestamp" -> record.timestamp,
     )
 
-  override protected def createFields(): Iterable[FieldDefinition] = Seq(
-    longField("personId"),
-    longField("forumId"),
-    textField("content"),
-    textField("imageFile"),
-    textField("features").index(false),
-    dateField("timestamp"),
-  )
+  override protected def createFields(): Iterable[FieldDefinition] =
+    Seq(
+      longField("personId"),
+      longField("forumId"), // TODO add forum title
+      textField("content"),
+      textField("imageFile"),
+      textField("features").index(false),
+      dateField("timestamp"),
+    )
 }

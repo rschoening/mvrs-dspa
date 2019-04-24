@@ -1,5 +1,6 @@
 package org.mvrs.dspa.jobs.recommendations
 
+import com.sksamuel.elastic4s.http.ElasticDsl._
 import com.sksamuel.elastic4s.http.search.SearchResponse
 import com.sksamuel.elastic4s.http.{ElasticClient, Response}
 import org.apache.flink.streaming.api.functions.async.ResultFuture
@@ -12,7 +13,6 @@ import scala.util.{Failure, Success}
 class AsyncForumLookupFunction(forumFeaturesIndex: String, nodes: ElasticSearchNode*)
   extends AsyncElasticSearchFunction[PostEvent, (PostEvent, Set[String])](nodes: _*) {
 
-  import com.sksamuel.elastic4s.http.ElasticDsl._
 
   override def asyncInvoke(client: ElasticClient,
                            input: PostEvent,
