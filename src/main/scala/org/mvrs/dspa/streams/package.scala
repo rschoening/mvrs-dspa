@@ -44,7 +44,7 @@ package object streams {
 
     env.addSource(
       new ReplayedCsvFileSourceFunction[RawCommentEvent](
-        Settings.config.getString("comments-csv-path"),
+        Settings.config.getString("data.comments-csv-path"),
         skipFirstLine = true, '|',
         extractEventTime = _.timestamp,
         Settings.config.getInt("data.speedup-factor"),
@@ -75,7 +75,7 @@ package object streams {
       )
     ).getOrElse(
       commentsFromCsv(
-        Settings.config.getString("comments-csv-path"),
+        Settings.config.getString("data.comments-csv-path"),
         Settings.config.getInt("data.speedup-factor"),
         Settings.config.getInt("data.random-delay"),
         Settings.config.getInt("data.csv-watermark-interval"),
@@ -91,7 +91,7 @@ package object streams {
       )
     ).getOrElse(
       postsFromCsv(
-        Settings.config.getString("posts-csv-path"),
+        Settings.config.getString("data.posts-csv-path"),
         Settings.config.getInt("data.speedup-factor"),
         Settings.config.getInt("data.random-delay"),
         Settings.config.getInt("data.csv-watermark-interval"),
@@ -107,7 +107,7 @@ package object streams {
       )
     ).getOrElse(
       likesFromCsv(
-        Settings.config.getString("likes-csv-path"),
+        Settings.config.getString("data.likes-csv-path"),
         Settings.config.getInt("data.speedup-factor"),
         Settings.config.getInt("data.random-delay"),
         Settings.config.getInt("data.csv-watermark-interval"),
