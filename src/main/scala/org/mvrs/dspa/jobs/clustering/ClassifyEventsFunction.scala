@@ -3,7 +3,8 @@ package org.mvrs.dspa.jobs.clustering
 import org.apache.flink.api.common.state.MapStateDescriptor
 import org.apache.flink.streaming.api.functions.co.KeyedBroadcastProcessFunction
 import org.apache.flink.util.Collector
-import org.mvrs.dspa.model.{ClusterModel, Point}
+import org.mvrs.dspa.model
+import org.mvrs.dspa.model.{ClassifiedEvent, ClusterModel, Point}
 
 class ClassifyEventsFunction(clusterStateDescriptor: MapStateDescriptor[Int, (Long, Int, ClusterModel)])
   extends KeyedBroadcastProcessFunction[Long, FeaturizedEvent, (Long, Int, ClusterModel), ClassifiedEvent] {
@@ -19,7 +20,7 @@ class ClassifyEventsFunction(clusterStateDescriptor: MapStateDescriptor[Int, (Lo
       // no clusters yet, cannot classify
     }
     else out.collect(
-      ClassifiedEvent(
+      model.ClassifiedEvent(
         personId = value.personId,
         eventType = value.eventType,
         eventId = value.eventId,
