@@ -14,7 +14,7 @@ class ElasticSearchSinkITSuite extends AbstractTestBase {
 
   @Test
   def baselinePerformance(): Unit = {
-    val index = new ActivePostStatisticsIndex("post-statistics_test", Settings.elasticSearchNodes: _*)
+    val index = new ActivePostStatisticsIndex("mvrs-test-active-post-statistics", Settings.elasticSearchNodes: _*)
     index.create()
 
     // set up the streaming execution environment
