@@ -1,6 +1,6 @@
 package org.mvrs.dspa.jobs.clustering
 
-import java.lang.Math.{pow, sqrt}
+import org.mvrs.dspa.model.Point
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -91,8 +91,8 @@ object KMeansClustering {
     if (clusters.size == k) clusters // base case
     else if (clusters.size < k) {
       // recursively split the largest clusters until reaching k
-      val largestCluster = clusters.maxBy{ case (_, (_, weight)) => weight }
-      val maxIndex = clusters.map{ case (_, (index, _)) => index}.max
+      val largestCluster = clusters.maxBy { case (_, (_, weight)) => weight }
+      val maxIndex = clusters.map { case (_, (index, _)) => index }.max
       val newClusterWeights = (clusters - largestCluster._1) ++ splitCluster(largestCluster, offsetFactor = iteration * 3, nextIndex = maxIndex + 1)
       ensureK(newClusterWeights, k, iteration + 1) // recurse to do further splits if needed
     }
@@ -175,35 +175,10 @@ object KMeansClustering {
     sum / count
   }
 
-  final case class Point(features: Vector[Double]) {
-
-    def distanceTo(that: Point): Double = sqrt(squaredDistanceTo(that))
-
-    def squaredDistanceTo(that: Point): Double =
-      features
-        .view
-        .zip(that.features)
-        .map { case (x0, x1) => pow(x0 - x1, 2) }
-        .sum
-
-    def +(that: Point) = Point(
-      features
-        .zip(that.features)
-        .map { case (x0, x1) => x0 + x1 })
-
-    def -(that: Point) = Point(
-      features
-        .zip(that.features)
-        .map { case (x0, x1) => x0 - x1 })
-
-    def /(number: Int) = Point(features.map(_ / number))
-
-    override def toString = s"Point(${features.mkString(", ")})"
-  }
-
-  object Point {
-    def apply(values: Double*): Point = Point(Vector(values: _*)): Point
-  }
 
 }
+
+
+
+
 

@@ -10,8 +10,8 @@ import org.apache.flink.core.fs.Path
 import org.apache.flink.streaming.api.datastream.BroadcastStream
 import org.apache.flink.streaming.api.functions.source.FileProcessingMode
 import org.apache.flink.streaming.api.scala._
-import org.mvrs.dspa.events.EventType
-import org.mvrs.dspa.jobs.clustering.KMeansClusterFunction.ClusterMetadata
+import org.mvrs.dspa.db.ElasticSearchIndexes
+import org.mvrs.dspa.model.{ClusterMetadata, ClusterModel, EventType}
 import org.mvrs.dspa.utils.FlinkStreamingJob
 import org.mvrs.dspa.{Settings, streams, utils}
 
@@ -27,14 +27,8 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
 
   val controlFilePath = Settings.config.getString("jobs.activity-detection.control-stream-path")
 
-  val classificationIndexName = "activity-classification"
-  val metadataIndexName = "activity-cluster-metadata"
-
-  val classificationIndex = new ActivityClassificationIndex(classificationIndexName, Settings.elasticSearchNodes: _*)
-  val metadataIndex = new ClusterMetadataIndex(metadataIndexName, Settings.elasticSearchNodes: _*)
-
-  classificationIndex.create()
-  metadataIndex.create()
+  ElasticSearchIndexes.classification.create()
+  ElasticSearchIndexes.clusterMetadata.create()
 
   // set up clustering stream:
   // - union of rooted comments and posts
@@ -143,8 +137,8 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
   val clusterMetadata = clusters.getSideOutput(outputTagClusterMetadata)
 
   clusterMetadata
-    .addSink(metadataIndex.createSink(5))
-    .name(s"elastic search: ${metadataIndex.indexName}")
+    .addSink(ElasticSearchIndexes.clusterMetadata.createSink(5))
+    .name(s"elastic search: ${ElasticSearchIndexes.clusterMetadata.indexName}")
 
   // broadcast stream for clusters
   val clusterStateDescriptor =
@@ -169,8 +163,8 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
   // write classification result to kafka/elasticsearch
   // TODO via kafka?
   classifiedComments
-    .addSink(classificationIndex.createSink(1))
-    .name(s"elastic search: ${classificationIndex.indexName}")
+    .addSink(ElasticSearchIndexes.classification.createSink(1))
+    .name(s"elastic search: ${ElasticSearchIndexes.classification.indexName}")
 
   env.execute()
 

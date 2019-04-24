@@ -1,8 +1,8 @@
-package jobs.recommendations
+package db
 
 import com.sksamuel.elastic4s.http.Response
 import com.sksamuel.elastic4s.http.get.GetResponse
-import jobs.recommendations.RecommendationIndexITSuite._
+import db.RecommendationIndexITSuite._
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test

@@ -1,6 +1,6 @@
 package org.mvrs.dspa.jobs.preparation
 
-import org.mvrs.dspa.events.RawCommentEvent
+import org.mvrs.dspa.model.RawCommentEvent
 
 import scala.collection.mutable
 import scala.language.reflectiveCalls

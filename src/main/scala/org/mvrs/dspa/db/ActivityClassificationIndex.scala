@@ -1,8 +1,9 @@
-package org.mvrs.dspa.jobs.clustering
+package org.mvrs.dspa.db
 
 import com.sksamuel.elastic4s.http.ElasticDsl.{dateField, doubleField, intField, keywordField, longField}
 import com.sksamuel.elastic4s.mappings.FieldDefinition
 import org.mvrs.dspa.io.{ElasticSearchIndexSink, ElasticSearchNode}
+import org.mvrs.dspa.jobs.clustering.ClassifiedEvent
 
 import scala.collection.JavaConverters._
 

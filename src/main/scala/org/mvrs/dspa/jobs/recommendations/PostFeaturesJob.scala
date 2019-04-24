@@ -2,7 +2,7 @@ package org.mvrs.dspa.jobs.recommendations
 
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.db.{ElasticSearchIndexes, PostFeatures}
-import org.mvrs.dspa.events.PostEvent
+import org.mvrs.dspa.model.PostEvent
 import org.mvrs.dspa.utils.FlinkStreamingJob
 import org.mvrs.dspa.{Settings, streams, utils}
 

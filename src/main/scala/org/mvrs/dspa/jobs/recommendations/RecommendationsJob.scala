@@ -5,7 +5,7 @@ import org.apache.flink.api.common.state.{MapStateDescriptor, StateTtlConfig}
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.scala.{DataStream, _}
 import org.mvrs.dspa.db.ElasticSearchIndexes
-import org.mvrs.dspa.events.{CommentEvent, ForumEvent, LikeEvent, PostEvent}
+import org.mvrs.dspa.model.{CommentEvent, ForumEvent, LikeEvent, PostEvent}
 import org.mvrs.dspa.functions.CollectSetFunction
 import org.mvrs.dspa.utils.FlinkStreamingJob
 import org.mvrs.dspa.{Settings, streams, utils}

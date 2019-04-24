@@ -1,6 +1,4 @@
-package org.mvrs.dspa.jobs.clustering
-
-import org.mvrs.dspa.jobs.clustering.KMeansClustering.Point
+package org.mvrs.dspa.model
 
 final case class ClusterModel(clusters: Vector[Cluster]) {
   private val clustersByIndex = clusters.map(c => (c.index, c)).toMap
@@ -45,3 +43,9 @@ final case class ClusterModel(clusters: Vector[Cluster]) {
 final case class Cluster(index: Int, centroid: Point, weight: Double, label: Option[String] = None) {
   def labelText: String = label.map(s => s"$index: $s").getOrElse(s"$index")
 }
+
+final case class ClusterMetadata(timestamp: Long,
+                                 clusters: Vector[(Cluster, Vector[Double], Double, Double)],
+                                 averageVectorDistance: Double,
+                                 averageWeightDifference: Double,
+                                 kDifference: Int)

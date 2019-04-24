@@ -1,4 +1,4 @@
-package events
+package utils
 
 import org.scalatest.{FlatSpec, Matchers}
 

@@ -4,7 +4,7 @@ import com.sksamuel.elastic4s.http.get.GetResponse
 import com.sksamuel.elastic4s.http.{ElasticClient, Response}
 import com.twitter.algebird.{MinHashSignature, MinHasher32}
 import org.apache.flink.streaming.api.functions.async.ResultFuture
-import org.mvrs.dspa.events.ForumEvent
+import org.mvrs.dspa.model.ForumEvent
 import org.mvrs.dspa.io.{AsyncElasticSearchFunction, ElasticSearchNode}
 
 import scala.collection.JavaConverters._

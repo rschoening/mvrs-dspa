@@ -11,7 +11,7 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
-import org.mvrs.dspa.events.{ForumEvent, LikeEvent}
+import org.mvrs.dspa.model.{ForumEvent, LikeEvent}
 import org.mvrs.dspa.jobs.recommendations.RecommendationsJob
 import org.mvrs.dspa.utils
 import org.scalatest.Assertions._

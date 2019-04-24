@@ -1,4 +1,4 @@
-package org.mvrs.dspa.jobs.activeposts
+package org.mvrs.dspa.model
 
 case class PostStatistics(postId: Long,
                           time: Long,

@@ -1,11 +1,15 @@
-package org.mvrs.dspa.events
+package org.mvrs.dspa.model
 
 import java.util.Date
 
 import kantan.csv.DecodeError.TypeError
 import kantan.csv.{CellDecoder, RowDecoder}
+import org.mvrs.dspa.model.EventType.EventType
+import org.mvrs.dspa.utils.ParseUtils
 
 import scala.collection.Set
+
+case class Event(eventType: EventType, postId: Long, personId: Long, timestamp: Long)
 
 object EventType extends Enumeration {
   type EventType = Value
@@ -67,7 +71,7 @@ object RawCommentEvent {
   def csvDecoder: RowDecoder[RawCommentEvent] = {
     // "id|personId|creationDate|locationIP|browserUsed|content|reply_to_postId|reply_to_commentId|placeId"
     //    implicit val dateDecoder: Decoder[String, Date, DecodeError, codecs.type] = ParseUtils.dateDecoder
-    import ParseUtils.utcDateDecoder
+    import org.mvrs.dspa.utils.ParseUtils.utcDateDecoder
     RowDecoder.decoder(0, 1, 2, 3, 4, 5, 6, 7, 8)(RawCommentEvent.apply)
   }
 

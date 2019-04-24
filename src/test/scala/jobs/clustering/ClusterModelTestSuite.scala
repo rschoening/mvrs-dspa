@@ -1,7 +1,6 @@
 package jobs.clustering
 
-import org.mvrs.dspa.jobs.clustering.KMeansClustering.Point
-import org.mvrs.dspa.jobs.clustering.{Cluster, ClusterModel}
+import org.mvrs.dspa.model.{Cluster, ClusterModel, Point}
 import org.scalatest.{FlatSpec, Matchers}
 
 class ClusterModelTestSuite extends FlatSpec with Matchers {

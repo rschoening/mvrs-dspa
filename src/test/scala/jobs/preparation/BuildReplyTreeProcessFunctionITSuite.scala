@@ -9,7 +9,7 @@ import org.apache.flink.streaming.api.scala._
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
-import org.mvrs.dspa.events.{CommentEvent, RawCommentEvent}
+import org.mvrs.dspa.model.{CommentEvent, RawCommentEvent}
 import org.mvrs.dspa.{streams, utils}
 import org.scalatest.Assertions.assertResult
 

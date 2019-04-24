@@ -7,8 +7,8 @@ import org.apache.flink.streaming.api.functions.co.KeyedBroadcastProcessFunction
 import org.apache.flink.streaming.api.scala.OutputTag
 import org.apache.flink.util.Collector
 import org.mvrs.dspa.jobs.clustering.KMeansClusterFunction._
-import org.mvrs.dspa.jobs.clustering.KMeansClustering.Point
-import org.mvrs.dspa.utils
+import org.mvrs.dspa.model.{Cluster, ClusterMetadata, ClusterModel, Point}
+import org.mvrs.dspa.{model, utils}
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
@@ -216,7 +216,7 @@ object KMeansClusterFunction {
 
     previousModel
       .map(_.update(clusters, params.decay))
-      .getOrElse(ClusterModel(clusters.toVector))
+      .getOrElse(model.ClusterModel(clusters.toVector))
   }
 
   def createResult(newClusterModel: ClusterModel, previousModel: Option[ClusterModel], timestamp: Long): ClusterMetadata = {
@@ -251,12 +251,6 @@ object KMeansClusterFunction {
   }
 
   final case class Element(features: mutable.ArrayBuffer[Double])
-
-  final case class ClusterMetadata(timestamp: Long,
-                                   clusters: Vector[(Cluster, Vector[Double], Double, Double)],
-                                   averageVectorDistance: Double,
-                                   averageWeightDifference: Double,
-                                   kDifference: Int)
 
   class Parameters(mapState: ReadOnlyBroadcastState[String, ClusteringParameter], defaultK: Int, defaultDecay: Double) {
     /**

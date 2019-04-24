@@ -7,6 +7,9 @@ object ElasticSearchIndexes {
 
   val activePostStatistics = new ActivePostStatisticsIndex("mvrs-active-post-statistics", nodes: _*)
 
+  val classification = new ActivityClassificationIndex("mvrs-activity-classification", nodes: _*)
+  val clusterMetadata = new ClusterMetadataIndex("mvrs-activity-cluster-metadata", nodes: _*)
+
   val recommendations = new RecommendationsIndex("mvrs-recommendations", nodes: _*)
   val postFeatures = new PostFeaturesIndex("mvrs-recommendation-post-features", nodes: _*)
   val personFeatures = new FeaturesIndex("mvrs-recommendation-person-features", nodes: _*)

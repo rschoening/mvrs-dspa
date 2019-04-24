@@ -1,4 +1,4 @@
-package jobs.activeposts
+package db
 
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
@@ -7,7 +7,7 @@ import org.junit.Test
 import org.junit.experimental.categories.Category
 import org.mvrs.dspa.Settings
 import org.mvrs.dspa.db.ActivePostStatisticsIndex
-import org.mvrs.dspa.jobs.activeposts.PostStatistics
+import org.mvrs.dspa.model.PostStatistics
 
 @Category(Array(classOf[categories.ElasticSearchTests]))
 class ElasticSearchSinkITSuite extends AbstractTestBase {

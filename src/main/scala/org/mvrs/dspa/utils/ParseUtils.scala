@@ -1,4 +1,4 @@
-package org.mvrs.dspa.events
+package org.mvrs.dspa.utils
 
 import java.time.format.DateTimeFormatter
 import java.time.{LocalDateTime, ZoneId, ZonedDateTime}

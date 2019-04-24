@@ -4,6 +4,7 @@ import java.util.Properties
 
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.db.ElasticSearchIndexes
+import org.mvrs.dspa.model.PostStatistics
 import org.mvrs.dspa.utils.FlinkStreamingJob
 import org.mvrs.dspa.{Settings, utils}
 

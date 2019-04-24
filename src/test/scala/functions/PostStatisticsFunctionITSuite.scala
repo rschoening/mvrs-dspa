@@ -6,8 +6,8 @@ import org.apache.flink.streaming.api.datastream.DataStreamUtils
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
-import org.mvrs.dspa.events.EventType
-import org.mvrs.dspa.jobs.activeposts.{Event, PostStatisticsFunction}
+import org.mvrs.dspa.jobs.activeposts.PostStatisticsFunction
+import org.mvrs.dspa.model.{Event, EventType}
 import org.mvrs.dspa.utils
 import org.scalatest.Assertions._
 

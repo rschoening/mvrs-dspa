@@ -1,6 +1,6 @@
 package jobs.preparation
 
-import org.mvrs.dspa.events.RawCommentEvent
+import org.mvrs.dspa.model.RawCommentEvent
 import org.mvrs.dspa.jobs.preparation.BuildReplyTreeProcessFunction
 import org.mvrs.dspa.utils
 import org.scalatest.{FlatSpec, Matchers}

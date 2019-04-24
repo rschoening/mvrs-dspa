@@ -1,6 +1,6 @@
 package org.mvrs.dspa.jobs.clustering
 
-import org.mvrs.dspa.events.EventType.EventType
+import org.mvrs.dspa.model.EventType.EventType
 
 import scala.collection.mutable.ArrayBuffer
 

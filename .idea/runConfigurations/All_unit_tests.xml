@@ -13,8 +13,6 @@
     <envs />
     <setting name="testKind" value="All in package" />
     <setting name="package" value="" />
-    <buffered bufClass="events.ParseUtilsSuite" />
-    <buffered bufClass="events.ParseUtilsSuite" />
     <buffered bufClass="functions.EventSchedulerTestSuite" />
     <buffered bufClass="functions.EventSchedulerTestSuite" />
     <buffered bufClass="functions.PostStatisticsFunctionTestSuite" />
@@ -29,6 +27,8 @@
     <buffered bufClass="jobs.preparation.BuildReplyTreeProcessFunctionTestSuite" />
     <buffered bufClass="jobs.recommendations.RecommendationUtilsTestSuite" />
     <buffered bufClass="jobs.recommendations.RecommendationUtilsTestSuite" />
+    <buffered bufClass="utils.ParseUtilsSuite" />
+    <buffered bufClass="utils.ParseUtilsSuite" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>
