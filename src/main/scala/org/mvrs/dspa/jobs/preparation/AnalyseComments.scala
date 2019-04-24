@@ -5,7 +5,7 @@ import org.mvrs.dspa.events.RawCommentEvent
 import scala.collection.mutable
 import scala.language.reflectiveCalls
 
-object PreprocessComments extends App {
+object AnalyseComments extends App {
   require(args.length == 1, "full path to csv file expected")
 
   val filePath: String = args(0)
@@ -83,7 +83,7 @@ object PreprocessComments extends App {
     // - total rows: 632042
     // - there are 35606 replies for which at least one of the parent replies appears later in the file
     //
-    // - BuildCommentsHierarchyJob drops 34753 replies and resolves 597289 rooted replies/comments, with a WM interval of 1000 (no scaling)
+    // - LoadCommentEventsJob drops 34753 replies and resolves 597289 rooted replies/comments, with a WM interval of 1000 (no scaling)
     //   -> the job can resolve 853 additional replies
     //      => due to watermark interval (the number of unresolved can be further decreased by increasing the WM interval)
     //   - note above numbers are for parallelism = 1; for p=4, there are 598659 rooted replies/comments

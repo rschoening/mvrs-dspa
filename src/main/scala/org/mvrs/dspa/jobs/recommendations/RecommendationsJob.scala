@@ -3,21 +3,18 @@ package org.mvrs.dspa.jobs.recommendations
 import com.twitter.algebird.{MinHashSignature, MinHasher32}
 import org.apache.flink.api.common.state.{MapStateDescriptor, StateTtlConfig}
 import org.apache.flink.api.common.time.Time
-import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala.{DataStream, _}
 import org.mvrs.dspa.events.{CommentEvent, ForumEvent, LikeEvent, PostEvent}
 import org.mvrs.dspa.functions.CollectSetFunction
 import org.mvrs.dspa.io.ElasticSearchNode
+import org.mvrs.dspa.utils.FlinkJob
 import org.mvrs.dspa.{Settings, streams, utils}
 
-object RecommendationsJob extends App {
+object RecommendationsJob extends FlinkJob {
   val windowSize = Time.hours(4)
   val windowSlide = Time.hours(1)
   val activeUsersTimeout = Time.days(14)
-  val minimumRecommendationSimilarity = 0.1
-  val maximumRecommendationCount = 5
 
-  val localWithUI = false
   val tracedPersonIds: Set[Long] = Set(913L)
 
   val recommendationsIndexName = "recommendations"
@@ -36,11 +33,10 @@ object RecommendationsJob extends App {
   val recommendationsIndex = new RecommendationsIndex(recommendationsIndexName, recommendationsTypeName, Settings.elasticSearchNodes(): _*)
   recommendationsIndex.create()
 
-  implicit val env: StreamExecutionEnvironment = utils.createStreamExecutionEnvironment(localWithUI)
-  env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
-  env.setParallelism(4)
-
-  val minHasher = RecommendationUtils.createMinHasher()
+  val minHasher = RecommendationUtils.createMinHasher(
+    Settings.config.getInt("jobs.recommendation.minhash-num-hashes"),
+    Settings.config.getDouble("jobs.recommendation.lsh-target-threshold")
+  )
 
   // val consumerGroup = "recommendations"
   //  val commentsStream = streams.commentsFromKafka(consumerGroup, speedupFactor, randomDelay)
@@ -87,7 +83,8 @@ object RecommendationsJob extends App {
   val recommendations = utils.asyncStream(
     candidatesWithoutInactiveUsers, new AsyncRecommendUsersFunction(
       personMinhashIndexName, minHasher,
-      maximumRecommendationCount, minimumRecommendationSimilarity,
+      Settings.config.getInt("jobs.recommendation.max-recommendation-count"),
+      Settings.config.getInt("jobs.recommendation.min-recommendation-similarity"),
       esNode))
 
   // debug output for selected person Ids

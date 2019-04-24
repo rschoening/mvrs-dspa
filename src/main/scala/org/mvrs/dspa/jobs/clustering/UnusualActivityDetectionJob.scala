@@ -7,27 +7,25 @@ import org.apache.flink.api.common.state.MapStateDescriptor
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.api.java.io.TextInputFormat
 import org.apache.flink.core.fs.Path
-import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.datastream.BroadcastStream
 import org.apache.flink.streaming.api.functions.source.FileProcessingMode
-import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
+import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.events.EventType
 import org.mvrs.dspa.jobs.clustering.KMeansClusterFunction.ClusterMetadata
+import org.mvrs.dspa.utils.FlinkJob
 import org.mvrs.dspa.{Settings, streams, utils}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
-object UnusualActivityDetectionJob extends App {
+object UnusualActivityDetectionJob extends FlinkJob {
   // TODO
   // - add integration tests, refactor for testability
   // - extract features within clustering operator (more flexibility to standardize/normalize features)
   // - if a cluster gets too small, split the largest cluster
   // - come up with better text features
 
-  val localWithUI = true // use arg (scallop?)
-  val speedupFactor = 0 // 0 --> read as fast as can
-  val randomDelay = 0 // event time
+  val controlFilePath = Settings.config.getString("jobs.activity-detection.control-stream-path")
 
   val classificationIndexName = "activity-classification"
   val classificationTypeName = "activity-classification-type"
@@ -48,10 +46,6 @@ object UnusualActivityDetectionJob extends App {
   // - broadcast resulting clusters
   // - NOTE: previous clusters are used as seed points for new clusters --> new clusters mapped to old clusters simply by cluster index
   // - side output: cluster center difference
-  implicit val env: StreamExecutionEnvironment = utils.createStreamExecutionEnvironment(localWithUI)
-
-  env.setParallelism(4) // NOTE with multiple workers, the comments AND broadcast stream watermarks lag VERY much behind
-  env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
   val clusterParametersBroadcastStateDescriptor =
     new MapStateDescriptor[String, ClusteringParameter](
@@ -59,7 +53,6 @@ object UnusualActivityDetectionJob extends App {
       classOf[String],
       classOf[ClusteringParameter])
 
-  val controlFilePath = Settings.config.getString("activity-detection.control-stream-path")
   val controlParameters: DataStream[Either[Throwable, ClusteringParameter]] =
     env
       .readFile(
