@@ -6,8 +6,8 @@ import org.mvrs.dspa.io.{ElasticSearchIndexSink, ElasticSearchNode}
 
 import scala.collection.JavaConverters._
 
-class ActivityClassificationIndex(indexName: String, typeName: String, esNode: ElasticSearchNode*)
-  extends ElasticSearchIndexSink[ClassifiedEvent](indexName, typeName, esNode: _*) {
+class ActivityClassificationIndex(indexName: String, esNode: ElasticSearchNode*)
+  extends ElasticSearchIndexSink[ClassifiedEvent](indexName, esNode: _*) {
 
   override protected def getDocumentId(record: ClassifiedEvent): String = s"${record.eventId}"
 

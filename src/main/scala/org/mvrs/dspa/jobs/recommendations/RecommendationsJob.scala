@@ -30,7 +30,7 @@ object RecommendationsJob extends FlinkStreamingJob {
 
   val esNode = ElasticSearchNode("localhost")
 
-  val recommendationsIndex = new RecommendationsIndex(recommendationsIndexName, recommendationsTypeName, Settings.elasticSearchNodes(): _*)
+  val recommendationsIndex = new RecommendationsIndex(recommendationsIndexName, Settings.elasticSearchNodes(): _*)
   recommendationsIndex.create()
 
   val minHasher = RecommendationUtils.createMinHasher(

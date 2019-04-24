@@ -8,8 +8,8 @@ import org.elasticsearch.action.update.UpdateRequest
 
 import scala.collection.JavaConverters._
 
-abstract class ElasticSearchIndexSink[T](indexName: String, typeName: String, nodes: ElasticSearchNode*)
-  extends ElasticSearchIndex(indexName, typeName, nodes: _*) {
+abstract class ElasticSearchIndexSink[T](indexName: String, nodes: ElasticSearchNode*)
+  extends ElasticSearchIndex(indexName, nodes: _*) {
 
   def createSink(batchSize: Int): ElasticsearchSink[T] = {
     require(batchSize > 0, s"invalid batch size: $batchSize")

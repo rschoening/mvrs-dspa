@@ -2,8 +2,8 @@ package org.mvrs.dspa.io
 
 import com.sksamuel.elastic4s.http.ElasticClient
 
-abstract class ElasticSearchIndexWithUpsertOutputFormat[T](indexName: String, typeName: String, nodes: ElasticSearchNode*)
-  extends ElasticSearchIndex(indexName, typeName, nodes: _*) {
+abstract class ElasticSearchIndexWithUpsertOutputFormat[T](indexName: String, nodes: ElasticSearchNode*)
+  extends ElasticSearchIndex(indexName, nodes: _*) {
 
   def createUpsertFormat(): ElasticSearchOutputFormat[T] = {
     new ElasticSearchOutputFormat[T](nodes: _*) {

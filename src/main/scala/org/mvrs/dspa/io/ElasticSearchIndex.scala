@@ -9,9 +9,10 @@ import com.sksamuel.elastic4s.mappings.FieldDefinition
   *
   * @param nodes     node addresses
   * @param indexName name of the elasticsearch index
-  * @param typeName  name of the elasticsearch type
   */
-abstract class ElasticSearchIndex(val indexName: String, val typeName: String, nodes: ElasticSearchNode*) extends Serializable {
+abstract class ElasticSearchIndex(val indexName: String, nodes: ElasticSearchNode*) extends Serializable {
+  val typeName = s"$indexName-type" // type name derived, now that ES supports only one type per index
+
   def create(dropFirst: Boolean = true): Unit = {
     val client = ElasticSearchUtils.createClient(nodes: _*)
     try {

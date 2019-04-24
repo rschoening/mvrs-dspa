@@ -6,8 +6,8 @@ import org.mvrs.dspa.io.{ElasticSearchIndexSink, ElasticSearchNode}
 
 import scala.collection.JavaConverters._
 
-class PostFeaturesIndex(indexName: String, typeName: String, nodes: ElasticSearchNode*)
-  extends ElasticSearchIndexSink[PostFeatures](indexName, typeName, nodes: _*) {
+class PostFeaturesIndex(indexName: String, nodes: ElasticSearchNode*)
+  extends ElasticSearchIndexSink[PostFeatures](indexName, nodes: _*) {
   override protected def getDocumentId(record: PostFeatures): String = record.postId.toString
 
   override protected def createDocument(record: PostFeatures): Map[String, Any] =

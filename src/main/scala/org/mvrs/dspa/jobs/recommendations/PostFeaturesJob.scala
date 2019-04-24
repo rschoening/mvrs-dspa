@@ -8,12 +8,11 @@ import org.mvrs.dspa.{Settings, streams, utils}
 
 object PostFeaturesJob extends FlinkStreamingJob(parallelism = 4) {
   val postFeaturesIndexName = "recommendations_posts"
-  val postFeaturesTypeName = "recommendations_posts_type"
   val forumFeaturesIndexName = "recommendation_forum_features"
   val elasticSearchNode = ElasticSearchNode("localhost")
 
   val esNodes = Settings.elasticSearchNodes()
-  val postFeaturesIndex = new PostFeaturesIndex(postFeaturesIndexName, postFeaturesTypeName, esNodes: _*)
+  val postFeaturesIndex = new PostFeaturesIndex(postFeaturesIndexName, esNodes: _*)
   postFeaturesIndex.create()
 
   // val postsStream = streams.posts(Some("post-features"))

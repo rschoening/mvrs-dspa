@@ -9,8 +9,8 @@ import org.mvrs.dspa.jobs.clustering.KMeansClusterFunction.ClusterMetadata
 
 import scala.collection.JavaConverters._
 
-class ClusterMetadataIndex(indexName: String, typeName: String, esNode: ElasticSearchNode*)
-  extends ElasticSearchIndexSink[ClusterMetadata](indexName, typeName, esNode: _*) {
+class ClusterMetadataIndex(indexName: String, esNode: ElasticSearchNode*)
+  extends ElasticSearchIndexSink[ClusterMetadata](indexName, esNode: _*) {
 
   override protected def getDocumentId(record: ClusterMetadata): String = s"${record.timestamp}"
 

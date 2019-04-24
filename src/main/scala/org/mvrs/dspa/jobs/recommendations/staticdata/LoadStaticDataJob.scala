@@ -28,18 +28,11 @@ object LoadStaticDataJob extends App {
   val knownPersonsIndexName = "recommendation_known_persons"
   val personMinHashIndexName = "recommendation_person_minhash"
 
-  val typeSuffix = "_type"
-  val personFeaturesTypeName = personFeaturesIndexName + typeSuffix
-  val forumFeaturesTypeName = forumFeaturesIndexName + typeSuffix
-  val bucketTypeName = bucketsIndexName + typeSuffix
-  val knownPersonsTypeName = knownPersonsIndexName + typeSuffix
-  val personMinHashIndexType = personMinHashIndexName + typeSuffix
-
-  val personFeaturesIndex = new FeaturesIndex(personFeaturesIndexName, personFeaturesTypeName, elasticSearchNode)
-  val forumFeaturesIndex = new FeaturesIndex(forumFeaturesIndexName, forumFeaturesTypeName, elasticSearchNode)
-  val personMinHashIndex = new PersonMinHashIndex(personMinHashIndexName, personMinHashIndexType, elasticSearchNode)
-  val knownPersonsIndex = new KnownUsersIndex(knownPersonsIndexName, knownPersonsTypeName, elasticSearchNode)
-  val personBucketsIndex = new PersonBucketsIndex(bucketsIndexName, bucketTypeName, elasticSearchNode)
+  val personFeaturesIndex = new FeaturesIndex(personFeaturesIndexName, elasticSearchNode)
+  val forumFeaturesIndex = new FeaturesIndex(forumFeaturesIndexName, elasticSearchNode)
+  val personMinHashIndex = new PersonMinHashIndex(personMinHashIndexName, elasticSearchNode)
+  val knownPersonsIndex = new KnownUsersIndex(knownPersonsIndexName, elasticSearchNode)
+  val personBucketsIndex = new PersonBucketsIndex(bucketsIndexName, elasticSearchNode)
 
   personFeaturesIndex.create()
   forumFeaturesIndex.create()

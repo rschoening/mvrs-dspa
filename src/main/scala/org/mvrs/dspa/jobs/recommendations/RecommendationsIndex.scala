@@ -6,8 +6,8 @@ import org.mvrs.dspa.io.{ElasticSearchIndexSink, ElasticSearchNode}
 
 import scala.collection.JavaConverters._
 
-class RecommendationsIndex(indexName: String, typeName: String, hosts: ElasticSearchNode*)
-  extends ElasticSearchIndexSink[(Long, Seq[(Long, Double)])](indexName, typeName, hosts: _*) {
+class RecommendationsIndex(indexName: String, hosts: ElasticSearchNode*)
+  extends ElasticSearchIndexSink[(Long, Seq[(Long, Double)])](indexName, hosts: _*) {
 
   override protected def createDocument(record: (Long, Seq[(Long, Double)])): Map[String, Any] = Map[String, Any](
     "users" -> record._2.map(createNestedDocument).toList.asJava,

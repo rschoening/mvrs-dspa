@@ -9,11 +9,10 @@ import org.mvrs.dspa.{Settings, utils}
 
 object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob {
 
-  val indexName = "statistics"
-  val typeName = "postStatistics"
+  val indexName = "active-post-statistics"
   val kafkaBrokers = Settings.config.getString("kafka.brokers")
 
-  val index = new ActivePostStatisticsIndex(indexName, typeName, Settings.elasticSearchNodes(): _*)
+  val index = new ActivePostStatisticsIndex(indexName, Settings.elasticSearchNodes(): _*)
   index.create()
 
   val props = new Properties()

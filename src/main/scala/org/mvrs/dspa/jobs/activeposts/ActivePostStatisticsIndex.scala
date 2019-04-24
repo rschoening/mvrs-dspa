@@ -4,7 +4,7 @@ import com.sksamuel.elastic4s.http.ElasticDsl._
 import com.sksamuel.elastic4s.mappings.FieldDefinition
 import org.mvrs.dspa.io.{ElasticSearchIndexSink, ElasticSearchNode}
 
-class ActivePostStatisticsIndex(indexName: String, typeName: String, nodes: ElasticSearchNode*) extends ElasticSearchIndexSink[PostStatistics](indexName, typeName, nodes: _*) {
+class ActivePostStatisticsIndex(indexName: String, nodes: ElasticSearchNode*) extends ElasticSearchIndexSink[PostStatistics](indexName, nodes: _*) {
 
   override protected def getDocumentId(record: PostStatistics): String = s"${record.postId}#${record.time}"
 

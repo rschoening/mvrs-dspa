@@ -28,12 +28,10 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
   val controlFilePath = Settings.config.getString("jobs.activity-detection.control-stream-path")
 
   val classificationIndexName = "activity-classification"
-  val classificationTypeName = "activity-classification-type"
   val metadataIndexName = "activity-cluster-metadata"
-  val metadataTypeName = "activity-cluster-metadata-type"
 
-  val classificationIndex = new ActivityClassificationIndex(classificationIndexName, classificationTypeName, Settings.elasticSearchNodes(): _*)
-  val metadataIndex = new ClusterMetadataIndex(metadataIndexName, metadataTypeName, Settings.elasticSearchNodes(): _*)
+  val classificationIndex = new ActivityClassificationIndex(classificationIndexName, Settings.elasticSearchNodes(): _*)
+  val metadataIndex = new ClusterMetadataIndex(metadataIndexName, Settings.elasticSearchNodes(): _*)
 
   classificationIndex.create()
   metadataIndex.create()

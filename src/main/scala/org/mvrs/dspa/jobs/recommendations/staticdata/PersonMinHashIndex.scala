@@ -7,8 +7,8 @@ import com.sksamuel.elastic4s.mappings.FieldDefinition
 import com.twitter.algebird.MinHashSignature
 import org.mvrs.dspa.io.{ElasticSearchIndexWithUpsertOutputFormat, ElasticSearchNode}
 
-class PersonMinHashIndex(indexName: String, typeName: String, nodes: ElasticSearchNode*)
-  extends ElasticSearchIndexWithUpsertOutputFormat[(Long, MinHashSignature)](indexName, typeName, nodes: _*) {
+class PersonMinHashIndex(indexName: String, nodes: ElasticSearchNode*)
+  extends ElasticSearchIndexWithUpsertOutputFormat[(Long, MinHashSignature)](indexName, nodes: _*) {
 
   override def getDocumentId(record: (Long, MinHashSignature)): String = record._1.toString
 

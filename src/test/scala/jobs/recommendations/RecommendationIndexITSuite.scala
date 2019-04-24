@@ -7,7 +7,8 @@ import org.apache.flink.streaming.api.scala._
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
 import org.junit.experimental.categories.Category
-import org.mvrs.dspa.io.{ElasticSearchNode, ElasticSearchUtils}
+import org.mvrs.dspa.Settings
+import org.mvrs.dspa.io.ElasticSearchUtils
 import org.mvrs.dspa.jobs.recommendations.RecommendationsIndex
 import org.scalatest.Assertions._
 
@@ -18,10 +19,8 @@ class RecommendationIndexITSuite extends AbstractTestBase {
   def testUpsertToElasticSearch(): Unit = {
 
     // NOTE this requires elasticsearch to run on localhost:9200
-    val esNode = ElasticSearchNode("localhost")
-    val indexName = "recommendations_test"
-    val typeName = "recommendations_test_type"
-    val index = new RecommendationsIndex(indexName, typeName, esNode)
+    val esNodes = Settings.elasticSearchNodes()
+    val index = new RecommendationsIndex("recommendations_test", esNodes: _*)
     index.create()
 
     val env = StreamExecutionEnvironment.getExecutionEnvironment
@@ -38,11 +37,11 @@ class RecommendationIndexITSuite extends AbstractTestBase {
     env.execute("test")
 
     // read back the last inserted record
-    val client = ElasticSearchUtils.createClient(esNode)
+    val client = ElasticSearchUtils.createClient(esNodes: _*)
 
     import com.sksamuel.elastic4s.http.ElasticDsl._
     val response: Response[GetResponse] = client.execute {
-      get(lastId.toString) from indexName / typeName
+      get(lastId.toString) from index.indexName / index.typeName
     }.await
 
     // assert correct results
