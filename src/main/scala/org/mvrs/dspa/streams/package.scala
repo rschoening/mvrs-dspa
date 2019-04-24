@@ -39,6 +39,21 @@ package object streams {
     (rootedComments, droppedReplies)
   }
 
+  def rawComments()(implicit env: StreamExecutionEnvironment): DataStream[RawCommentEvent] = {
+    implicit val decoder: RowDecoder[RawCommentEvent] = RawCommentEvent.csvDecoder
+
+    env.addSource(
+      new ReplayedCsvFileSourceFunction[RawCommentEvent](
+        Settings.config.getString("comments-csv-path"),
+        skipFirstLine = true, '|',
+        extractEventTime = _.timestamp,
+        Settings.config.getInt("data.speedup-factor"),
+        Settings.config.getInt("data.random-delay"),
+        Settings.config.getInt("data.csv-watermark-interval")
+      )
+    )
+  }
+
   def rawCommentsFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)(implicit env: StreamExecutionEnvironment): DataStream[RawCommentEvent] = {
     implicit val decoder: RowDecoder[RawCommentEvent] = RawCommentEvent.csvDecoder
 
@@ -51,10 +66,57 @@ package object streams {
       watermarkInterval))
   }
 
+  def comments(kafkaConsumerGroup: Option[String] = None)(implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] =
+    kafkaConsumerGroup.map(
+      commentsFromKafka(
+        _,
+        Settings.config.getInt("data.speedup-factor"),
+        Settings.config.getInt("data.random-delay"),
+      )
+    ).getOrElse(
+      commentsFromCsv(
+        Settings.config.getString("comments-csv-path"),
+        Settings.config.getInt("data.speedup-factor"),
+        Settings.config.getInt("data.random-delay"),
+        Settings.config.getInt("data.csv-watermark-interval"),
+      )
+    )
+
+  def posts(kafkaConsumerGroup: Option[String] = None)(implicit env: StreamExecutionEnvironment): DataStream[PostEvent] =
+    kafkaConsumerGroup.map(
+      postsFromKafka(
+        _,
+        Settings.config.getInt("data.speedup-factor"),
+        Settings.config.getInt("data.random-delay"),
+      )
+    ).getOrElse(
+      postsFromCsv(
+        Settings.config.getString("posts-csv-path"),
+        Settings.config.getInt("data.speedup-factor"),
+        Settings.config.getInt("data.random-delay"),
+        Settings.config.getInt("data.csv-watermark-interval"),
+      )
+    )
+
+  def likes(kafkaConsumerGroup: Option[String] = None)(implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] =
+    kafkaConsumerGroup.map(
+      likesFromKafka(
+        _,
+        Settings.config.getInt("data.speedup-factor"),
+        Settings.config.getInt("data.random-delay"),
+      )
+    ).getOrElse(
+      likesFromCsv(
+        Settings.config.getString("likes-csv-path"),
+        Settings.config.getInt("data.speedup-factor"),
+        Settings.config.getInt("data.random-delay"),
+        Settings.config.getInt("data.csv-watermark-interval"),
+      )
+    )
+
   def commentsFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)(implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] = {
     resolveReplyTree(rawCommentsFromCsv(filePath, speedupFactor, randomDelay, watermarkInterval))
   }
-
 
   def likesFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)(implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
     implicit val decoder: RowDecoder[LikeEvent] = LikeEvent.csvDecoder

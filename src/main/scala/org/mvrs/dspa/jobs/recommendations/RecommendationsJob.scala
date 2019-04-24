@@ -16,8 +16,6 @@ object RecommendationsJob extends App {
   val activeUsersTimeout = Time.days(14)
   val minimumRecommendationSimilarity = 0.1
   val maximumRecommendationCount = 5
-  val speedupFactor = 0 // 0 --> read as fast as can
-  val randomDelay = 0 // event time
 
   val localWithUI = false
   val tracedPersonIds: Set[Long] = Set(913L)
@@ -35,7 +33,7 @@ object RecommendationsJob extends App {
 
   val esNode = ElasticSearchNode("localhost")
 
-  val recommendationsIndex = new RecommendationsIndex(recommendationsIndexName, recommendationsTypeName, esNode)
+  val recommendationsIndex = new RecommendationsIndex(recommendationsIndexName, recommendationsTypeName, Settings.elasticSearchNodes(): _*)
   recommendationsIndex.create()
 
   implicit val env: StreamExecutionEnvironment = utils.createStreamExecutionEnvironment(localWithUI)
@@ -49,9 +47,9 @@ object RecommendationsJob extends App {
   //  val postsStream = streams.postsFromKafka(consumerGroup, speedupFactor, randomDelay)
   //  val likesStream = streams.likesFromKafka(consumerGroup, speedupFactor, randomDelay)
 
-  val commentsStream: DataStream[CommentEvent] = streams.commentsFromCsv(Settings.commentStreamCsvPath, speedupFactor, randomDelay)
-  val postsStream: DataStream[PostEvent] = streams.postsFromCsv(Settings.postStreamCsvPath, speedupFactor, randomDelay)
-  val likesStream: DataStream[LikeEvent] = streams.likesFromCsv(Settings.likesStreamCsvPath, speedupFactor, randomDelay)
+  val commentsStream: DataStream[CommentEvent] = streams.comments()
+  val postsStream: DataStream[PostEvent] = streams.posts()
+  val likesStream: DataStream[LikeEvent] = streams.likes()
 
   val forumEvents: DataStream[ForumEvent] = unionForumEvents(commentsStream, postsStream, likesStream)
 

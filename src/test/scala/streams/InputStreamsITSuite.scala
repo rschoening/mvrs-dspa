@@ -9,7 +9,7 @@ import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
-import org.mvrs.dspa.{Settings, streams, utils}
+import org.mvrs.dspa.{streams, utils}
 import org.scalatest.Assertions._
 
 import scala.collection.JavaConverters._
@@ -24,7 +24,7 @@ class InputStreamsITSuite extends AbstractTestBase {
     env.setParallelism(4)
 
     streams
-      .likesFromCsv(Settings.likesStreamCsvPath)
+      .likes()
       .map(e => (e.postId, 1))
       .keyBy(_._1)
       .timeWindow(Time.days(30))
@@ -54,7 +54,7 @@ class InputStreamsITSuite extends AbstractTestBase {
     val startTime = System.currentTimeMillis()
 
     streams
-      .postsFromCsv(Settings.postStreamCsvPath)
+      .posts()
       .map(e => (e.personId, 1))
       .keyBy(_._1)
       .timeWindow(Time.days(30))
@@ -87,7 +87,7 @@ class InputStreamsITSuite extends AbstractTestBase {
     val startTime = System.currentTimeMillis()
 
     streams
-      .rawCommentsFromCsv(Settings.commentStreamCsvPath)
+      .rawComments()
       .map(e => (e.personId, 1))
       .keyBy(_._1)
       .timeWindow(Time.days(30))
@@ -119,7 +119,7 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     val startTime = System.currentTimeMillis()
 
-    streams.commentsFromCsv(Settings.commentStreamCsvPath) // speedup factor 50000: ~11 minutes
+    streams.comments() // speedup factor 50000: ~11 minutes
       .map(e => (e.postId, 1))
       .keyBy(_._1)
       .timeWindow(Time.days(30))

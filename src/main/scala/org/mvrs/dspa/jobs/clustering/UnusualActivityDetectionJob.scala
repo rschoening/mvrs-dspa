@@ -12,7 +12,6 @@ import org.apache.flink.streaming.api.datastream.BroadcastStream
 import org.apache.flink.streaming.api.functions.source.FileProcessingMode
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
 import org.mvrs.dspa.events.EventType
-import org.mvrs.dspa.io.ElasticSearchNode
 import org.mvrs.dspa.jobs.clustering.KMeansClusterFunction.ClusterMetadata
 import org.mvrs.dspa.{Settings, streams, utils}
 
@@ -30,14 +29,13 @@ object UnusualActivityDetectionJob extends App {
   val speedupFactor = 0 // 0 --> read as fast as can
   val randomDelay = 0 // event time
 
-  val elasticHostName = "localhost"
   val classificationIndexName = "activity-classification"
   val classificationTypeName = "activity-classification-type"
   val metadataIndexName = "activity-cluster-metadata"
   val metadataTypeName = "activity-cluster-metadata-type"
 
-  val classificationIndex = new ActivityClassificationIndex(classificationIndexName, classificationTypeName, ElasticSearchNode(elasticHostName))
-  val metadataIndex = new ClusterMetadataIndex(metadataIndexName, metadataTypeName, ElasticSearchNode(elasticHostName))
+  val classificationIndex = new ActivityClassificationIndex(classificationIndexName, classificationTypeName, Settings.elasticSearchNodes(): _*)
+  val metadataIndex = new ClusterMetadataIndex(metadataIndexName, metadataTypeName, Settings.elasticSearchNodes(): _*)
 
   classificationIndex.create()
   metadataIndex.create()
@@ -61,11 +59,12 @@ object UnusualActivityDetectionJob extends App {
       classOf[String],
       classOf[ClusteringParameter])
 
+  val controlFilePath = Settings.config.getString("activity-detection.control-stream-path")
   val controlParameters: DataStream[Either[Throwable, ClusteringParameter]] =
     env
       .readFile(
-        new TextInputFormat(
-          new Path(Settings.UnusualActivityControlFilePath)), Settings.UnusualActivityControlFilePath,
+        new TextInputFormat(new Path(controlFilePath)),
+        controlFilePath,
         FileProcessingMode.PROCESS_CONTINUOUSLY,
         interval = 2000L).name("Read clustering parameters")
       .name("control stream source")
@@ -90,8 +89,8 @@ object UnusualActivityDetectionJob extends App {
       .print("Parameter parse error").setParallelism(1) // TODO write to rolling log file
 
   // val comments = streams.commentsFromKafka("activity-detection")
-  val comments = streams.commentsFromCsv(Settings.commentStreamCsvPath, speedupFactor, randomDelay)
-  val posts = streams.postsFromCsv(Settings.postStreamCsvPath, speedupFactor, randomDelay)
+  val comments = streams.comments()
+  val posts = streams.posts()
 
   val commentFeaturesStream =
     comments
@@ -122,7 +121,12 @@ object UnusualActivityDetectionJob extends App {
   val aggregatedFeaturesStream: DataStream[FeaturizedEvent] =
     eventFeaturesStream
       .connect(frequencyStream) // both keyed on person id
-      .process(new AggregateFeaturesFunction(utils.getTtl(Time.of(3, TimeUnit.HOURS), speedupFactor))) // join event with latest known frequency for the person
+      .process(
+      new AggregateFeaturesFunction(
+        utils.getTtl(
+          Time.of(3, TimeUnit.HOURS),
+          Settings.config.getInt("data.speedup-factor"))
+      )) // join event with latest known frequency for the person
       .name("aggregate features")
 
   // cluster combined features (on a single worker)

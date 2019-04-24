@@ -8,6 +8,8 @@ import org.mvrs.dspa.{Settings, streams, utils}
 
 object ActivePostStatisticsJob extends App {
 
+  println(Settings.config.getString("kafka.brokers"))
+
   implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
   env.setParallelism(3)
@@ -27,7 +29,10 @@ object ActivePostStatisticsJob extends App {
 
   statsStream
     .keyBy(_.postId)
-    .addSink(utils.createKafkaProducer("poststatistics", Settings.kafkaBrokers, createTypeInformation[PostStatistics]))
+    .addSink(utils.createKafkaProducer(
+      "poststatistics",
+      Settings.config.getString("kafka.brokers"),
+      createTypeInformation[PostStatistics]))
 
   env.execute("write post statistics to elastic search")
 

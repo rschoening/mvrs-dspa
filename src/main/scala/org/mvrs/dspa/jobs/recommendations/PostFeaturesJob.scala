@@ -4,7 +4,7 @@ import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.events.PostEvent
 import org.mvrs.dspa.io.ElasticSearchNode
-import org.mvrs.dspa.{Settings, streams, utils}
+import org.mvrs.dspa.{streams, utils}
 
 object PostFeaturesJob extends App {
   val speedupFactor = 0 // 0 --> read as fast as can
@@ -22,9 +22,8 @@ object PostFeaturesJob extends App {
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
   env.setParallelism(4)
 
-  // val consumerGroup = "post-features"
-  // val postsStream = streams.postsFromKafka(consumerGroup, speedupFactor, randomDelay)
-  val postsStream = streams.postsFromCsv(Settings.postStreamCsvPath, speedupFactor, randomDelay)
+  // val postsStream = streams.posts(Some("post-features"))
+  val postsStream = streams.posts()
 
   val postsWithForumFeatures = utils.asyncStream(
     postsStream, new AsyncForumLookupFunction(forumFeaturesIndexName, elasticSearchNode))

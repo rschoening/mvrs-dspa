@@ -11,7 +11,7 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
-import org.mvrs.dspa.events.ForumEvent
+import org.mvrs.dspa.events.{ForumEvent, LikeEvent}
 import org.mvrs.dspa.jobs.recommendations.RecommendationsJob
 import org.mvrs.dspa.utils
 import org.scalatest.Assertions._
@@ -35,14 +35,14 @@ class RecommendationJobITSuite extends AbstractTestBase {
     val posts =
       RecommendationsJob.collectPostsInteractedWith(
         eventStream(
-          Event(personA, post1, time(10, 0)),
-          Event(personB, post1, time(11, 0)),
-          Event(personB, post2, time(12, 0)),
-          Event(personA, post1, time(13, 0)),
-          Event(personC, post1, time(14, 0)),
-          Event(personB, post1, time(15, 0)),
-          Event(personC, post2, time(16, 0)),
-          Event(personC, post3, time(17, 0)),
+          LikeEvent(personA, time(10, 0), post1),
+          LikeEvent(personB, time(11, 0), post1),
+          LikeEvent(personB, time(12, 0), post2),
+          LikeEvent(personA, time(13, 0), post1),
+          LikeEvent(personC, time(14, 0), post1),
+          LikeEvent(personB, time(15, 0), post1),
+          LikeEvent(personC, time(16, 0), post2),
+          LikeEvent(personC, time(17, 0), post3),
         ),
         Time.hours(24),
         Time.hours(24))
@@ -82,9 +82,6 @@ class RecommendationJobITSuite extends AbstractTestBase {
     )
 
   def synchronizedList[T](): util.Collection[T] = util.Collections.synchronizedCollection(new util.ArrayList[T])
-
-  case class Event(personId: Long, postId: Long, creationDate: java.util.Date) extends ForumEvent
-
 }
 
 class PostsInWindowSink extends SinkFunction[(Long, Set[Long])] {

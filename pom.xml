@@ -108,6 +108,13 @@ under the License.
             <version>0.13.4</version>
         </dependency>
 
+        <!-- https://mvnrepository.com/artifact/com.typesafe/config -->
+        <dependency>
+            <groupId>com.typesafe</groupId>
+            <artifactId>config</artifactId>
+            <version>1.2.1</version>
+        </dependency>
+
         <!-- elastic4s - client library for ElasticSearch -->
         <dependency>
             <groupId>com.sksamuel.elastic4s</groupId>

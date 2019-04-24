@@ -17,7 +17,7 @@ object WriteActivePostStatisticsToElasticSearchJob extends App {
   val elasticSearchUri = s"$elasticScheme://$elasticHostName:$elasticPort"
   val indexName = "statistics"
   val typeName = "postStatistics"
-  val kafkaBrokers = Settings.kafkaBrokers
+  val kafkaBrokers = Settings.config.getString("kafka.brokers")
 
   val client = ElasticClient(ElasticProperties(elasticSearchUri))
   try {

@@ -13,7 +13,7 @@ object LoadStaticDataJob extends App {
   val localWithUI = false // TODO arg
 
   // TODO determine how to manage settings
-  val rootPath = Settings.tablesDirectory
+  val rootPath = Settings.config.getString("data.tables-directory")
   val hasInterestInTagCsv = Paths.get(rootPath, "person_hasInterest_tag.csv").toString
   val forumTagsCsv = Paths.get(rootPath, "forum_hasTag_tag.csv").toString
   val worksAtCsv = Paths.get(rootPath, "person_workAt_organisation.csv").toString
