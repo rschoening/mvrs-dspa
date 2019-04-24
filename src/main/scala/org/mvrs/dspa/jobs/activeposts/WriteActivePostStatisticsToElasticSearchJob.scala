@@ -6,7 +6,7 @@ import com.sksamuel.elastic4s.http.{ElasticClient, ElasticProperties}
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.io.ElasticSearchUtils
-import org.mvrs.dspa.utils
+import org.mvrs.dspa.{Settings, utils}
 
 
 object WriteActivePostStatisticsToElasticSearchJob extends App {
@@ -17,7 +17,7 @@ object WriteActivePostStatisticsToElasticSearchJob extends App {
   val elasticSearchUri = s"$elasticScheme://$elasticHostName:$elasticPort"
   val indexName = "statistics"
   val typeName = "postStatistics"
-  val kafkaBrokers = "localhost:9092"
+  val kafkaBrokers = Settings.kafkaBrokers
 
   val client = ElasticClient(ElasticProperties(elasticSearchUri))
   try {
@@ -40,6 +40,7 @@ object WriteActivePostStatisticsToElasticSearchJob extends App {
 
   val source = utils.createKafkaConsumer("poststatistics", createTypeInformation[PostStatistics], props)
 
+  // TODO look up post information (content etc.)
   val stream = env
     .addSource(source)
     .addSink(ActivePostStatisticsIndex.createSink(elasticHostName, elasticPort, elasticScheme, indexName, typeName))
