@@ -8,19 +8,15 @@ import org.mvrs.dspa.{Settings, streams, utils}
 
 object ActivePostStatisticsJob extends App {
 
-  println(Settings.config.getString("kafka.brokers"))
-
   implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
   env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
-  env.setParallelism(3)
+  env.setParallelism(4)
 
   val consumerGroup = "activePostStatistics"
-  val speedupFactor = 0 // 0 --> read as fast as can
-  val randomDelay = 0 // event time
 
-  val commentsStream = streams.commentsFromKafka(consumerGroup, speedupFactor, randomDelay)
-  val postsStream = streams.postsFromKafka(consumerGroup, speedupFactor, randomDelay)
-  val likesStream = streams.likesFromKafka(consumerGroup, speedupFactor, randomDelay)
+  val commentsStream = streams.comments(Some(consumerGroup))
+  val postsStream = streams.posts(Some(consumerGroup))
+  val likesStream = streams.likes(Option(consumerGroup))
 
   val statsStream = statisticsStream(
     commentsStream, postsStream, likesStream,
