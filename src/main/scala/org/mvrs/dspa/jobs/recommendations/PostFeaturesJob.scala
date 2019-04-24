@@ -1,32 +1,26 @@
 package org.mvrs.dspa.jobs.recommendations
 
-import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.events.PostEvent
 import org.mvrs.dspa.io.ElasticSearchNode
-import org.mvrs.dspa.{streams, utils}
+import org.mvrs.dspa.utils.FlinkJob
+import org.mvrs.dspa.{Settings, streams, utils}
 
-object PostFeaturesJob extends App {
-  val speedupFactor = 0 // 0 --> read as fast as can
-  val randomDelay = 0 // event time
-
+object PostFeaturesJob extends FlinkJob(parallelism = 4) {
   val postFeaturesIndexName = "recommendations_posts"
   val postFeaturesTypeName = "recommendations_posts_type"
   val forumFeaturesIndexName = "recommendation_forum_features"
   val elasticSearchNode = ElasticSearchNode("localhost")
 
-  val postFeaturesIndex = new PostFeaturesIndex(postFeaturesIndexName, postFeaturesTypeName, elasticSearchNode)
+  val esNodes = Settings.elasticSearchNodes()
+  val postFeaturesIndex = new PostFeaturesIndex(postFeaturesIndexName, postFeaturesTypeName, esNodes: _*)
   postFeaturesIndex.create()
-
-  implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
-  env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
-  env.setParallelism(4)
 
   // val postsStream = streams.posts(Some("post-features"))
   val postsStream = streams.posts()
 
   val postsWithForumFeatures = utils.asyncStream(
-    postsStream, new AsyncForumLookupFunction(forumFeaturesIndexName, elasticSearchNode))
+    postsStream, new AsyncForumLookupFunction(forumFeaturesIndexName, esNodes: _*))
 
   val postFeatures = postsWithForumFeatures.map(createPostRecord _)
 
