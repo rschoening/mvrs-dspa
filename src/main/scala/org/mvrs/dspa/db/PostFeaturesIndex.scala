@@ -1,8 +1,9 @@
 package org.mvrs.dspa.db
 
-import com.sksamuel.elastic4s.http.ElasticDsl.{longField, _}
+import com.sksamuel.elastic4s.http.ElasticDsl._
 import com.sksamuel.elastic4s.mappings.FieldDefinition
 import org.mvrs.dspa.elastic.{ElasticSearchIndexSink, ElasticSearchNode}
+import org.mvrs.dspa.model.PostFeatures
 
 import scala.collection.JavaConverters._
 
@@ -14,6 +15,7 @@ class PostFeaturesIndex(indexName: String, nodes: ElasticSearchNode*)
     Map[String, Any](
       "personId" -> record.personId,
       "forumId" -> record.forumId,
+      "forumTitle" -> record.forumTitle,
       "content" -> record.content,
       "imageFile" -> record.imageFile,
       "features" -> record.features.asJava,
@@ -21,9 +23,10 @@ class PostFeaturesIndex(indexName: String, nodes: ElasticSearchNode*)
     )
 
   override protected def createFields(): Iterable[FieldDefinition] =
-    Seq(
+    Iterable(
       longField("personId"),
-      longField("forumId"), // TODO add forum title
+      longField("forumId"),
+      keywordField("forumTitle"),
       textField("content"),
       textField("imageFile"),
       textField("features").index(false),

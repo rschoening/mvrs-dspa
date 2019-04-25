@@ -12,10 +12,10 @@ import scala.util.{Failure, Success}
 
 
 class AsyncEnrichPostStatisticsFunction(postFeaturesIndexName: String, nodes: ElasticSearchNode*)
-  extends AsyncElasticSearchFunction[PostStatistics, (PostStatistics, String)](nodes: _*) {
+  extends AsyncElasticSearchFunction[PostStatistics, (PostStatistics, String, String)](nodes: _*) {
   override def asyncInvoke(client: ElasticClient,
                            input: PostStatistics,
-                           resultFuture: ResultFuture[(PostStatistics, String)]): Unit = {
+                           resultFuture: ResultFuture[(PostStatistics, String, String)]): Unit = {
     import scala.collection.JavaConverters._
 
     client.execute {
@@ -28,13 +28,21 @@ class AsyncEnrichPostStatisticsFunction(postFeaturesIndexName: String, nodes: El
     }
   }
 
-  private def unpackResponse(input: PostStatistics, response: Response[SearchResponse]): Seq[(PostStatistics, String)] = {
-    val content: Array[String] =
-      response.result.hits.hits.map(
-        _.sourceAsMap("content").asInstanceOf[String])
-    assert(content.length <= 1, s"unexpected number of hits for post ${input.postId}")
+  private def unpackResponse(input: PostStatistics, response: Response[SearchResponse]): Seq[(PostStatistics, String, String)] = {
+    val hits = response.result.hits.hits
+    if (hits.length == 0) {
+      List((input, "<unknown content>", "<unknown forum>"))
+    }
+    else {
+      assert(hits.length == 1, s"unexpected number of hits for post ${input.postId}")
 
-    List((input, if (content.length == 0) "" else content(0)))
+      val source = hits(0).sourceAsMap
+
+      val content = source("content").asInstanceOf[String]
+      val forumTitle = source("forumTitle").asInstanceOf[String]
+
+      List((input, content, forumTitle))
+    }
   }
 
 }

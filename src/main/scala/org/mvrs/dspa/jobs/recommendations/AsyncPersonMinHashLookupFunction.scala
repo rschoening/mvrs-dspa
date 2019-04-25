@@ -27,7 +27,6 @@ class AsyncPersonMinHashLookupFunction(personFeaturesIndex: String, personFeatur
     }
   }
 
-  // TODO do this outside for testability? Just return the raw features from the function?
   private def unpackResponse(input: ForumEvent, response: Response[GetResponse]) =
     if (response.result.found)
       List(

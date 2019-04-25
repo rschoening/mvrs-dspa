@@ -23,7 +23,7 @@ class ElasticSearchSinkITSuite extends AbstractTestBase {
     env.setParallelism(3)
 
     env.generateSequence(1, 10000)
-      .map(i => (PostStatistics(i, System.currentTimeMillis, 1, 1, 1, 3, newPost = false), "test"))
+      .map(i => (PostStatistics(i, System.currentTimeMillis, 1, 1, 1, 3, newPost = false), "test", "testforum"))
       .addSink(index.createSink(100))
 
     val startTime = System.currentTimeMillis

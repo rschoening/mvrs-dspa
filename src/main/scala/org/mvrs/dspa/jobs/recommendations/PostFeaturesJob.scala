@@ -1,9 +1,9 @@
 package org.mvrs.dspa.jobs.recommendations
 
 import org.apache.flink.streaming.api.scala._
-import org.mvrs.dspa.db.{ElasticSearchIndexes, PostFeatures}
+import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.jobs.FlinkStreamingJob
-import org.mvrs.dspa.model.PostEvent
+import org.mvrs.dspa.model.{PostEvent, PostFeatures}
 import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.{Settings, streams}
 
@@ -26,14 +26,16 @@ object PostFeaturesJob extends FlinkStreamingJob(parallelism = 4) {
 
   env.execute("post features")
 
-  private def createPostRecord(t: (PostEvent, Set[String])): PostFeatures = {
+  private def createPostRecord(t: (PostEvent, String, Set[String])): PostFeatures = {
     val postEvent = t._1
-    val forumFeatures = t._2
+    val forumTitle = t._2
+    val forumFeatures = t._3
 
     PostFeatures(
       postEvent.postId,
       postEvent.personId,
-      postEvent.forumId, // TODO add forum name also
+      postEvent.forumId,
+      forumTitle,
       postEvent.timestamp,
       postEvent.content.getOrElse(""),
       postEvent.imageFile.getOrElse(""),

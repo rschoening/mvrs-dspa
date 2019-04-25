@@ -11,12 +11,12 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
 class AsyncForumLookupFunction(forumFeaturesIndex: String, nodes: ElasticSearchNode*)
-  extends AsyncElasticSearchFunction[PostEvent, (PostEvent, Set[String])](nodes: _*) {
+  extends AsyncElasticSearchFunction[PostEvent, (PostEvent, String, Set[String])](nodes: _*) {
 
 
   override def asyncInvoke(client: ElasticClient,
                            input: PostEvent,
-                           resultFuture: ResultFuture[(PostEvent, Set[String])]): Unit = {
+                           resultFuture: ResultFuture[(PostEvent, String, Set[String])]): Unit = {
     import scala.collection.JavaConverters._
 
     client.execute {
@@ -29,13 +29,22 @@ class AsyncForumLookupFunction(forumFeaturesIndex: String, nodes: ElasticSearchN
     }
   }
 
-  private def unpackResponse(input: PostEvent, response: Response[SearchResponse]): Seq[(PostEvent, Set[String])] = {
-    val features: Set[String] =
-      response.result.hits.hits.flatMap(
-        _.sourceAsMap("features").asInstanceOf[List[String]])
-        .toSet
+  private def unpackResponse(input: PostEvent, response: Response[SearchResponse]): Seq[(PostEvent, String, Set[String])] = {
+    val hits = response.result.hits.hits
 
-    List((input, features))
+    if (hits.length == 0) {
+      Nil
+    }
+    else {
+      assert(hits.length == 1)
+
+      val source = hits(0).sourceAsMap
+
+      val features = source("features").asInstanceOf[List[String]].toSet
+      val title = source("title").asInstanceOf[String]
+
+      List((input, title, features))
+    }
   }
 }
 

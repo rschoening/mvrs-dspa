@@ -18,6 +18,7 @@ object LoadStaticDataJob extends FlinkBatchJob {
   val worksAtCsv = Paths.get(rootPath, "person_workAt_organisation.csv").toString
   val studyAtCsv = Paths.get(rootPath, "person_studyAt_organisation.csv").toString
   val knownPersonsCsv = Paths.get(rootPath, "person_knows_person.csv").toString
+  val forumsCsv = Paths.get(rootPath, "forum.csv").toString
 
   ElasticSearchIndexes.personFeatures.create()
   ElasticSearchIndexes.forumFeatures.create()
@@ -30,6 +31,8 @@ object LoadStaticDataJob extends FlinkBatchJob {
   val personStudy = FlinkUtils.readCsv[(Long, Long)](studyAtCsv).map(toFeature(_, FeaturePrefix.Study))
   val forumTags = FlinkUtils.readCsv[(Long, Long)](forumTagsCsv).map(toFeature(_, FeaturePrefix.Tag))
 
+  val forums = FlinkUtils.readCsv[(Long, String, String)](forumsCsv)
+
   // TODO do example for hierarchy (place, tag structure) --> flatten over all levels
   val personFeatures: DataSet[(Long, List[String])] =
     personTagInterests
@@ -38,10 +41,20 @@ object LoadStaticDataJob extends FlinkBatchJob {
       .groupBy(_._1)
       .reduceGroup(sortedValues[String] _)
 
-  val forumFeatures: DataSet[(Long, List[String])] =
+  val forumFeatures: DataSet[(Long, String, List[String])] =
     forumTags
       .groupBy(_._1)
       .reduceGroup(sortedValues[String] _)
+      .join(forums)
+      .where(f => f._1)
+      .equalTo(ft => ft._1)
+      .map(
+        t => (
+          t._1._1, // forum id
+          t._2._2, // forum title
+          t._1._2 // features
+        )
+      )
 
   val personMinHashes: DataSet[(Long, MinHashSignature)] =
     personFeatures.map(t => (t._1, RecommendationUtils.getMinHashSignature(t._2, RecommendationUtils.minHasher)))
