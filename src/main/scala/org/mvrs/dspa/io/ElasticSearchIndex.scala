@@ -2,6 +2,7 @@ package org.mvrs.dspa.io
 
 import com.sksamuel.elastic4s.http.ElasticDsl._
 import com.sksamuel.elastic4s.mappings.FieldDefinition
+import org.mvrs.dspa.utils.ElasticSearchUtils
 
 
 /**

@@ -3,6 +3,7 @@ package org.mvrs.dspa.io
 import com.sksamuel.elastic4s.http.ElasticClient
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.async.{ResultFuture, RichAsyncFunction}
+import org.mvrs.dspa.utils.ElasticSearchUtils
 
 abstract class AsyncElasticSearchFunction[IN, OUT](nodes: ElasticSearchNode*) extends RichAsyncFunction[IN, OUT] {
   require(nodes.nonEmpty, "at least one node must be provided")

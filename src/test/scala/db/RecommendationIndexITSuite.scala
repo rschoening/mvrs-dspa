@@ -9,7 +9,7 @@ import org.junit.Test
 import org.junit.experimental.categories.Category
 import org.mvrs.dspa.Settings
 import org.mvrs.dspa.db.RecommendationsIndex
-import org.mvrs.dspa.io.ElasticSearchUtils
+import org.mvrs.dspa.utils.ElasticSearchUtils
 import org.scalatest.Assertions._
 
 @Category(Array(classOf[categories.ElasticSearchTests]))

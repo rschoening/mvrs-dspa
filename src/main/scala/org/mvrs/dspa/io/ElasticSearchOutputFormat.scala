@@ -3,6 +3,7 @@ package org.mvrs.dspa.io
 import com.sksamuel.elastic4s.http.ElasticClient
 import org.apache.flink.api.common.io.OutputFormat
 import org.apache.flink.configuration.Configuration
+import org.mvrs.dspa.utils.ElasticSearchUtils
 
 abstract class ElasticSearchOutputFormat[T](nodes: ElasticSearchNode*) extends OutputFormat[T] {
 
