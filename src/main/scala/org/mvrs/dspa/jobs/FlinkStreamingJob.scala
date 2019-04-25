@@ -23,6 +23,10 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
     env.enableCheckpointing(checkpointInterval, CheckpointingMode.EXACTLY_ONCE)
 
   if (stateBackendPath.length > 0) {
+
+    // NOTE rocksdb checkpoints fail due to long temporary directory path (>256 chars)
+    // at org.rocksdb.Checkpoint.createCheckpoint(Native Method)
+    // val stateBackend: StateBackend = new RocksDBStateBackend(stateBackendPath, true)
     val stateBackend: StateBackend = new FsStateBackend(stateBackendPath, false)
     env.setStateBackend(stateBackend)
   }
