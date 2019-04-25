@@ -1,4 +1,4 @@
-package org.mvrs.dspa.io
+package org.mvrs.dspa.elastic
 
 import com.sksamuel.elastic4s.http.ElasticDsl._
 import com.sksamuel.elastic4s.mappings.FieldDefinition

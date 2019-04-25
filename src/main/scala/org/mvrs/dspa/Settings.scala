@@ -1,7 +1,7 @@
 package org.mvrs.dspa
 
 import com.typesafe.config.{Config, ConfigFactory}
-import org.mvrs.dspa.io.ElasticSearchNode
+import org.mvrs.dspa.elastic.ElasticSearchNode
 
 import scala.collection.JavaConverters._
 

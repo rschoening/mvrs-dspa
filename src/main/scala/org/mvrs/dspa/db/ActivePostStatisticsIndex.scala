@@ -2,7 +2,7 @@ package org.mvrs.dspa.db
 
 import com.sksamuel.elastic4s.http.ElasticDsl._
 import com.sksamuel.elastic4s.mappings.FieldDefinition
-import org.mvrs.dspa.io.{ElasticSearchIndexSink, ElasticSearchNode}
+import org.mvrs.dspa.elastic.{ElasticSearchIndexSink, ElasticSearchNode}
 import org.mvrs.dspa.model.PostStatistics
 
 class ActivePostStatisticsIndex(indexName: String, nodes: ElasticSearchNode*)

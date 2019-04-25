@@ -1,4 +1,4 @@
-package org.mvrs.dspa.io
+package org.mvrs.dspa.elastic
 
 import org.apache.http.HttpHost
 
