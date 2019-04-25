@@ -2,8 +2,9 @@ package org.mvrs.dspa.jobs.activeposts
 
 import org.apache.flink.streaming.api.scala.{DataStream, createTypeInformation}
 import org.apache.flink.streaming.api.windowing.time.Time
+import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.model._
-import org.mvrs.dspa.utils.{FlinkStreamingJob, FlinkUtils}
+import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.{Settings, streams}
 
 object ActivePostStatisticsJob extends FlinkStreamingJob {

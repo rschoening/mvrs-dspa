@@ -6,6 +6,11 @@ import org.mvrs.dspa.io.ElasticSearchNode
 import scala.collection.JavaConverters._
 
 object Settings {
+  /**
+    *  The configuration read from application.conf (all resources with this name on classpath)
+    *
+    *  see https://github.com/lightbend/config#overview
+    */
   val config: Config = ConfigFactory.load()
 
   val elasticSearchNodes: Seq[ElasticSearchNode] =

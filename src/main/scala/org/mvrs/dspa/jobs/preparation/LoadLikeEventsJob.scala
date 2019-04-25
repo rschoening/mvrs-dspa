@@ -1,8 +1,9 @@
 package org.mvrs.dspa.jobs.preparation
 
 import org.apache.flink.streaming.api.scala._
+import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.model.LikeEvent
-import org.mvrs.dspa.utils.{FlinkStreamingJob, FlinkUtils}
+import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.{Settings, streams}
 
 

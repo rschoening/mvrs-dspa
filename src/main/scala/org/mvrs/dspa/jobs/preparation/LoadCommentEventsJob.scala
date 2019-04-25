@@ -2,8 +2,8 @@ package org.mvrs.dspa.jobs.preparation
 
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.functions.SimpleTextFileSinkFunction
+import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.streams
-import org.mvrs.dspa.utils.FlinkStreamingJob
 
 object LoadCommentEventsJob extends FlinkStreamingJob {
   val kafkaTopic = "mvrs_comments"

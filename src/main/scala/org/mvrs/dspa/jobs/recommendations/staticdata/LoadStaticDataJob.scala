@@ -7,8 +7,9 @@ import org.apache.flink.api.scala.DataSet
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.Settings
 import org.mvrs.dspa.db.ElasticSearchIndexes
+import org.mvrs.dspa.jobs.FlinkBatchJob
 import org.mvrs.dspa.jobs.recommendations.{FeaturePrefix, RecommendationUtils}
-import org.mvrs.dspa.utils.{FlinkBatchJob, FlinkUtils}
+import org.mvrs.dspa.utils.FlinkUtils
 
 object LoadStaticDataJob extends FlinkBatchJob {
   val rootPath = Settings.config.getString("data.tables-directory")

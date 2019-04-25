@@ -1,7 +1,8 @@
-package org.mvrs.dspa.utils
+package org.mvrs.dspa.jobs
 
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
+import org.mvrs.dspa.utils.FlinkUtils
 
 
 abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCharacteristic.EventTime,

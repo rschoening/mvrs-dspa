@@ -2,8 +2,9 @@ package org.mvrs.dspa.jobs.recommendations
 
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.db.{ElasticSearchIndexes, PostFeatures}
+import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.model.PostEvent
-import org.mvrs.dspa.utils.{FlinkStreamingJob, FlinkUtils}
+import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.{Settings, streams}
 
 object PostFeaturesJob extends FlinkStreamingJob(parallelism = 4) {

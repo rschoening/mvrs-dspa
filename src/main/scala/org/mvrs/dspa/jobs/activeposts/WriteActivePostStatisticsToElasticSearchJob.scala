@@ -5,8 +5,9 @@ import java.util.Properties
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.Settings
 import org.mvrs.dspa.db.ElasticSearchIndexes
+import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.model.PostStatistics
-import org.mvrs.dspa.utils.{FlinkStreamingJob, FlinkUtils}
+import org.mvrs.dspa.utils.FlinkUtils
 
 
 object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob {

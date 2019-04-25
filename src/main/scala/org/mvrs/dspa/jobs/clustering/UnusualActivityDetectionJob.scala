@@ -11,8 +11,9 @@ import org.apache.flink.streaming.api.datastream.BroadcastStream
 import org.apache.flink.streaming.api.functions.source.FileProcessingMode
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.db.ElasticSearchIndexes
+import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.model.{ClassifiedEvent, ClusterMetadata, ClusterModel, EventType}
-import org.mvrs.dspa.utils.{FlinkStreamingJob, FlinkUtils}
+import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.{Settings, streams}
 
 import scala.collection.JavaConverters._
