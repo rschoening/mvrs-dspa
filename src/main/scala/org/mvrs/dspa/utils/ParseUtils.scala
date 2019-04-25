@@ -24,10 +24,12 @@ object ParseUtils {
 
   def toEpochMillis(str: String): Long = ZonedDateTime.parse(str, formatter).toInstant.toEpochMilli
 
-  def toUtcLocalDateTime(str: String): LocalDateTime = ZonedDateTime.parse(str, formatter).withZoneSameInstant(ZoneId.of("UTC")).toLocalDateTime
+  def toUtcLocalDateTime(str: String): LocalDateTime =
+    ZonedDateTime.parse(str, formatter).withZoneSameInstant(ZoneId.of("UTC")).toLocalDateTime
 
   // since flink can't serialize ZonedDateTime/LocalDateTime natively, event classes currently use java.util.Date in UTC
-  def toUtcDate(str: String): Date = Date.from(ZonedDateTime.parse(str, formatter).withZoneSameInstant(ZoneId.of("UTC")).toInstant)
+  def toUtcDate(str: String): Date =
+    Date.from(ZonedDateTime.parse(str, formatter).withZoneSameInstant(ZoneId.of("UTC")).toInstant)
 
   def toOptionalString(str: String): Option[String] = str match {
     case "" | null => None

@@ -3,8 +3,8 @@ package org.mvrs.dspa.jobs.recommendations
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.db.{ElasticSearchIndexes, PostFeatures}
 import org.mvrs.dspa.model.PostEvent
-import org.mvrs.dspa.utils.FlinkStreamingJob
-import org.mvrs.dspa.{Settings, streams, utils}
+import org.mvrs.dspa.utils.{FlinkStreamingJob, FlinkUtils}
+import org.mvrs.dspa.{Settings, streams}
 
 object PostFeaturesJob extends FlinkStreamingJob(parallelism = 4) {
   ElasticSearchIndexes.postFeatures.create()
@@ -13,7 +13,7 @@ object PostFeaturesJob extends FlinkStreamingJob(parallelism = 4) {
   val postsStream = streams.posts()
 
   val postsWithForumFeatures =
-    utils.asyncStream(
+    FlinkUtils.asyncStream(
       postsStream,
       new AsyncForumLookupFunction(
         ElasticSearchIndexes.forumFeatures.indexName,

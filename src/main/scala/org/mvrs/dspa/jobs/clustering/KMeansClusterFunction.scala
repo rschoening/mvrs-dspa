@@ -7,8 +7,9 @@ import org.apache.flink.streaming.api.functions.co.KeyedBroadcastProcessFunction
 import org.apache.flink.streaming.api.scala.OutputTag
 import org.apache.flink.util.Collector
 import org.mvrs.dspa.jobs.clustering.KMeansClusterFunction._
+import org.mvrs.dspa.model
 import org.mvrs.dspa.model.{Cluster, ClusterMetadata, ClusterModel, Point}
-import org.mvrs.dspa.{model, utils}
+import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
@@ -56,9 +57,9 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
 
     if (ctx.timestamp() < windowStartTime) {
       LOG.warn(
-        s"Late event ($value): ${utils.formatTimestamp(ctx.timestamp())}, received in window starting at " +
-          s"${utils.formatTimestamp(windowStartTime)} (late by " +
-          s"${utils.formatDuration(windowStartTime - ctx.timestamp())})")
+        s"Late event ($value): ${DateTimeUtils.formatTimestamp(ctx.timestamp())}, received in window starting at " +
+          s"${DateTimeUtils.formatTimestamp(windowStartTime)} (late by " +
+          s"${DateTimeUtils.formatDuration(windowStartTime - ctx.timestamp())})")
       // TODO write to side output?
     }
     else if (ctx.timestamp() > nextTimer && !windowExtended) {
@@ -160,7 +161,7 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
       elementsState.clear()
       elementCount.update(0)
 
-      val nextElements = utils.toSeq(nextElementsState)
+      val nextElements = FlinkUtils.toSeq(nextElementsState)
 
       if (nextElements.nonEmpty) {
         elementsState.addAll(nextElements.asJava)
@@ -177,7 +178,7 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
   }
 
   private def registerTimer(nextTimer: Long, timerService: TimerService, key: Int): Unit = {
-    LOG.debug("Registering timer for {}: {}", key, utils.formatTimestamp(nextTimer))
+    LOG.debug("Registering timer for {}: {}", key, DateTimeUtils.formatTimestamp(nextTimer))
 
     timerService.registerEventTimeTimer(nextTimer)
 

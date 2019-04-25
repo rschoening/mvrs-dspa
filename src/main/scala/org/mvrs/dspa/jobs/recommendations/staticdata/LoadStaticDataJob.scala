@@ -5,10 +5,10 @@ import java.nio.file.Paths
 import com.twitter.algebird.MinHashSignature
 import org.apache.flink.api.scala.DataSet
 import org.apache.flink.streaming.api.scala._
+import org.mvrs.dspa.Settings
 import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.jobs.recommendations.{FeaturePrefix, RecommendationUtils}
-import org.mvrs.dspa.utils.FlinkBatchJob
-import org.mvrs.dspa.{Settings, utils}
+import org.mvrs.dspa.utils.{FlinkBatchJob, FlinkUtils}
 
 object LoadStaticDataJob extends FlinkBatchJob {
   val rootPath = Settings.config.getString("data.tables-directory")
@@ -24,10 +24,10 @@ object LoadStaticDataJob extends FlinkBatchJob {
   ElasticSearchIndexes.knownPersons.create()
   ElasticSearchIndexes.lshBuckets.create()
 
-  val personTagInterests = utils.readCsv[(Long, Long)](hasInterestInTagCsv).map(toFeature(_, FeaturePrefix.Tag))
-  val personWork = utils.readCsv[(Long, Long)](worksAtCsv).map(toFeature(_, FeaturePrefix.Work))
-  val personStudy = utils.readCsv[(Long, Long)](studyAtCsv).map(toFeature(_, FeaturePrefix.Study))
-  val forumTags = utils.readCsv[(Long, Long)](forumTagsCsv).map(toFeature(_, FeaturePrefix.Tag))
+  val personTagInterests = FlinkUtils.readCsv[(Long, Long)](hasInterestInTagCsv).map(toFeature(_, FeaturePrefix.Tag))
+  val personWork = FlinkUtils.readCsv[(Long, Long)](worksAtCsv).map(toFeature(_, FeaturePrefix.Work))
+  val personStudy = FlinkUtils.readCsv[(Long, Long)](studyAtCsv).map(toFeature(_, FeaturePrefix.Study))
+  val forumTags = FlinkUtils.readCsv[(Long, Long)](forumTagsCsv).map(toFeature(_, FeaturePrefix.Tag))
 
   // TODO do example for hierarchy (place, tag structure) --> flatten over all levels
   val personFeatures: DataSet[(Long, List[String])] =
@@ -58,7 +58,7 @@ object LoadStaticDataJob extends FlinkBatchJob {
       .reduceGroup(_.foldLeft[(Long, List[Long])]((0L, Nil))((z, t) => (t._1, t._2 :: z._2)))
 
   val knownPersons =
-    utils.readCsv[(Long, Long)](knownPersonsCsv)
+    FlinkUtils.readCsv[(Long, Long)](knownPersonsCsv)
       .groupBy(_._1)
       .reduceGroup(sortedValues[Long] _)
 

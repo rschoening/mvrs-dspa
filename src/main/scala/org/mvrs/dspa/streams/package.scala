@@ -6,13 +6,12 @@ import kantan.csv.RowDecoder
 import org.apache.flink.api.common.time
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.scala.{DataStream, OutputTag, StreamExecutionEnvironment, createTypeInformation}
-import org.mvrs.dspa.model.{CommentEvent, LikeEvent, PostEvent, RawCommentEvent}
 import org.mvrs.dspa.functions.{ReplayedCsvFileSourceFunction, ScaledReplayFunction}
 import org.mvrs.dspa.jobs.preparation.BuildReplyTreeProcessFunction
+import org.mvrs.dspa.model.{CommentEvent, LikeEvent, PostEvent, RawCommentEvent}
+import org.mvrs.dspa.utils.FlinkUtils
 
 package object streams {
-  val kafkaBrokers = "localhost:9092" // TODO to central configuration
-
   def resolveReplyTree(rawComments: DataStream[RawCommentEvent]): DataStream[CommentEvent] =
     resolveReplyTree(rawComments, droppedRepliesStream = false)._1
 
@@ -143,7 +142,7 @@ package object streams {
   }
 
   def commentsFromKafka(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] = {
-    val commentsSource = utils.createKafkaConsumer("comments", createTypeInformation[CommentEvent],
+    val commentsSource = FlinkUtils.createKafkaConsumer("comments", createTypeInformation[CommentEvent],
       getKafkaConsumerProperties(consumerGroup))
 
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
@@ -151,11 +150,11 @@ package object streams {
     env.addSource(commentsSource)
       .keyBy(_.commentId) // only for scaled replay function (timer)
       .process(new ScaledReplayFunction[Long, CommentEvent](_.timestamp, speedupFactor, randomDelay))
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[CommentEvent](maxOutOfOrderness, _.timestamp))
+      .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[CommentEvent](maxOutOfOrderness, _.timestamp))
   }
 
   def postsFromKafka(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[PostEvent] = {
-    val postsSource = utils.createKafkaConsumer("posts", createTypeInformation[PostEvent],
+    val postsSource = FlinkUtils.createKafkaConsumer("posts", createTypeInformation[PostEvent],
       getKafkaConsumerProperties(consumerGroup))
 
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
@@ -163,11 +162,11 @@ package object streams {
     env.addSource(postsSource)
       .keyBy(_.postId) // only for scaled replay function (timer)
       .process(new ScaledReplayFunction[Long, PostEvent](_.timestamp, speedupFactor, randomDelay))
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[PostEvent](maxOutOfOrderness, _.timestamp))
+      .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[PostEvent](maxOutOfOrderness, _.timestamp))
   }
 
   def likesFromKafka(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
-    val likesSource = utils.createKafkaConsumer("likes", createTypeInformation[LikeEvent],
+    val likesSource = FlinkUtils.createKafkaConsumer("likes", createTypeInformation[LikeEvent],
       getKafkaConsumerProperties(consumerGroup))
 
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
@@ -175,13 +174,13 @@ package object streams {
     env.addSource(likesSource)
       .keyBy(_.postId) // only for scaled replay function (timer)
       .process(new ScaledReplayFunction[Long, LikeEvent](_.timestamp, speedupFactor, randomDelay))
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[LikeEvent](maxOutOfOrderness, _.timestamp))
+      .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[LikeEvent](maxOutOfOrderness, _.timestamp))
   }
 
   private def getKafkaConsumerProperties(consumerGroup: String) = {
 
     val props = new Properties()
-    props.setProperty("bootstrap.servers", kafkaBrokers)
+    props.setProperty("bootstrap.servers", Settings.config.getString("kafka.brokers"))
     props.setProperty("group.id", consumerGroup)
     props.setProperty("isolation.level", "read_committed")
 

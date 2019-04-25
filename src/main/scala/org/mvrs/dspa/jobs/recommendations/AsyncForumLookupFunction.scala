@@ -4,8 +4,8 @@ import com.sksamuel.elastic4s.http.ElasticDsl._
 import com.sksamuel.elastic4s.http.search.SearchResponse
 import com.sksamuel.elastic4s.http.{ElasticClient, Response}
 import org.apache.flink.streaming.api.functions.async.ResultFuture
-import org.mvrs.dspa.model.PostEvent
 import org.mvrs.dspa.io.{AsyncElasticSearchFunction, ElasticSearchNode}
+import org.mvrs.dspa.model.PostEvent
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}

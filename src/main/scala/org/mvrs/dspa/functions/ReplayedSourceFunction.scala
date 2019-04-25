@@ -2,7 +2,7 @@ package org.mvrs.dspa.functions
 
 import org.apache.flink.streaming.api.functions.source.{RichSourceFunction, SourceFunction}
 import org.mvrs.dspa.functions.ReplayedSourceFunction._
-import org.mvrs.dspa.utils
+import org.mvrs.dspa.utils.FlinkUtils
 import org.slf4j.LoggerFactory
 
 import scala.util.Random
@@ -26,7 +26,7 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
                      watermarkInterval: Long = 1000) =
     this(parse, extractEventTime, speedupFactor, maximumDelayMilliseconds,
       if (maximumDelayMilliseconds <= 0) (_: OUT) => 0L
-      else (_: OUT) => utils.getNormalDelayMillis(rand, maximumDelayMilliseconds),
+      else (_: OUT) => FlinkUtils.getNormalDelayMillis(rand, maximumDelayMilliseconds),
       watermarkInterval)
 
   override def run(ctx: SourceFunction.SourceContext[OUT]): Unit = {

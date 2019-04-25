@@ -9,7 +9,8 @@ import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
-import org.mvrs.dspa.{streams, utils}
+import org.mvrs.dspa.streams
+import org.mvrs.dspa.utils.DateTimeUtils
 import org.scalatest.Assertions._
 
 import scala.collection.JavaConverters._
@@ -73,7 +74,7 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     val duration = System.currentTimeMillis() - startTime
 
-    println(s"duration: ${utils.formatDuration(duration)}")
+    println(s"duration: ${DateTimeUtils.formatDuration(duration)}")
   }
 
   @Test
@@ -106,7 +107,7 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     val duration = System.currentTimeMillis() - startTime
 
-    println(s"duration: ${utils.formatDuration(duration)}")
+    println(s"duration: ${DateTimeUtils.formatDuration(duration)}")
   }
 
   @Test
@@ -138,7 +139,7 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     val duration = System.currentTimeMillis() - startTime
 
-    println(s"duration: ${utils.formatDuration(duration)}")
+    println(s"duration: ${DateTimeUtils.formatDuration(duration)}")
   }
 }
 

@@ -11,9 +11,9 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
-import org.mvrs.dspa.model.{ForumEvent, LikeEvent}
 import org.mvrs.dspa.jobs.recommendations.RecommendationsJob
-import org.mvrs.dspa.utils
+import org.mvrs.dspa.model.{ForumEvent, LikeEvent}
+import org.mvrs.dspa.utils.FlinkUtils
 import org.scalatest.Assertions._
 
 import scala.collection.JavaConverters._
@@ -70,7 +70,7 @@ class RecommendationJobITSuite extends AbstractTestBase {
     env.getConfig.setAutoWatermarkInterval(1000L)
 
     env.fromCollection(events)
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[ForumEvent](
+      .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[ForumEvent](
         Time.minutes(1), extract = _.timestamp))
   }
 

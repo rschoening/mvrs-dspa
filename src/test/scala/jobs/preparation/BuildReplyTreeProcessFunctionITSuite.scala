@@ -3,14 +3,15 @@ package jobs.preparation
 import java.util
 import java.util.Collections
 
+import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.functions.sink.SinkFunction
 import org.apache.flink.streaming.api.scala._
-import org.apache.flink.api.common.time.Time
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
 import org.mvrs.dspa.model.{CommentEvent, RawCommentEvent}
-import org.mvrs.dspa.{streams, utils}
+import org.mvrs.dspa.streams
+import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
 import org.scalatest.Assertions.assertResult
 
 import scala.collection.JavaConverters._
@@ -35,15 +36,15 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     val postId = 999
     val personId = 1
     val rawComments: List[RawCommentEvent] = List(
-      RawCommentEvent(commentId = 111, personId, creationDate = utils.toDate(1000), None, None, None, Some(postId), None, 0),
-      RawCommentEvent(commentId = 112, personId, creationDate = utils.toDate(2000), None, None, None, None, Some(111), 0),
-      RawCommentEvent(commentId = 113, personId, creationDate = utils.toDate(3000), None, None, None, None, Some(112), 0),
-      RawCommentEvent(commentId = 114, personId, creationDate = utils.toDate(4000), None, None, None, None, Some(112), 0),
-      RawCommentEvent(commentId = 115, personId, creationDate = utils.toDate(5000), None, None, None, None, Some(113), 0),
+      RawCommentEvent(commentId = 111, personId, creationDate = DateTimeUtils.toDate(1000), None, None, None, Some(postId), None, 0),
+      RawCommentEvent(commentId = 112, personId, creationDate = DateTimeUtils.toDate(2000), None, None, None, None, Some(111), 0),
+      RawCommentEvent(commentId = 113, personId, creationDate = DateTimeUtils.toDate(3000), None, None, None, None, Some(112), 0),
+      RawCommentEvent(commentId = 114, personId, creationDate = DateTimeUtils.toDate(4000), None, None, None, None, Some(112), 0),
+      RawCommentEvent(commentId = 115, personId, creationDate = DateTimeUtils.toDate(5000), None, None, None, None, Some(113), 0),
     )
 
     val stream = env.fromCollection(rawComments)
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[RawCommentEvent](Time.milliseconds(100), _.timestamp))
+      .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[RawCommentEvent](Time.milliseconds(100), _.timestamp))
 
     val (rootedStream, droppedStream) = streams.resolveReplyTree(stream, droppedRepliesStream = true)
 
@@ -79,15 +80,15 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     val postId = 999
     val personId = 1
     val rawComments: List[RawCommentEvent] = List(
-      RawCommentEvent(commentId = 114, personId, creationDate = utils.toDate(1000), None, None, None, None, Some(112), 0),
-      RawCommentEvent(commentId = 115, personId, creationDate = utils.toDate(1000), None, None, None, None, Some(113), 0),
-      RawCommentEvent(commentId = 112, personId, creationDate = utils.toDate(3000), None, None, None, None, Some(111), 0),
-      RawCommentEvent(commentId = 113, personId, creationDate = utils.toDate(4000), None, None, None, None, Some(112), 0),
-      RawCommentEvent(commentId = 111, personId, creationDate = utils.toDate(5000), None, None, None, Some(postId), None, 0),
+      RawCommentEvent(commentId = 114, personId, creationDate = DateTimeUtils.toDate(1000), None, None, None, None, Some(112), 0),
+      RawCommentEvent(commentId = 115, personId, creationDate = DateTimeUtils.toDate(1000), None, None, None, None, Some(113), 0),
+      RawCommentEvent(commentId = 112, personId, creationDate = DateTimeUtils.toDate(3000), None, None, None, None, Some(111), 0),
+      RawCommentEvent(commentId = 113, personId, creationDate = DateTimeUtils.toDate(4000), None, None, None, None, Some(112), 0),
+      RawCommentEvent(commentId = 111, personId, creationDate = DateTimeUtils.toDate(5000), None, None, None, Some(postId), None, 0),
     )
 
     val stream = env.fromCollection(rawComments)
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[RawCommentEvent](Time.milliseconds(100), _.timestamp))
+      .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[RawCommentEvent](Time.milliseconds(100), _.timestamp))
 
     val (rootedStream, droppedStream) = streams.resolveReplyTree(stream, droppedRepliesStream = true)
 
@@ -125,15 +126,15 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     val postId = 999
     val personId = 1
     val rawComments: List[RawCommentEvent] = List(
-      RawCommentEvent(commentId = 114, personId, creationDate = utils.toDate(1000), None, None, None, None, Some(112), 0),
-      RawCommentEvent(commentId = 115, personId, creationDate = utils.toDate(1000), None, None, None, None, Some(113), 0), // child of dangling parent
-      RawCommentEvent(commentId = 112, personId, creationDate = utils.toDate(3000), None, None, None, None, Some(111), 0),
-      RawCommentEvent(commentId = 113, personId, creationDate = utils.toDate(4000), None, None, None, None, Some(888), 0), // dangling, unknown parent
-      RawCommentEvent(commentId = 111, personId, creationDate = utils.toDate(5000), None, None, None, Some(postId), None, 0),
+      RawCommentEvent(commentId = 114, personId, creationDate = DateTimeUtils.toDate(1000), None, None, None, None, Some(112), 0),
+      RawCommentEvent(commentId = 115, personId, creationDate = DateTimeUtils.toDate(1000), None, None, None, None, Some(113), 0), // child of dangling parent
+      RawCommentEvent(commentId = 112, personId, creationDate = DateTimeUtils.toDate(3000), None, None, None, None, Some(111), 0),
+      RawCommentEvent(commentId = 113, personId, creationDate = DateTimeUtils.toDate(4000), None, None, None, None, Some(888), 0), // dangling, unknown parent
+      RawCommentEvent(commentId = 111, personId, creationDate = DateTimeUtils.toDate(5000), None, None, None, Some(postId), None, 0),
     )
 
     val stream = env.fromCollection(rawComments)
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[RawCommentEvent](Time.milliseconds(100), _.timestamp))
+      .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[RawCommentEvent](Time.milliseconds(100), _.timestamp))
 
     val (rootedStream, droppedStream) = streams.resolveReplyTree(stream, droppedRepliesStream = true)
 

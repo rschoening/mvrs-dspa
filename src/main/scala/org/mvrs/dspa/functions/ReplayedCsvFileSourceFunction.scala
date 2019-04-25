@@ -5,7 +5,7 @@ import kantan.csv.ops._
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.source.SourceFunction
 import org.mvrs.dspa.functions.ReplayedSourceFunction._
-import org.mvrs.dspa.utils
+import org.mvrs.dspa.utils.FlinkUtils
 
 class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
                                                         skipFirstLine: Boolean,
@@ -28,7 +28,7 @@ class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
            watermarkInterval: Long = 1000)(implicit rowDecoder: RowDecoder[OUT]) =
     this(filePath, skipFirstLine, cellSeparator, extractEventTime, speedupFactor, maximumDelayMilliseconds,
       if (maximumDelayMilliseconds <= 0) (_: OUT) => 0L
-      else (_: OUT) => utils.getNormalDelayMillis(rand, maximumDelayMilliseconds),
+      else (_: OUT) => FlinkUtils.getNormalDelayMillis(rand, maximumDelayMilliseconds),
       watermarkInterval)
 
   override def open(parameters: Configuration): Unit = {

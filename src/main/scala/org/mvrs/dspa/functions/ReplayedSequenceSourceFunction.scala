@@ -1,7 +1,7 @@
 package org.mvrs.dspa.functions
 
 import org.mvrs.dspa.functions.ReplayedSourceFunction.rand
-import org.mvrs.dspa.utils
+import org.mvrs.dspa.utils.FlinkUtils
 
 class ReplayedSequenceSourceFunction[T](sequence: Seq[T],
                                         extractEventTime: T => Long,
@@ -18,7 +18,7 @@ class ReplayedSequenceSourceFunction[T](sequence: Seq[T],
            watermarkInterval : Long = 1000) =
     this(sequence, extractEventTime, speedupFactor, maximumDelayMilliseconds,
       if (maximumDelayMilliseconds <= 0) (_: T) => 0L
-      else (_: T) => utils.getNormalDelayMillis(rand, maximumDelayMilliseconds),
+      else (_: T) => FlinkUtils.getNormalDelayMillis(rand, maximumDelayMilliseconds),
       watermarkInterval)
 
   override protected def inputIterator: Iterator[T] = sequence.iterator

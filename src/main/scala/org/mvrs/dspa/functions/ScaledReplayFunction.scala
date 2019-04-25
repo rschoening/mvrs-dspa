@@ -6,7 +6,7 @@ import org.apache.flink.streaming.api.TimerService
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction
 import org.apache.flink.util.Collector
 import org.mvrs.dspa.functions.ScaledReplayFunction._
-import org.mvrs.dspa.utils
+import org.mvrs.dspa.utils.FlinkUtils
 
 
 class ScaledReplayFunction[K, I](extractEventTime: I => Long,
@@ -19,7 +19,7 @@ class ScaledReplayFunction[K, I](extractEventTime: I => Long,
 
   def this(extractEventTime: I => Long, speedupFactor: Double, maximumDelayMilliseconds: Long) =
     this(extractEventTime, speedupFactor, maximumDelayMilliseconds,
-      (_: I) => utils.getNormalDelayMillis(rand, maximumDelayMilliseconds))
+      (_: I) => FlinkUtils.getNormalDelayMillis(rand, maximumDelayMilliseconds))
 
   override def processElement(value: I, ctx: KeyedProcessFunction[K, I, I]#Context, out: Collector[I]): Unit = {
     val eventTime: Long = extractEventTime(value)

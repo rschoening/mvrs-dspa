@@ -3,8 +3,8 @@ package org.mvrs.dspa.jobs.activeposts
 import org.apache.flink.streaming.api.scala.{DataStream, createTypeInformation}
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.mvrs.dspa.model._
-import org.mvrs.dspa.utils.FlinkStreamingJob
-import org.mvrs.dspa.{Settings, streams, utils}
+import org.mvrs.dspa.utils.{FlinkStreamingJob, FlinkUtils}
+import org.mvrs.dspa.{Settings, streams}
 
 object ActivePostStatisticsJob extends FlinkStreamingJob {
   val consumerGroup = "active-post-statistics"
@@ -20,7 +20,7 @@ object ActivePostStatisticsJob extends FlinkStreamingJob {
 
   statsStream
     .keyBy(_.postId)
-    .addSink(utils.createKafkaProducer(
+    .addSink(FlinkUtils.createKafkaProducer(
       "mvrs_poststatistics",
       Settings.config.getString("kafka.brokers"),
       createTypeInformation[PostStatistics]))

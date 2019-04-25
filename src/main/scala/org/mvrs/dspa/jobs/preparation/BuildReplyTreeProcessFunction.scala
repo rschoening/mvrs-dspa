@@ -10,8 +10,8 @@ import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction
 import org.apache.flink.streaming.api.functions.co.KeyedBroadcastProcessFunction
 import org.apache.flink.streaming.api.scala.{OutputTag, createTypeInformation}
 import org.apache.flink.util.Collector
-import org.mvrs.dspa.model.{CommentEvent, RawCommentEvent}
 import org.mvrs.dspa.jobs.preparation.BuildReplyTreeProcessFunction._
+import org.mvrs.dspa.model.{CommentEvent, RawCommentEvent}
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._

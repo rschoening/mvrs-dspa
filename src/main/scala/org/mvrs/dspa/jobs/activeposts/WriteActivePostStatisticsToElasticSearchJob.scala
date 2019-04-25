@@ -3,10 +3,10 @@ package org.mvrs.dspa.jobs.activeposts
 import java.util.Properties
 
 import org.apache.flink.streaming.api.scala._
+import org.mvrs.dspa.Settings
 import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.model.PostStatistics
-import org.mvrs.dspa.utils.FlinkStreamingJob
-import org.mvrs.dspa.{Settings, utils}
+import org.mvrs.dspa.utils.{FlinkStreamingJob, FlinkUtils}
 
 
 object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob {
@@ -20,12 +20,12 @@ object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob {
   props.setProperty("group.id", "test")
   props.setProperty("isolation.level", "read_committed")
 
-  val source = utils.createKafkaConsumer("mvrs_poststatistics", createTypeInformation[PostStatistics], props)
+  val source = FlinkUtils.createKafkaConsumer("mvrs_poststatistics", createTypeInformation[PostStatistics], props)
 
   val postStatisticsStream = env.addSource(source)
 
   val enrichedStream =
-    utils.asyncStream(
+    FlinkUtils.asyncStream(
       postStatisticsStream,
       new AsyncEnrichPostStatisticsFunction(
         ElasticSearchIndexes.postFeatures.indexName,

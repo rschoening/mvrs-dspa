@@ -5,10 +5,10 @@ import org.apache.flink.api.common.state.{MapStateDescriptor, StateTtlConfig}
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.scala.{DataStream, _}
 import org.mvrs.dspa.db.ElasticSearchIndexes
-import org.mvrs.dspa.model.{CommentEvent, ForumEvent, LikeEvent, PostEvent}
 import org.mvrs.dspa.functions.CollectSetFunction
-import org.mvrs.dspa.utils.FlinkStreamingJob
-import org.mvrs.dspa.{Settings, streams, utils}
+import org.mvrs.dspa.model.{CommentEvent, ForumEvent, LikeEvent, PostEvent}
+import org.mvrs.dspa.utils.{FlinkStreamingJob, FlinkUtils}
+import org.mvrs.dspa.{Settings, streams}
 
 object RecommendationsJob extends FlinkStreamingJob {
   val windowSize = Time.hours(4)
@@ -40,7 +40,7 @@ object RecommendationsJob extends FlinkStreamingJob {
 
   // look up the tags for these posts (from post and from the post's forum) => (person id -> set of features)
   val personActivityFeatures: DataStream[(Long, Set[String])] =
-    utils.asyncStream(
+    FlinkUtils.asyncStream(
       postIds,
       new AsyncPostFeaturesLookupFunction(
         ElasticSearchIndexes.postFeatures.indexName,
@@ -48,7 +48,7 @@ object RecommendationsJob extends FlinkStreamingJob {
 
   // combine with stored interests of person (person id -> set of features)
   val allPersonFeatures: DataStream[(Long, Set[String])] =
-    utils.asyncStream(
+    FlinkUtils.asyncStream(
       personActivityFeatures,
       new AsyncUnionWithPersonFeaturesFunction(
         ElasticSearchIndexes.personFeatures.indexName,
@@ -61,7 +61,7 @@ object RecommendationsJob extends FlinkStreamingJob {
 
   // look up the persons in same lsh buckets
   val candidates: DataStream[(Long, MinHashSignature, Set[Long])] =
-    utils.asyncStream(
+    FlinkUtils.asyncStream(
       personActivityMinHash,
       new AsyncCandidateUsersLookupFunction(
         ElasticSearchIndexes.lshBuckets.indexName,
@@ -70,7 +70,7 @@ object RecommendationsJob extends FlinkStreamingJob {
 
   // exclude already known persons from recommendations
   val candidatesWithoutKnownPersons: DataStream[(Long, MinHashSignature, Set[Long])] =
-    utils.asyncStream(
+    FlinkUtils.asyncStream(
       candidates,
       new AsyncExcludeKnownPersonsFunction(
         ElasticSearchIndexes.knownPersons.indexName,
@@ -80,7 +80,7 @@ object RecommendationsJob extends FlinkStreamingJob {
   val candidatesWithoutInactiveUsers: DataStream[(Long, MinHashSignature, Set[Long])] =
     filterToActiveUsers(candidatesWithoutKnownPersons, forumEvents, activeUsersTimeout)
 
-  val recommendations = utils.asyncStream(
+  val recommendations = FlinkUtils.asyncStream(
     candidatesWithoutInactiveUsers,
     new AsyncRecommendUsersFunction(
       ElasticSearchIndexes.personMinHashes.indexName,
@@ -140,8 +140,8 @@ object RecommendationsJob extends FlinkStreamingJob {
     forumEvents
       .keyBy(_.personId)
       .timeWindow(
-        size = utils.convert(windowSize),
-        slide = utils.convert(windowSlide))
+        size = FlinkUtils.convert(windowSize),
+        slide = FlinkUtils.convert(windowSlide))
       .aggregate(new CollectSetFunction[ForumEvent, Long, Long](
         key = _.personId,
         value = _.postId))

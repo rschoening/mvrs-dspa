@@ -12,8 +12,8 @@ import org.apache.flink.streaming.api.functions.source.FileProcessingMode
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.model.{ClassifiedEvent, ClusterMetadata, ClusterModel, EventType}
-import org.mvrs.dspa.utils.FlinkStreamingJob
-import org.mvrs.dspa.{Settings, streams, utils}
+import org.mvrs.dspa.utils.{FlinkStreamingJob, FlinkUtils}
+import org.mvrs.dspa.{Settings, streams}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -54,7 +54,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
         interval = 2000L).name("Read clustering parameters")
       .name("control stream source")
       .setParallelism(1) // otherwise the empty splits never emit watermarks, timers never fire etc.
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[String](Time.seconds(0), _ => Long.MaxValue)) // required for downstream timers
+      .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[String](Time.seconds(0), _ => Long.MaxValue)) // required for downstream timers
       .flatMap(ClusteringParameter.parse _).name("Parse parameters")
       .setParallelism(1)
 
@@ -96,7 +96,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
     eventFeaturesStream
       .map(c => (c.personId, 1))
       .keyBy(_._1)
-      .timeWindow(utils.convert(Time.hours(12)), utils.convert(Time.hours(1)))
+      .timeWindow(FlinkUtils.convert(Time.hours(12)), FlinkUtils.convert(Time.hours(1)))
       .sum(1)
       .name("calculate comment frequency per user")
       .keyBy(_._1)
@@ -107,7 +107,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
       .connect(frequencyStream) // both keyed on person id
       .process(
       new AggregateFeaturesFunction(
-        utils.getTtl(
+        FlinkUtils.getTtl(
           Time.of(3, TimeUnit.HOURS),
           Settings.config.getInt("data.speedup-factor"))
       )) // join event with latest known frequency for the person

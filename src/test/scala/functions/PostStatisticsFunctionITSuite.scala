@@ -8,7 +8,7 @@ import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
 import org.mvrs.dspa.jobs.activeposts.PostStatisticsFunction
 import org.mvrs.dspa.model.{Event, EventType}
-import org.mvrs.dspa.utils
+import org.mvrs.dspa.utils.FlinkUtils
 import org.scalatest.Assertions._
 
 import scala.collection.JavaConverters._
@@ -37,7 +37,7 @@ class PostStatisticsFunctionITSuite extends AbstractTestBase {
     val maxOutofOrderness = Time.milliseconds(100)
 
     val stream = env.fromCollection(events)
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[Event](maxOutofOrderness, _.timestamp))
+      .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[Event](maxOutofOrderness, _.timestamp))
       .keyBy(_.postId)
       .process(new PostStatisticsFunction(11, 5))
 
@@ -74,7 +74,7 @@ class PostStatisticsFunctionITSuite extends AbstractTestBase {
 
     val stream = env.fromCollection(events)
       // .process(new ScaledReplayFunction[Event](_.timestamp, 0.01, 0)) // NOTE this causes assertion violation below - function is not finished
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[Event](maxOutofOrderness, _.timestamp))
+      .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[Event](maxOutofOrderness, _.timestamp))
       .keyBy(_.postId)
       .process(new PostStatisticsFunction(20, 20))
 
@@ -111,7 +111,7 @@ class PostStatisticsFunctionITSuite extends AbstractTestBase {
 
     val stream = env.fromCollection(events)
       // .process(new ScaledReplayFunction[Event](_.timestamp, 0.01, 0)) // NOTE this causes assertion violation below - function is not finished, but no obvious cause found yet
-      .assignTimestampsAndWatermarks(utils.timeStampExtractor[Event](maxOutofOrderness, _.timestamp))
+      .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[Event](maxOutofOrderness, _.timestamp))
       .keyBy(_.postId)
       .process(new PostStatisticsFunction(1000, 1000))
 
