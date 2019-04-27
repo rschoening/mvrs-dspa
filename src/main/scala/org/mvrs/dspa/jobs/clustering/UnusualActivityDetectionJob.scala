@@ -3,11 +3,14 @@ package org.mvrs.dspa.jobs.clustering
 import java.util.concurrent.TimeUnit
 
 import com.google.common.base.Splitter
+import org.apache.flink.api.common.serialization.SimpleStringEncoder
 import org.apache.flink.api.common.state.MapStateDescriptor
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.api.java.io.TextInputFormat
 import org.apache.flink.core.fs.Path
 import org.apache.flink.streaming.api.datastream.BroadcastStream
+import org.apache.flink.streaming.api.functions.sink.filesystem.StreamingFileSink
+import org.apache.flink.streaming.api.functions.sink.filesystem.bucketassigners.BasePathBucketAssigner
 import org.apache.flink.streaming.api.functions.source.FileProcessingMode
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.db.ElasticSearchIndexes
@@ -26,7 +29,8 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
   // - if a cluster gets too small, split the largest cluster
   // - come up with better text features
 
-  val controlFilePath = Settings.config.getString("jobs.activity-detection.control-stream-path")
+  val clusterParameterFilePath = Settings.config.getString("jobs.activity-detection.cluster-parameter-file-path")
+  val clusterParameterParseErrorsOutputPath = Settings.config.getString("jobs.activity-detection.cluster-parameter-file-parse-errors-path")
   val frequencyWindowSize = Settings.duration("jobs.activity-detection.frequency-window-size")
   val frequencyWindowSlide = Settings.duration("jobs.activity-detection.frequency-window-slide")
   val defaultK = Settings.config.getInt("jobs.activity-detection.default-k")
@@ -44,7 +48,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
   val posts: DataStream[PostEvent] = streams.posts()
 
   // read raw control file lines
-  val controlParameterLines: DataStream[String] = readControlParameters(controlFilePath)
+  val controlParameterLines: DataStream[String] = readControlParameters(clusterParameterFilePath)
 
   // parse into valid parameters and parse error streams
   val (controlParameters, controlParameterParseErrors) = parseControlParameters(controlParameterLines)
@@ -88,7 +92,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
     .addSink(ElasticSearchIndexes.clusterMetadata.createSink(5))
     .name(s"elastic search: ${ElasticSearchIndexes.clusterMetadata.indexName}")
 
-  controlParameterParseErrors.print("Parameter parse error") // TODO write to rolling log file
+  outputErrors(controlParameterParseErrors, clusterParameterParseErrorsOutputPath)
 
   env.execute()
 
@@ -123,6 +127,20 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
         .name("Control stream for clustering parameters")
 
     (controlParameters, controlParameterParseErrors)
+  }
+
+  def outputErrors(errors: DataStream[Throwable], outputPath: String): Unit =
+    if (outputPath != null && !outputPath.trim.isEmpty)
+      errors.print()
+    else errors
+      .map(_.getMessage)
+      .addSink(createParseErrorSink(outputPath))
+
+  def createParseErrorSink(outputPath: String): StreamingFileSink[String] = {
+    StreamingFileSink
+      .forRowFormat(new Path(outputPath), new SimpleStringEncoder[String]("UTF-8"))
+      .withBucketAssigner(new BasePathBucketAssigner[String]())
+      .build()
   }
 
   def getEventFeatures(comments: DataStream[CommentEvent],
