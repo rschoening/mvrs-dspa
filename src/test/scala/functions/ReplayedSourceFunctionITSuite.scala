@@ -43,10 +43,10 @@ class ReplayedSourceFunctionITSuite extends AbstractTestBase {
     assertResult(eventTimes.length)(list.length)
     assertResult(List(10000, 20000, 30000))(list.map(_._1))
     assert(duration >= minDuration / speedupFactor)
-    assert(expectedDelays(list, speedupFactor))
+    assert(expectedDelays(list, speedupFactor, tolerance = 10))
   }
 
-  def expectedDelays(results: List[(Long, Long)], speedupFactor: Double, tolerance: Double = 10): Boolean = {
+  def expectedDelays(results: List[(Long, Long)], speedupFactor: Double, tolerance: Double): Boolean = {
     results.zipWithIndex.drop(1).forall {
       case ((eventTime, procTime), index) =>
         val previous = results(index - 1)
