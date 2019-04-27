@@ -15,10 +15,23 @@ package object streams {
   def resolveReplyTree(rawComments: DataStream[RawCommentEvent]): DataStream[CommentEvent] =
     resolveReplyTree(rawComments, droppedRepliesStream = false)._1
 
-  def resolveReplyTree(rawComments: DataStream[RawCommentEvent], droppedRepliesStream: Boolean): (DataStream[CommentEvent], DataStream[RawCommentEvent]) = {
+  def resolveReplyTree(rawComments: DataStream[RawCommentEvent],
+                       droppedRepliesStream: Boolean): (DataStream[CommentEvent], DataStream[RawCommentEvent]) = {
     val firstLevelComments = rawComments
       .filter(_.replyToPostId.isDefined)
-      .map(c => CommentEvent(c.commentId, c.personId, c.creationDate, c.locationIP, c.browserUsed, c.content, c.replyToPostId.get, None, c.placeId))
+      .map(c =>
+        CommentEvent(
+          c.commentId,
+          c.personId,
+          c.creationDate,
+          c.locationIP,
+          c.browserUsed,
+          c.content,
+          c.replyToPostId.get,
+          None,
+          c.placeId
+        )
+      )
       .keyBy(_.postId)
 
     val repliesBroadcast = rawComments
@@ -53,7 +66,8 @@ package object streams {
     )
   }
 
-  def rawCommentsFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)(implicit env: StreamExecutionEnvironment): DataStream[RawCommentEvent] = {
+  def rawCommentsFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)
+                        (implicit env: StreamExecutionEnvironment): DataStream[RawCommentEvent] = {
     implicit val decoder: RowDecoder[RawCommentEvent] = RawCommentEvent.csvDecoder
 
     env.addSource(new ReplayedCsvFileSourceFunction[RawCommentEvent](
@@ -113,11 +127,13 @@ package object streams {
       )
     )
 
-  def commentsFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)(implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] = {
+  def commentsFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)
+                     (implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] = {
     resolveReplyTree(rawCommentsFromCsv(filePath, speedupFactor, randomDelay, watermarkInterval))
   }
 
-  def likesFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)(implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
+  def likesFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)
+                  (implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
     implicit val decoder: RowDecoder[LikeEvent] = LikeEvent.csvDecoder
 
     env.addSource(new ReplayedCsvFileSourceFunction[LikeEvent](
@@ -129,7 +145,8 @@ package object streams {
       watermarkInterval))
   }
 
-  def postsFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)(implicit env: StreamExecutionEnvironment): DataStream[PostEvent] = {
+  def postsFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)
+                  (implicit env: StreamExecutionEnvironment): DataStream[PostEvent] = {
     implicit val decoder: RowDecoder[PostEvent] = PostEvent.csvDecoder
 
     env.addSource(new ReplayedCsvFileSourceFunction[PostEvent](
@@ -141,7 +158,8 @@ package object streams {
       watermarkInterval))
   }
 
-  def commentsFromKafka(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] = {
+  def commentsFromKafka(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)
+                       (implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] = {
     val commentsSource = FlinkUtils.createKafkaConsumer("comments", createTypeInformation[CommentEvent],
       getKafkaConsumerProperties(consumerGroup))
 
@@ -153,7 +171,8 @@ package object streams {
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[CommentEvent](maxOutOfOrderness, _.timestamp))
   }
 
-  def postsFromKafka(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[PostEvent] = {
+  def postsFromKafka(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)
+                    (implicit env: StreamExecutionEnvironment): DataStream[PostEvent] = {
     val postsSource = FlinkUtils.createKafkaConsumer("posts", createTypeInformation[PostEvent],
       getKafkaConsumerProperties(consumerGroup))
 
@@ -165,7 +184,8 @@ package object streams {
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[PostEvent](maxOutOfOrderness, _.timestamp))
   }
 
-  def likesFromKafka(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)(implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
+  def likesFromKafka(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)
+                    (implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
     val likesSource = FlinkUtils.createKafkaConsumer("likes", createTypeInformation[LikeEvent],
       getKafkaConsumerProperties(consumerGroup))
 
