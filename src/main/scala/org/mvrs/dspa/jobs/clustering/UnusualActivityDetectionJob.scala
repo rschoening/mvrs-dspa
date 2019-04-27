@@ -25,16 +25,15 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
   // - extract features within clustering operator (more flexibility to standardize/normalize features)
   // - if a cluster gets too small, split the largest cluster
   // - come up with better text features
-  // - show raw clusters in kibana (saved search)
 
   val controlFilePath = Settings.config.getString("jobs.activity-detection.control-stream-path")
-  val frequencyWindowSize = Time.hours(12)
-  val frequencyWindowSlide = Time.hours(1)
-  val defaultK = 4
-  val defaultDecay = 0.2
-  val clusterWindowSize = Time.hours(24)
-  val minClusterElementCount = 100
-  val maxClusterElementCount = 20000
+  val frequencyWindowSize = Settings.duration("jobs.activity-detection.frequency-window-size")
+  val frequencyWindowSlide = Settings.duration("jobs.activity-detection.frequency-window-slide")
+  val defaultK = Settings.config.getInt("jobs.activity-detection.default-k")
+  val defaultDecay = Settings.config.getDouble("jobs.activity-detection.default-decay")
+  val clusterWindowSize = Settings.duration("jobs.activity-detection.cluster-window-size")
+  val minClusterElementCount = Settings.config.getInt("jobs.activity-detection.minimum-cluster-element-count")
+  val maxClusterElementCount = Settings.config.getInt("jobs.activity-detection.maximum-cluster-element.count")
   val aggregateFeaturesStateTtl = FlinkUtils.getTtl(Time.of(3, TimeUnit.HOURS), Settings.config.getInt("data.speedup-factor"))
 
   ElasticSearchIndexes.classification.create()
