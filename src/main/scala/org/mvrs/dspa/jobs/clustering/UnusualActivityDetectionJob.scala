@@ -80,12 +80,22 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
 
   val commentFeaturesStream =
     comments
-      .map(c => FeaturizedEvent(c.personId, if (c.isReply) EventType.Reply else EventType.Comment, c.commentId, extractTextFeatures(c.content)))
+      .map(c => FeaturizedEvent(
+        c.personId,
+        if (c.isReply) EventType.Reply else EventType.Comment,
+        c.commentId,
+        c.timestamp,
+        extractTextFeatures(c.content)))
       .name("extract comment features")
 
   val postFeaturesStream =
     posts
-      .map(c => FeaturizedEvent(c.personId, EventType.Post, c.postId, extractTextFeatures(c.content)))
+      .map(p => FeaturizedEvent(
+        p.personId,
+        EventType.Post,
+        p.postId,
+        p.timestamp,
+        extractTextFeatures(p.content)))
       .name("extract post features")
 
   val eventFeaturesStream =

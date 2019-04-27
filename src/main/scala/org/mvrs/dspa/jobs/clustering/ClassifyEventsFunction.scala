@@ -16,6 +16,8 @@ class ClassifyEventsFunction(clusterStateDescriptor: MapStateDescriptor[Int, (Lo
 
     val clusterState = state.get(0)
 
+    // TODO check cause for gaps in classified events - are there really no comments?
+
     if (clusterState == null) {
       // no clusters yet, cannot classify
     }
@@ -25,7 +27,7 @@ class ClassifyEventsFunction(clusterStateDescriptor: MapStateDescriptor[Int, (Lo
         eventType = value.eventType,
         eventId = value.eventId,
         cluster = clusterState._3.classify(Point(value.features.toVector)),
-        timestamp = ctx.timestamp()
+        timestamp = value.timestamp
       )
     )
   }
