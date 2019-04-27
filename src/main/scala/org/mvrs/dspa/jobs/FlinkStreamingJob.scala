@@ -34,6 +34,8 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
 
   env.setStreamTimeCharacteristic(timeCharacteristic)
   env.setParallelism(4)
+
+  execute()
 }
 
 

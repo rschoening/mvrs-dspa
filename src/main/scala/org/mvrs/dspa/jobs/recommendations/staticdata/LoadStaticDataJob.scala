@@ -12,77 +12,80 @@ import org.mvrs.dspa.jobs.recommendations.{FeaturePrefix, RecommendationUtils}
 import org.mvrs.dspa.utils.FlinkUtils
 
 object LoadStaticDataJob extends FlinkBatchJob {
-  val rootPath = Settings.config.getString("data.tables-directory")
-  val hasInterestInTagCsv = Paths.get(rootPath, "person_hasInterest_tag.csv").toString
-  val forumTagsCsv = Paths.get(rootPath, "forum_hasTag_tag.csv").toString
-  val worksAtCsv = Paths.get(rootPath, "person_workAt_organisation.csv").toString
-  val studyAtCsv = Paths.get(rootPath, "person_studyAt_organisation.csv").toString
-  val knownPersonsCsv = Paths.get(rootPath, "person_knows_person.csv").toString
-  val forumsCsv = Paths.get(rootPath, "forum.csv").toString
+  def execute(): Unit = {
 
-  ElasticSearchIndexes.personFeatures.create()
-  ElasticSearchIndexes.forumFeatures.create()
-  ElasticSearchIndexes.personMinHashes.create()
-  ElasticSearchIndexes.knownPersons.create()
-  ElasticSearchIndexes.lshBuckets.create()
+    val rootPath = Settings.config.getString("data.tables-directory")
+    val hasInterestInTagCsv = Paths.get(rootPath, "person_hasInterest_tag.csv").toString
+    val forumTagsCsv = Paths.get(rootPath, "forum_hasTag_tag.csv").toString
+    val worksAtCsv = Paths.get(rootPath, "person_workAt_organisation.csv").toString
+    val studyAtCsv = Paths.get(rootPath, "person_studyAt_organisation.csv").toString
+    val knownPersonsCsv = Paths.get(rootPath, "person_knows_person.csv").toString
+    val forumsCsv = Paths.get(rootPath, "forum.csv").toString
 
-  val personTagInterests = FlinkUtils.readCsv[(Long, Long)](hasInterestInTagCsv).map(toFeature(_, FeaturePrefix.Tag))
-  val personWork = FlinkUtils.readCsv[(Long, Long)](worksAtCsv).map(toFeature(_, FeaturePrefix.Work))
-  val personStudy = FlinkUtils.readCsv[(Long, Long)](studyAtCsv).map(toFeature(_, FeaturePrefix.Study))
-  val forumTags = FlinkUtils.readCsv[(Long, Long)](forumTagsCsv).map(toFeature(_, FeaturePrefix.Tag))
+    ElasticSearchIndexes.personFeatures.create()
+    ElasticSearchIndexes.forumFeatures.create()
+    ElasticSearchIndexes.personMinHashes.create()
+    ElasticSearchIndexes.knownPersons.create()
+    ElasticSearchIndexes.lshBuckets.create()
 
-  val forums = FlinkUtils.readCsv[(Long, String, String)](forumsCsv)
+    val personTagInterests = FlinkUtils.readCsv[(Long, Long)](hasInterestInTagCsv).map(toFeature(_, FeaturePrefix.Tag))
+    val personWork = FlinkUtils.readCsv[(Long, Long)](worksAtCsv).map(toFeature(_, FeaturePrefix.Work))
+    val personStudy = FlinkUtils.readCsv[(Long, Long)](studyAtCsv).map(toFeature(_, FeaturePrefix.Study))
+    val forumTags = FlinkUtils.readCsv[(Long, Long)](forumTagsCsv).map(toFeature(_, FeaturePrefix.Tag))
 
-  // TODO do example for hierarchy (place, tag structure) --> flatten over all levels
-  val personFeatures: DataSet[(Long, List[String])] =
-    personTagInterests
-      .union(personWork)
-      .union(personStudy)
-      .groupBy(_._1)
-      .reduceGroup(sortedValues[String] _)
+    val forums = FlinkUtils.readCsv[(Long, String, String)](forumsCsv)
 
-  val forumFeatures: DataSet[(Long, String, List[String])] =
-    forumTags
-      .groupBy(_._1)
-      .reduceGroup(sortedValues[String] _)
-      .join(forums)
-      .where(f => f._1)
-      .equalTo(ft => ft._1)
-      .map(
-        t => (
-          t._1._1, // forum id
-          t._2._2, // forum title
-          t._1._2 // features
+    // TODO do example for hierarchy (place, tag structure) --> flatten over all levels
+    val personFeatures: DataSet[(Long, List[String])] =
+      personTagInterests
+        .union(personWork)
+        .union(personStudy)
+        .groupBy(_._1)
+        .reduceGroup(sortedValues[String] _)
+
+    val forumFeatures: DataSet[(Long, String, List[String])] =
+      forumTags
+        .groupBy(_._1)
+        .reduceGroup(sortedValues[String] _)
+        .join(forums)
+        .where(f => f._1)
+        .equalTo(ft => ft._1)
+        .map(
+          t => (
+            t._1._1, // forum id
+            t._2._2, // forum title
+            t._1._2 // features
+          )
         )
-      )
 
-  val personMinHashes: DataSet[(Long, MinHashSignature)] =
-    personFeatures.map(t => (t._1, RecommendationUtils.getMinHashSignature(t._2, RecommendationUtils.minHasher)))
+    val personMinHashes: DataSet[(Long, MinHashSignature)] =
+      personFeatures.map(t => (t._1, RecommendationUtils.getMinHashSignature(t._2, RecommendationUtils.minHasher)))
 
-  val personMinHashBuckets: DataSet[(Long, MinHashSignature, List[Long])] =
-    personMinHashes.map(t => (
-      t._1, // person id
-      t._2, // minhash
-      RecommendationUtils.minHasher.buckets(t._2)))
+    val personMinHashBuckets: DataSet[(Long, MinHashSignature, List[Long])] =
+      personMinHashes.map(t => (
+        t._1, // person id
+        t._2, // minhash
+        RecommendationUtils.minHasher.buckets(t._2)))
 
-  val buckets: DataSet[(Long, List[Long])] =
-    personMinHashBuckets
-      .flatMap((t: (Long, MinHashSignature, List[Long])) => t._3.map(bucket => (bucket, t._1)))
-      .groupBy(_._1) // group by bucket id
-      .reduceGroup(_.foldLeft[(Long, List[Long])]((0L, Nil))((z, t) => (t._1, t._2 :: z._2)))
+    val buckets: DataSet[(Long, List[Long])] =
+      personMinHashBuckets
+        .flatMap((t: (Long, MinHashSignature, List[Long])) => t._3.map(bucket => (bucket, t._1)))
+        .groupBy(_._1) // group by bucket id
+        .reduceGroup(_.foldLeft[(Long, List[Long])]((0L, Nil))((z, t) => (t._1, t._2 :: z._2)))
 
-  val knownPersons =
-    FlinkUtils.readCsv[(Long, Long)](knownPersonsCsv)
-      .groupBy(_._1)
-      .reduceGroup(sortedValues[Long] _)
+    val knownPersons =
+      FlinkUtils.readCsv[(Long, Long)](knownPersonsCsv)
+        .groupBy(_._1)
+        .reduceGroup(sortedValues[Long] _)
 
-  personFeatures.output(ElasticSearchIndexes.personFeatures.createUpsertFormat())
-  forumFeatures.output(ElasticSearchIndexes.forumFeatures.createUpsertFormat())
-  personMinHashes.output(ElasticSearchIndexes.personMinHashes.createUpsertFormat())
-  knownPersons.output(ElasticSearchIndexes.knownPersons.createUpsertFormat())
-  buckets.output(ElasticSearchIndexes.lshBuckets.createUpsertFormat())
+    personFeatures.output(ElasticSearchIndexes.personFeatures.createUpsertFormat())
+    forumFeatures.output(ElasticSearchIndexes.forumFeatures.createUpsertFormat())
+    personMinHashes.output(ElasticSearchIndexes.personMinHashes.createUpsertFormat())
+    knownPersons.output(ElasticSearchIndexes.knownPersons.createUpsertFormat())
+    buckets.output(ElasticSearchIndexes.lshBuckets.createUpsertFormat())
 
-  env.execute("import static data for recommendations")
+    env.execute("import static data for recommendations")
+  }
 
   private def sortedValues[V: Ordering](x: Iterator[(Long, V)]): (Long, List[V]) = {
     val t: (Long, List[V]) = x.foldLeft[(Long, List[V])]((0L, Nil))((z, t) => (t._1, t._2 :: z._2))

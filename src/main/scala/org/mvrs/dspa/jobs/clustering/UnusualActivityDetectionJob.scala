@@ -24,77 +24,80 @@ import scala.collection.mutable
 
 object UnusualActivityDetectionJob extends FlinkStreamingJob {
   // TODO
-  // - add integration tests, refactor for testability
+  // - add integration tests
   // - extract features within clustering operator (more flexibility to standardize/normalize features)
   // - if a cluster gets too small, split the largest cluster
   // - come up with better text features
+  def execute(): Unit = {
 
-  val clusterParameterFilePath = Settings.config.getString("jobs.activity-detection.cluster-parameter-file-path")
-  val clusterParameterParseErrorsOutputPath = Settings.config.getString("jobs.activity-detection.cluster-parameter-file-parse-errors-path")
-  val frequencyWindowSize = Settings.duration("jobs.activity-detection.frequency-window-size")
-  val frequencyWindowSlide = Settings.duration("jobs.activity-detection.frequency-window-slide")
-  val defaultK = Settings.config.getInt("jobs.activity-detection.default-k")
-  val defaultDecay = Settings.config.getDouble("jobs.activity-detection.default-decay")
-  val clusterWindowSize = Settings.duration("jobs.activity-detection.cluster-window-size")
-  val minClusterElementCount = Settings.config.getInt("jobs.activity-detection.minimum-cluster-element-count")
-  val maxClusterElementCount = Settings.config.getInt("jobs.activity-detection.maximum-cluster-element.count")
-  val aggregateFeaturesStateTtl = FlinkUtils.getTtl(Time.of(3, TimeUnit.HOURS), Settings.config.getInt("data.speedup-factor"))
+    val clusterParameterFilePath = Settings.config.getString("jobs.activity-detection.cluster-parameter-file-path")
+    val clusterParameterParseErrorsOutputPath = Settings.config.getString("jobs.activity-detection.cluster-parameter-file-parse-errors-path")
+    val frequencyWindowSize = Settings.duration("jobs.activity-detection.frequency-window-size")
+    val frequencyWindowSlide = Settings.duration("jobs.activity-detection.frequency-window-slide")
+    val defaultK = Settings.config.getInt("jobs.activity-detection.default-k")
+    val defaultDecay = Settings.config.getDouble("jobs.activity-detection.default-decay")
+    val clusterWindowSize = Settings.duration("jobs.activity-detection.cluster-window-size")
+    val minClusterElementCount = Settings.config.getInt("jobs.activity-detection.minimum-cluster-element-count")
+    val maxClusterElementCount = Settings.config.getInt("jobs.activity-detection.maximum-cluster-element.count")
+    val aggregateFeaturesStateTtl = FlinkUtils.getTtl(Time.of(3, TimeUnit.HOURS), Settings.config.getInt("data.speedup-factor"))
 
-  ElasticSearchIndexes.classification.create()
-  ElasticSearchIndexes.clusterMetadata.create()
+    ElasticSearchIndexes.classification.create()
+    ElasticSearchIndexes.clusterMetadata.create()
 
-  // val kafkaConsumerGroup = Some("activity-detection")
-  val comments: DataStream[CommentEvent] = streams.comments()
-  val posts: DataStream[PostEvent] = streams.posts()
+    // val kafkaConsumerGroup = Some("activity-detection")
+    val comments: DataStream[CommentEvent] = streams.comments()
+    val posts: DataStream[PostEvent] = streams.posts()
 
-  // read raw control file lines
-  val controlParameterLines: DataStream[String] = readControlParameters(clusterParameterFilePath)
+    // read raw control file lines
+    val controlParameterLines: DataStream[String] = readControlParameters(clusterParameterFilePath)
 
-  // parse into valid parameters and parse error streams
-  val (controlParameters, controlParameterParseErrors) = parseControlParameters(controlParameterLines)
+    // parse into valid parameters and parse error streams
+    val (controlParameters, controlParameterParseErrors) = parseControlParameters(controlParameterLines)
 
-  // get featurized comments and posts in a unioned stream
-  val eventFeaturesStream: DataStream[FeaturizedEvent] = getEventFeatures(comments, posts)
+    // get featurized comments and posts in a unioned stream
+    val eventFeaturesStream: DataStream[FeaturizedEvent] = getEventFeatures(comments, posts)
 
-  // get frequency of posts/comments in time window, per person
-  val frequencyStream: DataStream[(Long, Int)] =
-    getEventFrequencyPerPerson(eventFeaturesStream, frequencyWindowSize, frequencyWindowSlide)
+    // get frequency of posts/comments in time window, per person
+    val frequencyStream: DataStream[(Long, Int)] =
+      getEventFrequencyPerPerson(eventFeaturesStream, frequencyWindowSize, frequencyWindowSlide)
 
-  // get aggregated features (text and frequency-based)
-  val aggregatedFeaturesStream: DataStream[FeaturizedEvent] =
-    aggregateFeatures(eventFeaturesStream, frequencyStream, aggregateFeaturesStateTtl)
+    // get aggregated features (text and frequency-based)
+    val aggregatedFeaturesStream: DataStream[FeaturizedEvent] =
+      aggregateFeatures(eventFeaturesStream, frequencyStream, aggregateFeaturesStateTtl)
 
-  // cluster combined features (on a single worker) in a custom window:
-  // - tumbling window of configured size
-  // - ... but never exceeding maximum event count (early firing)
-  // - ... and making sure that there is a minimum number of events (extending the window if needed)
+    // cluster combined features (on a single worker) in a custom window:
+    // - tumbling window of configured size
+    // - ... but never exceeding maximum event count (early firing)
+    // - ... and making sure that there is a minimum number of events (extending the window if needed)
 
-  // if to be parallelized: distribute points randomly, cluster subsets, merge resulting clusters as in
-  // 7.6.4 of "Mining of massive datasets"
+    // if to be parallelized: distribute points randomly, cluster subsets, merge resulting clusters as in
+    // 7.6.4 of "Mining of massive datasets"
 
-  val (clusterModelStream: DataStream[(Long, Int, ClusterModel)], clusterMetadata: DataStream[ClusterMetadata]) =
-    updateClusterModel(
-      aggregatedFeaturesStream, controlParameters,
-      defaultK, defaultDecay,
-      clusterWindowSize, minClusterElementCount, maxClusterElementCount)
+    val (clusterModelStream: DataStream[(Long, Int, ClusterModel)], clusterMetadata: DataStream[ClusterMetadata]) =
+      updateClusterModel(
+        aggregatedFeaturesStream, controlParameters,
+        defaultK, defaultDecay,
+        clusterWindowSize, minClusterElementCount, maxClusterElementCount)
 
-  // classify (in parallel) events with aggregated features based on broadcasted cluster model
-  val classifiedEvents: DataStream[ClassifiedEvent] = classifyEvents(aggregatedFeaturesStream, clusterModelStream)
+    // classify (in parallel) events with aggregated features based on broadcasted cluster model
+    val classifiedEvents: DataStream[ClassifiedEvent] = classifyEvents(aggregatedFeaturesStream, clusterModelStream)
 
-  // set up sinks
+    // set up sinks
 
-  // write classification result to kafka/elasticsearch
-  classifiedEvents
-    .addSink(ElasticSearchIndexes.classification.createSink(1))
-    .name(s"elastic search: ${ElasticSearchIndexes.classification.indexName}")
+    // write classification result to kafka/elasticsearch
+    classifiedEvents
+      .addSink(ElasticSearchIndexes.classification.createSink(1))
+      .name(s"elastic search: ${ElasticSearchIndexes.classification.indexName}")
 
-  clusterMetadata
-    .addSink(ElasticSearchIndexes.clusterMetadata.createSink(5))
-    .name(s"elastic search: ${ElasticSearchIndexes.clusterMetadata.indexName}")
+    clusterMetadata
+      .addSink(ElasticSearchIndexes.clusterMetadata.createSink(5))
+      .name(s"elastic search: ${ElasticSearchIndexes.clusterMetadata.indexName}")
 
-  outputErrors(controlParameterParseErrors, clusterParameterParseErrorsOutputPath)
+    outputErrors(controlParameterParseErrors, clusterParameterParseErrorsOutputPath)
 
-  env.execute()
+    env.execute()
+
+  }
 
   def readControlParameters(controlFilePath: String, updateInterval: Long = 2000L)
                            (implicit env: StreamExecutionEnvironment): DataStream[String] =
@@ -108,7 +111,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
       .setParallelism(1) // otherwise the empty splits never emit watermarks, timers never fire etc.
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[String](Time.seconds(0), _ => Long.MaxValue)) // required for downstream timers
 
-  def parseControlParameters(controlParametersParsed: DataStream[String]): (DataStream[ClusteringParameter], DataStream[Throwable]) = {
+  def parseControlParameters(controlParameterLines: DataStream[String]): (DataStream[ClusteringParameter], DataStream[Throwable]) = {
     val controlParametersParsed: DataStream[Either[Throwable, ClusteringParameter]] =
       controlParameterLines
         .flatMap(ClusteringParameter.parse _).name("Parse parameters")

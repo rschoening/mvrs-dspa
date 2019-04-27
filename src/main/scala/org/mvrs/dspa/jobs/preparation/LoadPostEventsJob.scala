@@ -7,11 +7,13 @@ import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.{Settings, streams}
 
 object LoadPostEventsJob extends FlinkStreamingJob {
-  val kafkaTopic = "mvrs_posts"
-  val stream = streams.posts()
+  def execute(): Unit = {
+    val kafkaTopic = "mvrs_posts"
+    val stream = streams.posts()
 
-  stream.addSink(FlinkUtils.createKafkaProducer(kafkaTopic, Settings.config.getString("kafka.brokers"), createTypeInformation[PostEvent]))
+    stream.addSink(FlinkUtils.createKafkaProducer(kafkaTopic, Settings.config.getString("kafka.brokers"), createTypeInformation[PostEvent]))
 
-  // execute program
-  env.execute("Import post events from csv file to Kafka")
+    // execute program
+    env.execute("Import post events from csv file to Kafka")
+  }
 }

@@ -8,23 +8,28 @@ import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.{Settings, streams}
 
 object PostFeaturesJob extends FlinkStreamingJob(parallelism = 4) {
-  ElasticSearchIndexes.postFeatures.create()
+  def execute(): Unit = {
+    ElasticSearchIndexes.postFeatures.create()
 
-  // val postsStream = streams.posts(Some("post-features"))
-  val postsStream = streams.posts()
+    // val postsStream = streams.posts(Some("post-features"))
+    val postsStream = streams.posts()
 
-  val postsWithForumFeatures =
+    val postsWithForumFeatures: DataStream[(PostEvent, String, Set[String])] = lookupForumFeatures(postsStream)
+
+    val postFeatures = postsWithForumFeatures.map(createPostRecord _)
+
+    postFeatures.addSink(ElasticSearchIndexes.postFeatures.createSink(100))
+
+    env.execute("post features")
+  }
+
+  private def lookupForumFeatures(postsStream: DataStream[PostEvent]): DataStream[(PostEvent, String, Set[String])] = {
     FlinkUtils.asyncStream(
       postsStream,
       new AsyncForumLookupFunction(
         ElasticSearchIndexes.forumFeatures.indexName,
         Settings.elasticSearchNodes: _*))
-
-  val postFeatures = postsWithForumFeatures.map(createPostRecord _)
-
-  postFeatures.addSink(ElasticSearchIndexes.postFeatures.createSink(100))
-
-  env.execute("post features")
+  }
 
   private def createPostRecord(t: (PostEvent, String, Set[String])): PostFeatures = {
     val postEvent = t._1

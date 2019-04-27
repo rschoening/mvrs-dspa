@@ -8,25 +8,27 @@ import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.{Settings, streams}
 
 object ActivePostStatisticsJob extends FlinkStreamingJob {
-  val consumerGroup = "active-post-statistics"
+  def execute(): Unit = {
+    val consumerGroup = "active-post-statistics"
+    val commentsStream = streams.comments() // Some(consumerGroup))
+    val postsStream = streams.posts() //Some(consumerGroup))
+    val likesStream = streams.likes() //Option(consumerGroup))
 
-  val commentsStream = streams.comments() // Some(consumerGroup))
-  val postsStream = streams.posts() //Some(consumerGroup))
-  val likesStream = streams.likes() //Option(consumerGroup))
+    // TODO to settings
+    val statsStream = statisticsStream(
+      commentsStream, postsStream, likesStream,
+      Time.hours(12).toMilliseconds,
+      Time.minutes(30).toMilliseconds)
 
-  val statsStream = statisticsStream(
-    commentsStream, postsStream, likesStream,
-    Time.hours(12).toMilliseconds,
-    Time.minutes(30).toMilliseconds)
+    statsStream
+      .keyBy(_.postId)
+      .addSink(FlinkUtils.createKafkaProducer(
+        "mvrs_poststatistics",
+        Settings.config.getString("kafka.brokers"),
+        createTypeInformation[PostStatistics]))
 
-  statsStream
-    .keyBy(_.postId)
-    .addSink(FlinkUtils.createKafkaProducer(
-      "mvrs_poststatistics",
-      Settings.config.getString("kafka.brokers"),
-      createTypeInformation[PostStatistics]))
-
-  env.execute("write post statistics to elastic search")
+    env.execute("write post statistics to elastic search")
+  }
 
   //noinspection ConvertibleToMethodValue
   def statisticsStream(commentsStream: DataStream[CommentEvent],

@@ -18,71 +18,74 @@ import org.mvrs.dspa.{Settings, streams}
 import scala.collection.JavaConverters._
 
 object RecommendationsJob extends FlinkStreamingJob {
-  val windowSize = Time.milliseconds(Settings.config.getDuration("jobs.recommendation.activity-window-size", TimeUnit.MILLISECONDS))
-  val windowSlide = Time.milliseconds(Settings.config.getDuration("jobs.recommendation.activity-window-slide", TimeUnit.MILLISECONDS))
-  val activeUsersTimeout = Time.milliseconds(Settings.config.getDuration("jobs.recommendation.active-users-timeout", TimeUnit.MILLISECONDS))
-  val tracedPersonIds: Set[lang.Long] = Settings.config.getLongList("jobs.recommendation.trace-person-ids").asScala.toSet
+  def execute(): Unit = {
+    val windowSize = Time.milliseconds(Settings.config.getDuration("jobs.recommendation.activity-window-size", TimeUnit.MILLISECONDS))
+    val windowSlide = Time.milliseconds(Settings.config.getDuration("jobs.recommendation.activity-window-slide", TimeUnit.MILLISECONDS))
+    val activeUsersTimeout = Time.milliseconds(Settings.config.getDuration("jobs.recommendation.active-users-timeout", TimeUnit.MILLISECONDS))
+    val tracedPersonIds: Set[lang.Long] = Settings.config.getLongList("jobs.recommendation.trace-person-ids").asScala.toSet
 
-  implicit val esNodes: Seq[ElasticSearchNode] = Settings.elasticSearchNodes
-  implicit val minHasher: MinHasher32 = RecommendationUtils.minHasher
+    implicit val esNodes: Seq[ElasticSearchNode] = Settings.elasticSearchNodes
+    implicit val minHasher: MinHasher32 = RecommendationUtils.minHasher
 
-  // (re)create the index for storing recommendations (person-id -> List((person-id, similarity))
-  ElasticSearchIndexes.recommendations.create()
+    // (re)create the index for storing recommendations (person-id -> List((person-id, similarity))
+    ElasticSearchIndexes.recommendations.create()
 
-  // val kafkaConsumerGroup = Some("recommendations")
-  val commentsStream: DataStream[CommentEvent] = streams.comments()
-  val postsStream: DataStream[PostEvent] = streams.posts()
-  val likesStream: DataStream[LikeEvent] = streams.likes()
+    // val kafkaConsumerGroup = Some("recommendations")
+    val commentsStream: DataStream[CommentEvent] = streams.comments()
+    val postsStream: DataStream[PostEvent] = streams.posts()
+    val likesStream: DataStream[LikeEvent] = streams.likes()
 
-  val forumEvents: DataStream[ForumEvent] = unionEvents(commentsStream, postsStream, likesStream)
+    val forumEvents: DataStream[ForumEvent] = unionEvents(commentsStream, postsStream, likesStream)
 
-  // gather the posts that the user interacted with in a sliding window
-  val postIds: DataStream[(Long, Set[Long])] = collectPostsInteractedWith(forumEvents, windowSize, windowSlide)
+    // gather the posts that the user interacted with in a sliding window
+    val postIds: DataStream[(Long, Set[Long])] = collectPostsInteractedWith(forumEvents, windowSize, windowSlide)
 
-  // look up the tags for these posts (from post and from the post's forum) => (person id -> set of features)
-  val personActivityFeatures: DataStream[(Long, Set[String])] = lookupPostFeaturesForPerson(postIds)
+    // look up the tags for these posts (from post and from the post's forum) => (person id -> set of features)
+    val personActivityFeatures: DataStream[(Long, Set[String])] = lookupPostFeaturesForPerson(postIds)
 
-  // combine with stored interests of person (person id -> set of features)
-  val allPersonFeatures: DataStream[(Long, Set[String])] = unionWithPersonFeatures(personActivityFeatures)
+    // combine with stored interests of person (person id -> set of features)
+    val allPersonFeatures: DataStream[(Long, Set[String])] = unionWithPersonFeatures(personActivityFeatures)
 
-  // calculate minhash per person id, based on person features
-  val personActivityMinHash: DataStream[(Long, MinHashSignature)] = getPersonMinHash(personActivityFeatures)
+    // calculate minhash per person id, based on person features
+    val personActivityMinHash: DataStream[(Long, MinHashSignature)] = getPersonMinHash(personActivityFeatures)
 
-  // look up the persons in same lsh buckets
-  val candidates: DataStream[(Long, MinHashSignature, Set[Long])] = lookupCandidateUsers(personActivityMinHash)
+    // look up the persons in same lsh buckets
+    val candidates: DataStream[(Long, MinHashSignature, Set[Long])] = lookupCandidateUsers(personActivityMinHash)
 
-  // exclude already known persons from recommendations
-  val candidatesWithoutKnownPersons: DataStream[(Long, MinHashSignature, Set[Long])] = excludeKnownPersons(candidates)
+    // exclude already known persons from recommendations
+    val candidatesWithoutKnownPersons: DataStream[(Long, MinHashSignature, Set[Long])] = excludeKnownPersons(candidates)
 
-  // exclude inactive users from recommendations
-  val candidatesWithoutInactiveUsers: DataStream[(Long, MinHashSignature, Set[Long])] =
-    filterToActiveUsers(candidatesWithoutKnownPersons, forumEvents, activeUsersTimeout)
+    // exclude inactive users from recommendations
+    val candidatesWithoutInactiveUsers: DataStream[(Long, MinHashSignature, Set[Long])] =
+      filterToActiveUsers(candidatesWithoutKnownPersons, forumEvents, activeUsersTimeout)
 
 
-  val recommendations: DataStream[(Long, Seq[(Long, Double)])] =
-    recommendUsers(
-      candidatesWithoutInactiveUsers,
-      Settings.config.getInt("jobs.recommendation.max-recommendation-count"),
-      Settings.config.getInt("jobs.recommendation.min-recommendation-similarity"),
-    )
+    val recommendations: DataStream[(Long, Seq[(Long, Double)])] =
+      recommendUsers(
+        candidatesWithoutInactiveUsers,
+        Settings.config.getInt("jobs.recommendation.max-recommendation-count"),
+        Settings.config.getInt("jobs.recommendation.min-recommendation-similarity"),
+      )
 
-  tracePersons(tracedPersonIds)
+    tracePersons(tracedPersonIds)
 
-  recommendations.addSink(ElasticSearchIndexes.recommendations.createSink(batchSize = 100))
+    recommendations.addSink(ElasticSearchIndexes.recommendations.createSink(batchSize = 100))
 
-  env.execute("recommendations")
+    env.execute("recommendations")
 
-  private def tracePersons(personIds: Set[lang.Long]) = {
-    // debug output for selected person Ids
-    if (personIds.nonEmpty) {
-      val length = 15
-      postIds.filter(t => personIds.contains(t._1)).print("Post Ids:".padTo(length, ' '))
-      personActivityFeatures.filter(t => personIds.contains(t._1)).print("Activity:".padTo(length, ' '))
-      allPersonFeatures.filter(t => personIds.contains(t._1)).print("Combined:".padTo(length, ' '))
-      candidates.filter(t => personIds.contains(t._1)).print("Candidates:".padTo(length, ' '))
-      candidatesWithoutKnownPersons.filter(t => personIds.contains(t._1)).print("Filtered:".padTo(length, ' '))
-      candidatesWithoutInactiveUsers.filter(t => personIds.contains(t._1)).print("Active only:".padTo(length, ' '))
-      recommendations.filter(t => personIds.contains(t._1)).print("-> RESULT:".padTo(length, ' '))
+
+    def tracePersons(personIds: Set[lang.Long]) = {
+      // debug output for selected person Ids
+      if (personIds.nonEmpty) {
+        val length = 15
+        postIds.filter(t => personIds.contains(t._1)).print("Post Ids:".padTo(length, ' '))
+        personActivityFeatures.filter(t => personIds.contains(t._1)).print("Activity:".padTo(length, ' '))
+        allPersonFeatures.filter(t => personIds.contains(t._1)).print("Combined:".padTo(length, ' '))
+        candidates.filter(t => personIds.contains(t._1)).print("Candidates:".padTo(length, ' '))
+        candidatesWithoutKnownPersons.filter(t => personIds.contains(t._1)).print("Filtered:".padTo(length, ' '))
+        candidatesWithoutInactiveUsers.filter(t => personIds.contains(t._1)).print("Active only:".padTo(length, ' '))
+        recommendations.filter(t => personIds.contains(t._1)).print("-> RESULT:".padTo(length, ' '))
+      }
     }
   }
 
@@ -128,7 +131,7 @@ object RecommendationsJob extends FlinkStreamingJob {
         .map(_.personId)
         .broadcast(stateDescriptor)
 
-    candidatesWithoutKnownPersons
+    candidates
       .connect(broadcastActivePersons)
       .process(new FilterToActivePersonsFunction(activityTimeout, stateDescriptor))
   }

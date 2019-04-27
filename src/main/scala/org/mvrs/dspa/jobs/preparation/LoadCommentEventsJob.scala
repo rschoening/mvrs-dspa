@@ -6,14 +6,16 @@ import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.streams
 
 object LoadCommentEventsJob extends FlinkStreamingJob {
-  val kafkaTopic = "mvrs_comments"
-  val comments = streams.comments()
+  def execute(): Unit = {
+    val kafkaTopic = "mvrs_comments"
+    val comments = streams.comments()
 
-  comments.map(c => s"${c.commentId};-1;${c.postId};${c.creationDate}")
-    .addSink(new SimpleTextFileSinkFunction("c:\\temp\\dspa_rooted"))
+    comments.map(c => s"${c.commentId};-1;${c.postId};${c.creationDate}")
+      .addSink(new SimpleTextFileSinkFunction("c:\\temp\\dspa_rooted"))
 
-  // rootedComments.addSink(utils.createKafkaProducer(kafkaTopic, Settings.config.getString("kafka.brokers"), createTypeInformation[CommentEvent]))
+    // rootedComments.addSink(utils.createKafkaProducer(kafkaTopic, Settings.config.getString("kafka.brokers"), createTypeInformation[CommentEvent]))
 
-  println(env.getExecutionPlan) // NOTE this is the same json as env.getStreamGraph.dumpStreamingPlanAsJSON()
-  env.execute()
+    println(env.getExecutionPlan) // NOTE this is the same json as env.getStreamGraph.dumpStreamingPlanAsJSON()
+    env.execute()
+  }
 }
