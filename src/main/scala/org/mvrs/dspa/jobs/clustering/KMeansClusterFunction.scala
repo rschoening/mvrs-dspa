@@ -174,7 +174,7 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
 
     val endMillis = System.currentTimeMillis()
 
-    println(s"cluster duration: ${endMillis - startMillis} ms for ${points.size} points")
+    LOG.debug(s"cluster duration: ${endMillis - startMillis} ms for ${points.size} points")
   }
 
   private def registerTimer(nextTimer: Long, timerService: TimerService, key: Int): Unit = {
