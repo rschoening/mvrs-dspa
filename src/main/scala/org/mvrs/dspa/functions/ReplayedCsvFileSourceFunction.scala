@@ -1,5 +1,7 @@
 package org.mvrs.dspa.functions
 
+import java.net.URI
+
 import kantan.csv._
 import kantan.csv.ops._
 import org.apache.flink.configuration.Configuration
@@ -32,7 +34,8 @@ class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
       watermarkInterval)
 
   override def open(parameters: Configuration): Unit = {
-    val file = new java.io.File(filePath)
+    val uri = new URI(filePath)
+    val file = new java.io.File(uri)
     val config = (if (skipFirstLine) rfc.withHeader() else rfc).withCellSeparator(cellSeparator)
     csvReader = Some(file.asCsvReader[OUT](config))
   }
