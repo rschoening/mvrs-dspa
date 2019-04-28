@@ -19,6 +19,8 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
 
   env.getConfig.setLatencyTrackingInterval(latencyTrackingInterval)
 
+  env.getConfig.disableGenericTypes() // to make sure the warning can't be overlooked
+
   if (checkpointInterval > 0)
     env.enableCheckpointing(checkpointInterval, CheckpointingMode.EXACTLY_ONCE)
 
