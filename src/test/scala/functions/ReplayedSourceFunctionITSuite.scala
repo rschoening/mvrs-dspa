@@ -43,7 +43,7 @@ class ReplayedSourceFunctionITSuite extends AbstractTestBase {
     assertResult(eventTimes.length)(list.length)
     assertResult(List(10000, 20000, 30000))(list.map(_._1))
     assert(duration >= minDuration / speedupFactor)
-    assert(expectedDelays(list, speedupFactor, tolerance = 10))
+    assert(expectedDelays(list, speedupFactor, tolerance = 20)) // TODO revise tolerance
   }
 
   def expectedDelays(results: List[(Long, Long)], speedupFactor: Double, tolerance: Double): Boolean = {
