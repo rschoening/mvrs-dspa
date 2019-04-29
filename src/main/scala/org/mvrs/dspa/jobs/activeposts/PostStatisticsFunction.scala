@@ -11,17 +11,7 @@ import org.slf4j.LoggerFactory
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
-object PostStatisticsFunction {
-  def getBucketForTimestamp(timestamp: Long, exclusiveUpperBound: Long, bucketSize: Long): Long = {
-    require(bucketSize > 0)
-
-    val offset = exclusiveUpperBound % bucketSize
-    val index = 1 + (timestamp - offset) / bucketSize
-    offset + index * bucketSize
-  }
-}
-
-class PostStatisticsFunction(windowSizeMillis: Long, slide: Long)
+class PostStatisticsFunction(windowSizeMillis: Long, slide: Long, countPostAuthor: Boolean = true)
   extends KeyedProcessFunction[Long, Event, PostStatistics] {
   require(slide > 0, "slide must be > 0")
   require(windowSizeMillis > 0, "windowSize must be > 0")
@@ -198,7 +188,7 @@ class PostStatisticsFunction(windowSizeMillis: Long, slide: Long)
 
     def registerPost(personId: Long): Unit = {
       originalPost = true
-      persons += personId
+      if (countPostAuthor) persons += personId
     }
 
     def addReply(personId: Long): Unit = {
@@ -216,5 +206,15 @@ class PostStatisticsFunction(windowSizeMillis: Long, slide: Long)
       persons += personId
     }
   }
+}
 
+object PostStatisticsFunction {
+  def getBucketForTimestamp(timestamp: Long, exclusiveUpperBound: Long, bucketSize: Long): Long = {
+    require(bucketSize > 0, "invalid bucket size")
+
+    val offset = exclusiveUpperBound % bucketSize
+    val index = (if (timestamp < offset) 0 else 1) + (timestamp - offset) / bucketSize
+
+    offset + index * bucketSize
+  }
 }
