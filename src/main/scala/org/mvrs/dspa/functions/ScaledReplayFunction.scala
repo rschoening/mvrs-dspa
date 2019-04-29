@@ -31,7 +31,7 @@ class ScaledReplayFunction[K, I](extractEventTime: I => Long,
   private def processPending(out: Collector[I], timerService: TimerService): Unit = {
     val upcomingEventTime = scheduler.processPending(
       (e, _) => out.collect(e),
-      _ => (),
+      _ => (), // cannot emit watermark outside of source function
       sleep,
       () => false,
       flush = false)

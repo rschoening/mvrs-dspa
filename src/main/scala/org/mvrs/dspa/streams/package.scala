@@ -17,26 +17,28 @@ package object streams {
 
   def resolveReplyTree(rawComments: DataStream[RawCommentEvent],
                        droppedRepliesStream: Boolean): (DataStream[CommentEvent], DataStream[RawCommentEvent]) = {
-    val firstLevelComments = rawComments
-      .filter(_.replyToPostId.isDefined)
-      .map(c =>
-        CommentEvent(
-          c.commentId,
-          c.personId,
-          c.creationDate,
-          c.locationIP,
-          c.browserUsed,
-          c.content,
-          c.replyToPostId.get,
-          None,
-          c.placeId
+    val firstLevelComments =
+      rawComments
+        .filter(_.replyToPostId.isDefined)
+        .map(c =>
+          CommentEvent(
+            c.commentId,
+            c.personId,
+            c.creationDate,
+            c.locationIP,
+            c.browserUsed,
+            c.content,
+            c.replyToPostId.get,
+            None,
+            c.placeId
+          )
         )
-      )
-      .keyBy(_.postId)
+        .keyBy(_.postId)
 
-    val repliesBroadcast = rawComments
-      .filter(_.replyToPostId.isEmpty)
-      .broadcast()
+    val repliesBroadcast =
+      rawComments
+        .filter(_.replyToPostId.isEmpty)
+        .broadcast()
 
     val outputTagDroppedReplies = new OutputTag[RawCommentEvent]("dropped replies")
 
