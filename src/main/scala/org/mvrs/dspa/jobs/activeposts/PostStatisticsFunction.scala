@@ -206,6 +206,7 @@ class PostStatisticsFunction(windowSizeMillis: Long, slide: Long, countPostAutho
       persons += personId
     }
   }
+
 }
 
 object PostStatisticsFunction {
@@ -213,8 +214,7 @@ object PostStatisticsFunction {
     require(bucketSize > 0, "invalid bucket size")
 
     val offset = exclusiveUpperBound % bucketSize
-    val index = (if (timestamp < offset) 0 else 1) + (timestamp - offset) / bucketSize
-
-    offset + index * bucketSize
+    val index = math.floor((timestamp - offset).toDouble / bucketSize).toLong
+    offset + (index + 1) * bucketSize
   }
 }
