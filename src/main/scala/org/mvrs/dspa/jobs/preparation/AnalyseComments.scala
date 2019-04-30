@@ -1,5 +1,6 @@
 package org.mvrs.dspa.jobs.preparation
 
+
 import org.mvrs.dspa.model.RawCommentEvent
 
 import scala.collection.mutable
@@ -15,7 +16,7 @@ object AnalyseComments extends App {
   var referenceToLaterComment = 0
 
   // first pass: build dictionary comment id -> creation date
-  using(io.Source.fromFile(filePath))(source => {
+  using(scala.io.Source.fromFile(filePath))(source => {
     for (line <- source.getLines.drop(1)) {
       val c = RawCommentEvent.parse(line)
       dict += c.commentId -> c.timestamp
@@ -23,7 +24,7 @@ object AnalyseComments extends App {
   })
 
   // second pass: collect negative time differences
-  using(io.Source.fromFile(filePath))(source => {
+  using(scala.io.Source.fromFile(filePath))(source => {
     var minDifference: Long = Long.MaxValue
     var maxDifference: Long = Long.MinValue
     var minDifferenceComment: Option[RawCommentEvent] = None
