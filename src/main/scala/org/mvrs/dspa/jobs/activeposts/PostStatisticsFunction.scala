@@ -1,21 +1,20 @@
 package org.mvrs.dspa.jobs.activeposts
 
 import org.apache.flink.api.common.state.{MapStateDescriptor, StateTtlConfig, ValueStateDescriptor}
+import org.apache.flink.api.common.time.Time
+import org.apache.flink.api.scala._
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.TimerService
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction
 import org.apache.flink.util.Collector
-import org.apache.flink.api.scala._
 import org.mvrs.dspa.model.{Event, EventType, PostStatistics}
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
-class PostStatisticsFunction(windowSizeMillis: Long, slide: Long, countPostAuthor: Boolean = true)
+class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, countPostAuthor: Boolean = true)
   extends KeyedProcessFunction[Long, Event, PostStatistics] {
-  require(slide > 0, "slide must be > 0")
-  require(windowSizeMillis > 0, "windowSize must be > 0")
 
   private lazy val lastActivityState = getRuntimeContext.getState(lastActivityDescriptor)
   private lazy val windowEndState = getRuntimeContext.getState(windowEndDescriptor)
@@ -25,9 +24,8 @@ class PostStatisticsFunction(windowSizeMillis: Long, slide: Long, countPostAutho
   private val lastActivityDescriptor = new ValueStateDescriptor("lastActivity", classOf[Long])
   private val windowEndDescriptor = new ValueStateDescriptor("windowEnd", classOf[Long])
 
-  private val scaledTtlTime = org.apache.flink.api.common.time.Time.milliseconds(windowSizeMillis) // TODO
   private val ttlConfig = StateTtlConfig
-    .newBuilder(scaledTtlTime)
+    .newBuilder(stateTtl)
     .setUpdateType(StateTtlConfig.UpdateType.OnReadAndWrite)
     .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
     .build
@@ -47,9 +45,9 @@ class PostStatisticsFunction(windowSizeMillis: Long, slide: Long, countPostAutho
 
     val lastActivity = lastActivityState.value()
 
-    LOG.debug(s"onTimer: $timestamp for key: ${ctx.getCurrentKey} (last activity: $lastActivity window size: $windowSizeMillis")
+    LOG.debug(s"onTimer: $timestamp for key: ${ctx.getCurrentKey} (last activity: $lastActivity window size: ${windowSize.toMilliseconds}")
 
-    if (lastActivity < timestamp - windowSizeMillis) {
+    if (lastActivity < timestamp - windowSize.toMilliseconds) {
       // nothing to report, now new timer to register
       LOG.debug(s"- last activity outside of window - go to sleep until next event arrives")
       bucketMapState.clear()
@@ -80,7 +78,7 @@ class PostStatisticsFunction(windowSizeMillis: Long, slide: Long, countPostAutho
           if (bucketTimestamp > timestamp) {
             futureBucketCount += 1 // future bucket, ignore (count for later assertion)
           }
-          else if (bucketTimestamp <= timestamp - windowSizeMillis) bucketsToDrop += bucketTimestamp // to be evicted
+          else if (bucketTimestamp <= timestamp - windowSize.toMilliseconds) bucketsToDrop += bucketTimestamp // to be evicted
           else {
             // bucket within window
             val bucket = entry.getValue
@@ -103,7 +101,7 @@ class PostStatisticsFunction(windowSizeMillis: Long, slide: Long, countPostAutho
         })
 
       if (postCreatedInWindow || (commentCount + replyCount + likeCount > 0)) {
-        assert(activeUserSet.nonEmpty)
+        if (countPostAuthor) assert(activeUserSet.nonEmpty)
 
         out.collect(
           PostStatistics(
@@ -117,7 +115,7 @@ class PostStatisticsFunction(windowSizeMillis: Long, slide: Long, countPostAutho
 
       LOG.debug(s"registering FOLLOWING timer for $timestamp + $slide (current watermark: ${ctx.timerService.currentWatermark()})")
 
-      registerWindowEndTimer(ctx.timerService, timestamp + slide)
+      registerWindowEndTimer(ctx.timerService, timestamp + slide.toMilliseconds)
 
       // evict state
       bucketsToDrop.foreach(bucketMapState.remove)
@@ -134,15 +132,15 @@ class PostStatisticsFunction(windowSizeMillis: Long, slide: Long, countPostAutho
                               out: Collector[PostStatistics]): Unit = {
     if (windowEndState.value == 0) {
       // no window yet: register timer at event timestamp + slide
-      LOG.debug(s"registering NEW timer for ${value.timestamp} + $slide (current watermark: ${ctx.timerService.currentWatermark()})")
-      registerWindowEndTimer(ctx.timerService, value.timestamp + slide)
+      LOG.debug(s"registering NEW timer for ${value.timestamp} + ${slide.toMilliseconds} (current watermark: ${ctx.timerService.currentWatermark()})")
+      registerWindowEndTimer(ctx.timerService, value.timestamp + slide.toMilliseconds)
     }
 
     // register last activity for post
     lastActivityState.update(value.timestamp)
 
     val windowEnd = windowEndState.value
-    val bucketTimestamp = PostStatisticsFunction.getBucketForTimestamp(value.timestamp, windowEnd, slide)
+    val bucketTimestamp = PostStatisticsFunction.getBucketForTimestamp(value.timestamp, windowEnd, slide.toMilliseconds)
 
     value.eventType match {
       case EventType.Comment => updateBucket(bucketTimestamp, _.addComment(value.personId))
@@ -156,7 +154,7 @@ class PostStatisticsFunction(windowSizeMillis: Long, slide: Long, countPostAutho
     if (value.timestamp > windowEnd) {
       LOG.debug(s"Early event, to future bucket: $value (current window: $windowEnd)")
     }
-    else if (value.timestamp < windowEnd - windowSizeMillis) {
+    else if (value.timestamp < windowEnd - windowSize.toMilliseconds) {
       LOG.debug(s"Late event, to past bucket: $value (current window: $windowEnd)")
     }
     else {

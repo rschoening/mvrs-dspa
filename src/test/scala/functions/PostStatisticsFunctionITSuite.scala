@@ -39,7 +39,13 @@ class PostStatisticsFunctionITSuite extends AbstractTestBase {
     val stream = env.fromCollection(events)
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[Event](maxOutofOrderness, _.timestamp))
       .keyBy(_.postId)
-      .process(new PostStatisticsFunction(11, 5))
+      .process(
+        new PostStatisticsFunction(
+          Time.milliseconds(11),
+          Time.milliseconds(5),
+          Time.milliseconds(100)
+        )
+      )
 
     env.execute()
 
@@ -76,7 +82,13 @@ class PostStatisticsFunctionITSuite extends AbstractTestBase {
       // .process(new ScaledReplayFunction[Event](_.timestamp, 0.01, 0)) // NOTE this causes assertion violation below - function is not finished
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[Event](maxOutofOrderness, _.timestamp))
       .keyBy(_.postId)
-      .process(new PostStatisticsFunction(20, 20))
+      .process(
+        new PostStatisticsFunction(
+          Time.milliseconds(20),
+          Time.milliseconds(20),
+          Time.milliseconds(100)
+        )
+      )
 
     // Note: this must be called *instead of* execute()
     val statistics = DataStreamUtils.collect(stream.javaStream).asScala.toList
@@ -113,7 +125,13 @@ class PostStatisticsFunctionITSuite extends AbstractTestBase {
       // .process(new ScaledReplayFunction[Event](_.timestamp, 0.01, 0)) // NOTE this causes assertion violation below - function is not finished, but no obvious cause found yet
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[Event](maxOutofOrderness, _.timestamp))
       .keyBy(_.postId)
-      .process(new PostStatisticsFunction(1000, 1000))
+      .process(
+        new PostStatisticsFunction(
+          Time.milliseconds(1000),
+          Time.milliseconds(1000),
+          Time.milliseconds(10000)
+        )
+      )
 
     // Note: this must be called *instead of* execute()
     val statistics = DataStreamUtils.collect(stream.javaStream).asScala.toList
