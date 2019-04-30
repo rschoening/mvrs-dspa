@@ -2,6 +2,7 @@ package org.mvrs.dspa.jobs.clustering
 
 import org.apache.flink.api.common.state._
 import org.apache.flink.api.common.time.Time
+import org.apache.flink.api.scala._
 import org.apache.flink.streaming.api.TimerService
 import org.apache.flink.streaming.api.functions.co.KeyedBroadcastProcessFunction
 import org.apache.flink.streaming.api.scala.OutputTag
@@ -13,38 +14,37 @@ import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
 class KMeansClusterFunction(k: Int, decay: Double = 0.9,
                             windowSize: Time, minElementCount: Int, maxElementCount: Int,
                             broadcastStateDescriptor: MapStateDescriptor[String, ClusteringParameter],
                             outputTagClusters: Option[OutputTag[ClusterMetadata]] = None)
-  extends KeyedBroadcastProcessFunction[Int, mutable.ArrayBuffer[Double], ClusteringParameter, (Long, Int, ClusterModel)] {
+  extends KeyedBroadcastProcessFunction[Int, Vector[Double], ClusteringParameter, (Long, Int, ClusterModel)] {
   require(k > 1, s"invalid k: $k")
   require(windowSize.toMilliseconds > 0, s"invalid window size: $windowSize")
   require(minElementCount >= 0, s"invalid minimum element count: $minElementCount")
   require(maxElementCount > 0, s"invalid maximum element count: $maxElementCount")
   require(decay >= 0 && decay <= 1, s"invalid decay: $decay (must be between 0 and 1)")
 
-  private val clusterStateDescriptor = new ValueStateDescriptor("cluster-model", classOf[ClusterModel])
+  // NOTE: use createTypeInformation to ensure serialization by Flink (not Kryo)
+  private val elementsStateDescriptor = new ListStateDescriptor("elements", createTypeInformation[Vector[Double]])
+  private val nextElementsStateDescriptor = new ListStateDescriptor("next-elements", createTypeInformation[Vector[Double]])
+  private val clusterStateDescriptor = new ValueStateDescriptor("cluster-model", createTypeInformation[ClusterModel])
+
   private val nextTimerStateDescriptor = new ValueStateDescriptor("next-timer", classOf[Long])
   private val windowExtendedStateDescriptor = new ValueStateDescriptor("window-extended", classOf[Boolean])
   private val elementCountStateDescriptor = new ValueStateDescriptor("element-count", classOf[Int])
 
-  private val elementsStateDescriptor = new ListStateDescriptor("elements", classOf[Element])
-  private val nextElementsStateDescriptor = new ListStateDescriptor("next-elements", classOf[Element])
-
   private val LOG = LoggerFactory.getLogger(classOf[KMeansClusterFunction])
 
-  override def processElement(value: ArrayBuffer[Double],
-                              ctx: KeyedBroadcastProcessFunction[Int, ArrayBuffer[Double], ClusteringParameter, (Long, Int, ClusterModel)]#ReadOnlyContext,
+  override def processElement(value: Vector[Double],
+                              ctx: KeyedBroadcastProcessFunction[Int, Vector[Double], ClusteringParameter, (Long, Int, ClusterModel)]#ReadOnlyContext,
                               out: Collector[(Long, Int, ClusterModel)]): Unit = {
     var nextTimer = getRuntimeContext.getState(nextTimerStateDescriptor).value()
     val windowExtended = getRuntimeContext.getState(windowExtendedStateDescriptor).value()
     val elementsListState = getRuntimeContext.getListState(elementsStateDescriptor)
-    val nextElementsListState: ListState[Element] = getRuntimeContext.getListState(nextElementsStateDescriptor)
+    val nextElementsListState = getRuntimeContext.getListState(nextElementsStateDescriptor)
     val elementCountState = getRuntimeContext.getState(elementCountStateDescriptor)
 
     if (nextTimer == 0) {
@@ -66,11 +66,11 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
       // element with timestamp after next timer, but delivered before the timer
       // (the timer fires only after watermark for its timestamp has passed, so there can be "early" elements
       // belonging to the next window)
-      nextElementsListState.add(Element(value))
+      nextElementsListState.add(value)
     }
     else {
       // regular element, add to list state
-      elementsListState.add(Element(value))
+      elementsListState.add(value)
       elementCountState.update(elementCountState.value + 1)
     }
 
@@ -98,10 +98,10 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
     outputTagClusters.foreach(output(_, metadata))
 
   override def onTimer(timestamp: Long,
-                       ctx: KeyedBroadcastProcessFunction[Int, ArrayBuffer[Double], ClusteringParameter, (Long, Int, ClusterModel)]#OnTimerContext,
+                       ctx: KeyedBroadcastProcessFunction[Int, Vector[Double], ClusteringParameter, (Long, Int, ClusterModel)]#OnTimerContext,
                        out: Collector[(Long, Int, ClusterModel)]): Unit = {
     val elementsListState = getRuntimeContext.getListState(elementsStateDescriptor)
-    val nextElementsListState: ListState[Element] = getRuntimeContext.getListState(nextElementsStateDescriptor)
+    val nextElementsListState = getRuntimeContext.getListState(nextElementsStateDescriptor)
     val elementCountState = getRuntimeContext.getState(elementCountStateDescriptor)
 
     val elementCount = elementCountState.value()
@@ -123,13 +123,13 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
   }
 
   override def processBroadcastElement(value: ClusteringParameter,
-                                       ctx: KeyedBroadcastProcessFunction[Int, ArrayBuffer[Double], ClusteringParameter, (Long, Int, ClusterModel)]#Context,
+                                       ctx: KeyedBroadcastProcessFunction[Int, Vector[Double], ClusteringParameter, (Long, Int, ClusterModel)]#Context,
                                        out: Collector[(Long, Int, ClusterModel)]): Unit = {
     ctx.getBroadcastState(broadcastStateDescriptor).put(value.key, value)
   }
 
-  private def emitClusters(elementsState: ListState[Element],
-                           nextElementsState: ListState[Element],
+  private def emitClusters(elementsState: ListState[Vector[Double]],
+                           nextElementsState: ListState[Vector[Double]],
                            elementCount: ValueState[Int],
                            out: Collector[(Long, Int, ClusterModel)],
                            timestamp: Long,
@@ -139,7 +139,7 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
 
     val startMillis = System.currentTimeMillis()
 
-    val points = elementsState.get.asScala.map(e => Point(e.features.toVector)).toSeq
+    val points = elementsState.get.asScala.map(Point(_)).toSeq
 
     if (points.isEmpty) {
       // no need to emit anything, as the clusters are stored in broadcast state downstream, and there is no reliance on
@@ -185,9 +185,7 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
     getRuntimeContext.getState(nextTimerStateDescriptor).update(nextTimer)
     getRuntimeContext.getState(windowExtendedStateDescriptor).update(false)
   }
-
 }
-
 
 object KMeansClusterFunction {
   implicit private val random: Random = new Random()
@@ -251,7 +249,6 @@ object KMeansClusterFunction {
     )
   }
 
-  final case class Element(features: mutable.ArrayBuffer[Double])
 
   class Parameters(mapState: ReadOnlyBroadcastState[String, ClusteringParameter], defaultK: Int, defaultDecay: Double) {
     /**

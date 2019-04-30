@@ -22,7 +22,7 @@ import org.mvrs.dspa.{Settings, streams}
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
-object UnusualActivityDetectionJob extends FlinkStreamingJob {
+object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes = true) {
   // TODO
   // - add integration tests
   // - extract features within clustering operator (more flexibility to standardize/normalize features)
@@ -49,6 +49,8 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
     val posts: DataStream[PostEvent] = streams.posts()
 
     // read raw control file lines
+    // NOTE generic types have to be enabled, since reading the control parameter file using TextInputFormat
+    // causes "type org.apache.flink.streaming.api.functions.source.TimestampedFileInputSplit is treated as a generic type"
     val controlParameterLines: DataStream[String] = readControlParameters(clusterParameterFilePath)
 
     // parse into valid parameters and parse error streams
@@ -100,10 +102,13 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
   }
 
   def readControlParameters(controlFilePath: String, updateInterval: Long = 2000L)
-                           (implicit env: StreamExecutionEnvironment): DataStream[String] =
+                           (implicit env: StreamExecutionEnvironment): DataStream[String] = {
+    val format = new TextInputFormat(new Path(controlFilePath))
+    format.setNumSplits(1)
+
     env
       .readFile(
-        new TextInputFormat(new Path(controlFilePath)),
+        format,
         controlFilePath,
         FileProcessingMode.PROCESS_CONTINUOUSLY,
         updateInterval).name("Read clustering parameters")
@@ -111,13 +116,16 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
       .setParallelism(1) // otherwise the empty splits never emit watermarks, timers never fire etc.
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[String](Time.seconds(0), _ => Long.MaxValue)) // required for downstream timers
 
-  def parseControlParameters(controlParameterLines: DataStream[String]): (DataStream[ClusteringParameter], DataStream[Throwable]) = {
-    val controlParametersParsed: DataStream[Either[Throwable, ClusteringParameter]] =
+  }
+
+  def parseControlParameters(controlParameterLines: DataStream[String]): (DataStream[ClusteringParameter], DataStream[String]) = {
+    val controlParametersParsed: DataStream[Either[String, ClusteringParameter]] =
       controlParameterLines
-        .flatMap(ClusteringParameter.parse _).name("Parse parameters")
+        .flatMap(ClusteringParameter.parse(_).map(_.left.map(_.getMessage)))
+        .name("Parse parameters")
         .setParallelism(1)
 
-    val controlParameterParseErrors: DataStream[Throwable] =
+    val controlParameterParseErrors: DataStream[String] =
       controlParametersParsed
         .filter(_.isLeft).setParallelism(1)
         .map(_.left.get).setParallelism(1)
@@ -132,11 +140,11 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
     (controlParameters, controlParameterParseErrors)
   }
 
-  def outputErrors(errors: DataStream[Throwable], outputPath: String): Unit =
+  def outputErrors(errors: DataStream[String], outputPath: String): Unit =
     if (outputPath != null && !outputPath.trim.isEmpty)
       errors.print()
     else errors
-      .map(_.getMessage)
+      //      .map(_.getMessage)
       .addSink(createParseErrorSink(outputPath))
 
   def createParseErrorSink(outputPath: String): StreamingFileSink[String] = {
@@ -212,7 +220,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob {
 
     val clusters: DataStream[(Long, Int, ClusterModel)] =
       aggregatedFeaturesStream
-        .map(_.features) // feature vector
+        .map(_.features.toVector) // feature vector
         .keyBy(_ => 0) // all to same worker
         .connect(controlParameterBroadcast)
         .process(
