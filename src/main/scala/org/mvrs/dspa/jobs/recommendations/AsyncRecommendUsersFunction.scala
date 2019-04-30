@@ -3,6 +3,7 @@ package org.mvrs.dspa.jobs.recommendations
 import com.sksamuel.elastic4s.http.search.{SearchHit, SearchResponse}
 import com.sksamuel.elastic4s.http.{ElasticClient, Response}
 import com.twitter.algebird.{MinHashSignature, MinHasher32}
+import org.apache.flink.api.scala._
 import org.apache.flink.streaming.api.functions.async.ResultFuture
 import org.mvrs.dspa.elastic.{AsyncElasticSearchFunction, ElasticSearchNode}
 
