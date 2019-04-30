@@ -1,0 +1,3 @@
+package categories
+
+class KafkaTests {}
