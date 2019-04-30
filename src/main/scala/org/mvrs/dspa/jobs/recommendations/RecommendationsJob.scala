@@ -11,7 +11,7 @@ import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.elastic.ElasticSearchNode
 import org.mvrs.dspa.functions.CollectSetFunction
 import org.mvrs.dspa.jobs.FlinkStreamingJob
-import org.mvrs.dspa.model.{CommentEvent, ForumEvent, LikeEvent, PostEvent}
+import org.mvrs.dspa.model.{CommentEvent, LikeEvent, PostEvent}
 import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.{Settings, streams}
 
@@ -35,7 +35,7 @@ object RecommendationsJob extends FlinkStreamingJob {
     val postsStream: DataStream[PostEvent] = streams.posts()
     val likesStream: DataStream[LikeEvent] = streams.likes()
 
-    val forumEvents: DataStream[ForumEvent] = unionEvents(commentsStream, postsStream, likesStream)
+    val forumEvents: DataStream[(Long, Long)] = unionEvents(commentsStream, postsStream, likesStream)
 
     // gather the posts that the user interacted with in a sliding window
     val postIds: DataStream[(Long, Set[Long])] = collectPostsInteractedWith(forumEvents, windowSize, windowSlide)
@@ -59,7 +59,6 @@ object RecommendationsJob extends FlinkStreamingJob {
     val candidatesWithoutInactiveUsers: DataStream[(Long, MinHashSignature, Set[Long])] =
       filterToActiveUsers(candidatesWithoutKnownPersons, forumEvents, activeUsersTimeout)
 
-
     val recommendations: DataStream[(Long, Seq[(Long, Double)])] =
       recommendUsers(
         candidatesWithoutInactiveUsers,
@@ -72,7 +71,6 @@ object RecommendationsJob extends FlinkStreamingJob {
     recommendations.addSink(ElasticSearchIndexes.recommendations.createSink(batchSize = 100))
 
     env.execute("recommendations")
-
 
     def tracePersons(personIds: Set[lang.Long]) = {
       // debug output for selected person Ids
@@ -114,21 +112,21 @@ object RecommendationsJob extends FlinkStreamingJob {
 
   def unionEvents(comments: DataStream[CommentEvent],
                   posts: DataStream[PostEvent],
-                  likes: DataStream[LikeEvent]): DataStream[ForumEvent] =
+                  likes: DataStream[LikeEvent]): DataStream[(Long, Long)] =
     comments
-      .map(_.asInstanceOf[ForumEvent])
+      .map(c => (c.personId, c.postId))
       .union(
-        posts.map(_.asInstanceOf[ForumEvent]),
-        likes.map(_.asInstanceOf[ForumEvent]))
+        posts.map(p => (p.personId, p.postId)),
+        likes.map(l => (l.personId, l.postId)))
 
   def filterToActiveUsers(candidates: DataStream[(Long, MinHashSignature, Set[Long])],
-                          forumEvents: DataStream[ForumEvent],
+                          forumEvents: DataStream[(Long, Long)],
                           activityTimeout: Time) = {
     val stateDescriptor = createActiveUsersStateDescriptor(activityTimeout)
 
     val broadcastActivePersons =
       forumEvents
-        .map(_.personId)
+        .map(_._1) // person id
         .broadcast(stateDescriptor)
 
     candidates
@@ -136,18 +134,18 @@ object RecommendationsJob extends FlinkStreamingJob {
       .process(new FilterToActivePersonsFunction(activityTimeout, stateDescriptor))
   }
 
-  def collectPostsInteractedWith(forumEvents: DataStream[ForumEvent],
+  def collectPostsInteractedWith(forumEvents: DataStream[(Long, Long)],
                                  windowSize: Time,
                                  windowSlide: Time): DataStream[(Long, Set[Long])] = {
     // gather features from user activity in sliding window
     forumEvents
-      .keyBy(_.personId)
+      .keyBy(_._1) // person id
       .timeWindow(
-        size = FlinkUtils.convert(windowSize),
-        slide = FlinkUtils.convert(windowSlide))
-      .aggregate(new CollectSetFunction[ForumEvent, Long, Long](
-        key = _.personId,
-        value = _.postId))
+      size = FlinkUtils.convert(windowSize),
+      slide = FlinkUtils.convert(windowSlide))
+      .aggregate(new CollectSetFunction[(Long, Long), Long, Long](
+        key = _._1,
+        value = _._2))
   }
 
   def createActiveUsersStateDescriptor(timeout: Time): MapStateDescriptor[Long, Long] = {

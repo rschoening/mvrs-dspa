@@ -43,7 +43,7 @@ class RecommendationJobITSuite extends AbstractTestBase {
           LikeEvent(personB, time(15, 0), post1),
           LikeEvent(personC, time(16, 0), post2),
           LikeEvent(personC, time(17, 0), post3),
-        ),
+        ).map(e => (e.personId, e.postId)),
         Time.hours(24),
         Time.hours(24))
 
