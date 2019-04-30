@@ -5,6 +5,7 @@ import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.TimerService
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction
 import org.apache.flink.util.Collector
+import org.apache.flink.api.scala._
 import org.mvrs.dspa.model.{Event, EventType, PostStatistics}
 import org.slf4j.LoggerFactory
 
@@ -20,7 +21,7 @@ class PostStatisticsFunction(windowSizeMillis: Long, slide: Long, countPostAutho
   private lazy val windowEndState = getRuntimeContext.getState(windowEndDescriptor)
   private lazy val bucketMapState = getRuntimeContext.getMapState(bucketMapDescriptor)
 
-  private val bucketMapDescriptor = new MapStateDescriptor[Long, Bucket]("buckets", classOf[Long], classOf[Bucket])
+  private val bucketMapDescriptor = new MapStateDescriptor[Long, Bucket]("buckets", createTypeInformation[Long], createTypeInformation[Bucket])
   private val lastActivityDescriptor = new ValueStateDescriptor("lastActivity", classOf[Long])
   private val windowEndDescriptor = new ValueStateDescriptor("windowEnd", classOf[Long])
 
