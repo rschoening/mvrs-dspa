@@ -7,7 +7,6 @@ import org.apache.flink.streaming.api.functions.async.ResultFuture
 import org.mvrs.dspa.elastic.{AsyncElasticSearchFunction, ElasticSearchNode}
 
 import scala.collection.JavaConverters._
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
 class AsyncUnionWithPersonFeaturesFunction(personFeaturesIndex: String, personFeaturesType: String, nodes: ElasticSearchNode*)

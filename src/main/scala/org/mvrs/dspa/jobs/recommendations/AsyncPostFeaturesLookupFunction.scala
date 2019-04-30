@@ -6,7 +6,6 @@ import org.apache.flink.api.scala._
 import org.apache.flink.streaming.api.functions.async.ResultFuture
 import org.mvrs.dspa.elastic.{AsyncElasticSearchFunction, ElasticSearchNode}
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
 class AsyncPostFeaturesLookupFunction(postFeaturesIndex: String, nodes: ElasticSearchNode*)

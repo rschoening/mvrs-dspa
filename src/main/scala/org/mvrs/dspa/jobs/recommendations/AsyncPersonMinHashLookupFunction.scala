@@ -9,7 +9,6 @@ import org.mvrs.dspa.elastic.{AsyncElasticSearchFunction, ElasticSearchNode}
 import org.mvrs.dspa.model.ForumEvent
 
 import scala.collection.JavaConverters._
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
 class AsyncPersonMinHashLookupFunction(personFeaturesIndex: String, personFeaturesType: String, minHasher: MinHasher32, nodes: ElasticSearchNode*)
