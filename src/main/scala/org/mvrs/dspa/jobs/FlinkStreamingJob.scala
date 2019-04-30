@@ -9,7 +9,8 @@ import org.mvrs.dspa.utils.FlinkUtils
 
 
 abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCharacteristic.EventTime,
-                                 parallelism: Int = 4) extends FlinkJob {
+                                 parallelism: Int = 4,
+                                 enableGenericTypes: Boolean = false) extends FlinkJob {
   // read settings
   private val latencyTrackingInterval = Settings.config.getInt("jobs.latency-tracking-interval")
   private val stateBackendPath = Settings.config.getString("jobs.state-backend-path")
@@ -19,7 +20,12 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
 
   env.getConfig.setLatencyTrackingInterval(latencyTrackingInterval)
 
-  env.getConfig.disableGenericTypes() // to make sure the warning can't be overlooked
+  // NOTE: this fails when using streams of tuples
+  // maybe explicit registration needed:
+  // https://ci.apache.org/projects/flink/flink-docs-stable/dev/types_serialization.html#creating-a-typeinformation-or-typeserializer
+
+  if (!enableGenericTypes)
+    env.getConfig.disableGenericTypes() // to make sure the warning can't be overlooked
 
   if (checkpointInterval > 0)
     env.enableCheckpointing(checkpointInterval, CheckpointingMode.EXACTLY_ONCE)
