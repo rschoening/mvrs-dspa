@@ -1,7 +1,6 @@
 package org.mvrs.dspa.jobs.recommendations
 
 import java.lang
-import java.util.concurrent.TimeUnit
 
 import com.twitter.algebird.{MinHashSignature, MinHasher32}
 import org.apache.flink.api.common.state.{MapStateDescriptor, StateTtlConfig}
@@ -19,10 +18,12 @@ import scala.collection.JavaConverters._
 
 object RecommendationsJob extends FlinkStreamingJob {
   def execute(): Unit = {
-    val windowSize = Time.milliseconds(Settings.config.getDuration("jobs.recommendation.activity-window-size", TimeUnit.MILLISECONDS))
-    val windowSlide = Time.milliseconds(Settings.config.getDuration("jobs.recommendation.activity-window-slide", TimeUnit.MILLISECONDS))
-    val activeUsersTimeout = Time.milliseconds(Settings.config.getDuration("jobs.recommendation.active-users-timeout", TimeUnit.MILLISECONDS))
-    val tracedPersonIds: Set[lang.Long] = Settings.config.getLongList("jobs.recommendation.trace-person-ids").asScala.toSet
+    val windowSize = Settings.duration("jobs.recommendation.activity-window-size")
+    val windowSlide = Settings.duration("jobs.recommendation.activity-window-slide")
+    val activeUsersTimeout = Settings.duration("jobs.recommendation.active-users-timeout")
+    val tracedPersonIds = Settings.config.getLongList("jobs.recommendation.trace-person-ids").asScala.toSet
+    val maxRecommendationCount = Settings.config.getInt("jobs.recommendation.max-recommendation-count")
+    val minRecommendationSimilarity = Settings.config.getInt("jobs.recommendation.min-recommendation-similarity")
 
     implicit val esNodes: Seq[ElasticSearchNode] = Settings.elasticSearchNodes
     implicit val minHasher: MinHasher32 = RecommendationUtils.minHasher
@@ -60,11 +61,7 @@ object RecommendationsJob extends FlinkStreamingJob {
       filterToActiveUsers(candidatesWithoutKnownPersons, forumEvents, activeUsersTimeout)
 
     val recommendations: DataStream[(Long, Seq[(Long, Double)])] =
-      recommendUsers(
-        candidatesWithoutInactiveUsers,
-        Settings.config.getInt("jobs.recommendation.max-recommendation-count"),
-        Settings.config.getInt("jobs.recommendation.min-recommendation-similarity"),
-      )
+      recommendUsers(candidatesWithoutInactiveUsers, maxRecommendationCount, minRecommendationSimilarity)
 
     tracePersons(tracedPersonIds)
 

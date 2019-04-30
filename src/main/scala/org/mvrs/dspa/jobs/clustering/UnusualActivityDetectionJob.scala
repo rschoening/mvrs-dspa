@@ -39,7 +39,8 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     val clusterWindowSize = Settings.duration("jobs.activity-detection.cluster-window-size")
     val minClusterElementCount = Settings.config.getInt("jobs.activity-detection.minimum-cluster-element-count")
     val maxClusterElementCount = Settings.config.getInt("jobs.activity-detection.maximum-cluster-element.count")
-    val aggregateFeaturesStateTtl = FlinkUtils.getTtl(Time.of(3, TimeUnit.HOURS), Settings.config.getInt("data.speedup-factor"))
+
+    val aggregateFeaturesStateTtl = FlinkUtils.getTtl(Time.hours(3), Settings.config.getInt("data.speedup-factor"))
 
     ElasticSearchIndexes.classification.create()
     ElasticSearchIndexes.clusterMetadata.create()
