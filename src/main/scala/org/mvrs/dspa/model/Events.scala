@@ -7,8 +7,6 @@ import kantan.csv.{CellDecoder, RowDecoder}
 import org.mvrs.dspa.model.EventType.EventType
 import org.mvrs.dspa.utils.ParseUtils
 
-import scala.collection.Set
-
 case class Event(eventType: EventType, postId: Long, personId: Long, timestamp: Long)
 
 object EventType extends Enumeration {
@@ -119,7 +117,7 @@ object PostEvent {
   def csvDecoder: RowDecoder[PostEvent] = {
     // id|personId|creationDate|imageFile|locationIP|browserUsed|language|content|tags|forumId|placeId
     import ParseUtils.utcDateDecoder
-    implicit val setDecoder: CellDecoder[scala.collection.Set[Int]] = CellDecoder.from(toSet)
+    implicit val setDecoder: CellDecoder[Set[Int]] = CellDecoder.from(toSet)
     RowDecoder.decoder(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)(PostEvent.apply)
   }
 
