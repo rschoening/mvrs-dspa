@@ -6,7 +6,7 @@ import java.util.concurrent.TimeUnit
 import com.twitter.algebird.{MinHashSignature, MinHasher32}
 import org.apache.flink.api.common.state.{MapStateDescriptor, StateTtlConfig}
 import org.apache.flink.api.common.time.Time
-import org.apache.flink.streaming.api.scala.{DataStream, _}
+import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.elastic.ElasticSearchNode
 import org.mvrs.dspa.functions.CollectSetFunction
