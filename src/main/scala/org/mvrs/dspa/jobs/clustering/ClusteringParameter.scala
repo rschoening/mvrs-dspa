@@ -3,21 +3,13 @@ package org.mvrs.dspa.jobs.clustering
 import scala.util.Try
 import scala.util.matching.Regex
 
-sealed trait ClusteringParameter {
-  val key: String
-}
+sealed abstract class ClusteringParameter(val key: String)
 
-final case class ClusteringParameterK(k: Int) extends ClusteringParameter {
-  val key = "k"
-}
+final case class ClusteringParameterK(k: Int) extends ClusteringParameter("k")
 
-final case class ClusteringParameterDecay(decay: Double) extends ClusteringParameter {
-  val key = "decay"
-}
+final case class ClusteringParameterDecay(decay: Double) extends ClusteringParameter("decay")
 
-final case class ClusteringParameterLabel(clusterIndex: Int, label: String) extends ClusteringParameter {
-  val key = s"label$clusterIndex"
-}
+final case class ClusteringParameterLabel(clusterIndex: Int, label: String) extends ClusteringParameter(s"label$clusterIndex")
 
 object ClusteringParameter {
   private val labelPattern: Regex = "(\\s*label\\s*:\\s*)(\\d*)".r
