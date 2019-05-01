@@ -1,18 +1,13 @@
 package org.mvrs.dspa.jobs.preparation
 
-import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.jobs.FlinkStreamingJob
-import org.mvrs.dspa.model.LikeEvent
-import org.mvrs.dspa.utils.FlinkUtils
-import org.mvrs.dspa.{Settings, streams}
+import org.mvrs.dspa.streams
+import org.mvrs.dspa.streams.KafkaTopics
 
 
 object LoadLikeEventsJob extends FlinkStreamingJob {
   def execute(): Unit = {
-    val kafkaTopic = "mvrs_likes"
-    val stream = streams.likes()
-
-    stream.addSink(FlinkUtils.createKafkaProducer[LikeEvent](kafkaTopic, Settings.config.getString("kafka.brokers")))
+    streams.likes().addSink(KafkaTopics.likes.producer())
 
     // execute program
     env.execute("Import Like events from csv file to Kafka")

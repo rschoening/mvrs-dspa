@@ -4,20 +4,26 @@ import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.scala.{DataStream, createTypeInformation}
 import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.model._
+import org.mvrs.dspa.streams.KafkaTopics
 import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.{Settings, streams}
 
-object ActivePostStatisticsJob extends FlinkStreamingJob {
+// NOTE: KafkaTopicPartition is treated as generic type
+// NOTE: checkpoints fail!!
+// NOTE: assertion failure when reading from Kafka (in EventScheduler - events are out of order)
+object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = true) {
   def execute(): Unit = {
     val windowSize = Settings.duration("jobs.active-post-statistics.window-size")
     val windowSlide = Settings.duration("jobs.active-post-statistics.window-slide")
     val countPostAuthor = Settings.config.getBoolean("jobs.active-post-statistics.count-post-author")
     val stateTtl = FlinkUtils.getTtl(windowSize, Settings.config.getInt("data.speedup-factor"))
 
-    val consumerGroup = "active-post-statistics"
-    val commentsStream = streams.comments() // Some(consumerGroup))
-    val postsStream = streams.posts() //Some(consumerGroup))
-    val likesStream = streams.likes() //Option(consumerGroup))
+    val kafkaTopic = KafkaTopics.postStatistics
+
+    val consumerGroup = None // Some("active-post-statistics") // None for csv
+    val commentsStream = streams.comments(consumerGroup)
+    val postsStream = streams.posts(consumerGroup)
+    val likesStream = streams.likes(consumerGroup)
 
     val statsStream = statisticsStream(
       commentsStream, postsStream, likesStream,
@@ -25,9 +31,7 @@ object ActivePostStatisticsJob extends FlinkStreamingJob {
 
     statsStream
       .keyBy(_.postId)
-      .addSink(FlinkUtils.createKafkaProducer[PostStatistics](
-        "mvrs_poststatistics",
-        Settings.config.getString("kafka.brokers")))
+      .addSink(kafkaTopic.producer())
 
     env.execute("write post statistics to elastic search")
   }

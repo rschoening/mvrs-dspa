@@ -1,31 +1,23 @@
 package org.mvrs.dspa.jobs.activeposts
 
-import java.util.Properties
-
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.Settings
 import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.model.PostStatistics
+import org.mvrs.dspa.streams.KafkaTopics
 import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.utils.elastic.ElasticSearchNode
 
 
 object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob {
   def execute(): Unit = {
-    val kafkaBrokers = Settings.config.getString("kafka.brokers")
     implicit val esNodes: Seq[ElasticSearchNode] = Settings.elasticSearchNodes
 
     ElasticSearchIndexes.activePostStatistics.create()
 
-    val props = new Properties()
-    props.setProperty("bootstrap.servers", kafkaBrokers)
-    props.setProperty("group.id", "test")
-    props.setProperty("isolation.level", "read_committed")
-
-    val source = FlinkUtils.createKafkaConsumer[PostStatistics]("mvrs_poststatistics", props)
-
-    val postStatisticsStream = env.addSource(source)
+    val postStatisticsStream: DataStream[PostStatistics] =
+      env.addSource(KafkaTopics.postStatistics.consumer("move-post-statistics"))
 
     val enrichedStream: DataStream[(PostStatistics, String, String)] = enrichPostStatistics(postStatisticsStream)
 
