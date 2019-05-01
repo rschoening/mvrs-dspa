@@ -4,11 +4,14 @@ import java.util.Date
 
 import com.sksamuel.avro4s._
 import org.apache.avro.Schema
+import org.apache.flink.api.common.typeinfo.TypeInformation
 
 object AvroUtils {
   implicit val dateSchemaFor: DateSchemaFor = new DateSchemaFor
   implicit val dateEncoder: DateEncoder = new DateEncoder
   implicit val dateDecoder: DateDecoder = new DateDecoder
+
+  def getSchema[T: Decoder : TypeInformation](implicit schemaFor: SchemaFor[T]): Schema = schemaFor.schema
 
   def parseSchema(schemaJSon: String): Schema = new Schema.Parser().parse(schemaJSon)
 
