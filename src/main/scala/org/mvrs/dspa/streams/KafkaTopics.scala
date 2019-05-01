@@ -3,7 +3,7 @@ package org.mvrs.dspa.streams
 import org.apache.flink.api.scala._
 import org.mvrs.dspa.Settings
 import org.mvrs.dspa.model.{CommentEvent, LikeEvent, PostEvent, PostStatistics}
-import org.mvrs.dspa.utils.{KafkaCluster, KafkaTopic}
+import org.mvrs.dspa.utils.kafka.{KafkaCluster, KafkaTopic}
 
 object KafkaTopics {
   private val cluster = new KafkaCluster(Settings.config.getString("kafka.brokers"))

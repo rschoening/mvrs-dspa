@@ -5,11 +5,11 @@ import com.sksamuel.elastic4s.http.get.GetResponse
 import db.RecommendationIndexITSuite._
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.test.util.AbstractTestBase
-import org.junit.{Ignore, Test}
 import org.junit.experimental.categories.Category
+import org.junit.{Ignore, Test}
 import org.mvrs.dspa.Settings
 import org.mvrs.dspa.db.RecommendationsIndex
-import org.mvrs.dspa.utils.ElasticSearchUtils
+import org.mvrs.dspa.utils.elastic
 import org.scalatest.Assertions._
 
 @Category(Array(classOf[categories.ElasticSearchTests]))
@@ -37,7 +37,7 @@ class RecommendationIndexITSuite extends AbstractTestBase {
     env.execute("test")
 
     // read back the last inserted record
-    val client = ElasticSearchUtils.createClient(Settings.elasticSearchNodes: _*)
+    val client = elastic.createClient(Settings.elasticSearchNodes: _*)
 
     import com.sksamuel.elastic4s.http.ElasticDsl._
     val response: Response[GetResponse] = client.execute {

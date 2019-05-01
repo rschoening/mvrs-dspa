@@ -7,7 +7,7 @@ import org.apache.flink.api.scala._
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.runtime.concurrent.Executors
 import org.apache.flink.streaming.api.functions.async.{ResultFuture, RichAsyncFunction}
-import org.mvrs.dspa.utils.ElasticSearchUtils
+import org.mvrs.dspa.utils.elastic
 
 import scala.concurrent.ExecutionContext
 
@@ -19,7 +19,7 @@ abstract class AsyncElasticSearchFunction[IN, OUT: TypeInformation](nodes: Elast
 
   private var client: Option[ElasticClient] = None
 
-  override def open(parameters: Configuration): Unit = client = Some(ElasticSearchUtils.createClient(nodes: _*))
+  override def open(parameters: Configuration): Unit = client = Some(elastic.createClient(nodes: _*))
 
   override def close(): Unit = {
     client.foreach(_.close())

@@ -2,7 +2,6 @@ package org.mvrs.dspa.utils.elastic
 
 import com.sksamuel.elastic4s.http.ElasticDsl._
 import com.sksamuel.elastic4s.mappings.FieldDefinition
-import org.mvrs.dspa.utils.ElasticSearchUtils
 
 /**
   * Base class for elastic search index gateways, with support for index creation and building stream sinks
@@ -14,9 +13,9 @@ abstract class ElasticSearchIndex(val indexName: String, nodes: ElasticSearchNod
   val typeName = s"$indexName-type" // type name derived, now that ES supports only one type per index
 
   def create(dropFirst: Boolean = true): Unit = {
-    val client = ElasticSearchUtils.createClient(nodes: _*)
+    val client = createClient(nodes: _*)
     try {
-      if (dropFirst) ElasticSearchUtils.dropIndex(client, indexName)
+      if (dropFirst) dropIndex(client, indexName)
 
       client.execute {
         createIndex(indexName)

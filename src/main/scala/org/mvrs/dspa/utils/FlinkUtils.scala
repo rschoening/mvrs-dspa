@@ -94,7 +94,7 @@ object FlinkUtils {
     val producer = new FlinkKafkaProducer[T](
       topicId,
       serializationSchema,
-      KafkaUtils.connectionProperties(bootstrapServers),
+      kafka.connectionProperties(bootstrapServers),
       customPartitioner
     )
 
