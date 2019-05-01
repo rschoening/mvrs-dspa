@@ -1,7 +1,5 @@
 package org.mvrs.dspa
 
-import java.util.Properties
-
 import kantan.csv.RowDecoder
 import org.apache.flink.api.common.time
 import org.apache.flink.api.common.time.Time
@@ -162,9 +160,7 @@ package object streams {
 
   def commentsFromKafka(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)
                        (implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] = {
-    val commentsSource = FlinkUtils.createKafkaConsumer("comments", createTypeInformation[CommentEvent],
-      getKafkaConsumerProperties(consumerGroup))
-
+    val commentsSource = KafkaTopics.comments.consumer(consumerGroup)
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
 
     env.addSource(commentsSource)
@@ -175,9 +171,7 @@ package object streams {
 
   def postsFromKafka(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)
                     (implicit env: StreamExecutionEnvironment): DataStream[PostEvent] = {
-    val postsSource = FlinkUtils.createKafkaConsumer("posts", createTypeInformation[PostEvent],
-      getKafkaConsumerProperties(consumerGroup))
-
+    val postsSource = KafkaTopics.posts.consumer(consumerGroup)
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
 
     env.addSource(postsSource)
@@ -188,25 +182,13 @@ package object streams {
 
   def likesFromKafka(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)
                     (implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
-    val likesSource = FlinkUtils.createKafkaConsumer("likes", createTypeInformation[LikeEvent],
-      getKafkaConsumerProperties(consumerGroup))
-
+    val likesSource = KafkaTopics.likes.consumer(consumerGroup)
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
 
     env.addSource(likesSource)
       .keyBy(_.postId) // only for scaled replay function (timer)
       .process(new ScaledReplayFunction[Long, LikeEvent](_.timestamp, speedupFactor, randomDelay))
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[LikeEvent](maxOutOfOrderness, _.timestamp))
-  }
-
-  private def getKafkaConsumerProperties(consumerGroup: String) = {
-
-    val props = new Properties()
-    props.setProperty("bootstrap.servers", Settings.config.getString("kafka.brokers"))
-    props.setProperty("group.id", consumerGroup)
-    props.setProperty("isolation.level", "read_committed")
-
-    props
   }
 
   private def getMaxOutOfOrderness(speedupFactor: Int, randomDelay: Int): time.Time =

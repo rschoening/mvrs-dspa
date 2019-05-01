@@ -16,7 +16,6 @@ import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrderness
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer, FlinkKafkaProducer}
-import org.apache.kafka.clients.producer.ProducerConfig
 
 import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
@@ -89,19 +88,22 @@ object FlinkUtils {
                              bootstrapServers: String,
                              serializationSchema: SerializationSchema[T],
                              partitioner: Option[FlinkKafkaPartitioner[T]]): FlinkKafkaProducer[T] = {
-    val props = new Properties()
-    props.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers)
-
     // if no partitioner is specified, use the default Kafka partitioner (round-robin) instead of the FlinkFixedPartitioner
-    val part: Optional[FlinkKafkaPartitioner[T]] = Optional.ofNullable(partitioner.orNull)
+    val customPartitioner: Optional[FlinkKafkaPartitioner[T]] = Optional.ofNullable(partitioner.orNull)
 
-    val producer = new FlinkKafkaProducer[T](topicId, serializationSchema, props, part)
+    val producer = new FlinkKafkaProducer[T](
+      topicId,
+      serializationSchema,
+      KafkaUtils.connectionProperties(bootstrapServers),
+      customPartitioner
+    )
 
     // TODO ensure transactional writes
 
     producer.setWriteTimestampToKafka(false) // TODO not sure if kafka timestamps will be of any use - deactivate for now
     producer
   }
+
 
   def readCsv[T: ClassTag](path: String)(implicit env: ExecutionEnvironment, typeInformation: TypeInformation[T]): DataSet[T] =
     env.readCsvFile[T](path, fieldDelimiter = "|", ignoreFirstLine = true)

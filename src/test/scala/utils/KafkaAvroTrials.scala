@@ -1,7 +1,5 @@
 package utils
 
-import java.util.Properties
-
 import org.apache.commons.lang3.StringUtils
 import org.apache.flink.api.scala._
 import org.apache.flink.formats.avro.AvroRowSerializationSchema
@@ -10,12 +8,12 @@ import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 import org.apache.flink.table.api.scala._
 import org.apache.flink.table.api.{Table, TableEnvironment}
 import org.apache.flink.test.util.AbstractTestBase
-import org.junit.{Ignore, Test}
 import org.junit.experimental.categories.Category
+import org.junit.{Ignore, Test}
 import org.mvrs.dspa.Settings
-import org.mvrs.dspa.utils.FlinkUtils
+import org.mvrs.dspa.utils.avro.AvroUtils
 import org.mvrs.dspa.utils.avro.AvroUtils.{DateDecoder, DateEncoder, DateSchemaFor}
-import org.mvrs.dspa.utils.avro.{Avro4sDeserializationSchema, Avro4sSerializationSchema, AvroUtils}
+import org.mvrs.dspa.utils.{FlinkUtils, KafkaCluster, KafkaTopic}
 
 @Category(Array(classOf[categories.KafkaTests]))
 class KafkaAvroTrials extends AbstractTestBase {
@@ -24,14 +22,18 @@ class KafkaAvroTrials extends AbstractTestBase {
   implicit val dateEncoder: DateEncoder = new DateEncoder
   implicit val dateDecoder: DateDecoder = new DateDecoder
 
+  val cluster = new KafkaCluster(Settings.config.getString("kafka.brokers"))
+
   // TODO
-  // - compare performance with writing plain case classes - almost exactly the same
   // - compare memory consumption
   // - on deserialization: check first bytes (0 + int?),
 
   @Ignore("requires Kafka broker on default port, topic mvrs_posts_test")
   @Test
   def write(): Unit = {
+    val topic = new KafkaTopic[TestPostEvent]("mvrs_posts_test", cluster)
+    if (!topic.exists()) topic.create(3, 1)
+
     implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.setParallelism(3)
@@ -40,15 +42,17 @@ class KafkaAvroTrials extends AbstractTestBase {
 
     // response time appears to be almost identical for avro and direct case class ser. (53 to 64 secs per 500000 records, running on battery)
 
-    val serializer = Avro4sSerializationSchema[TestPostEvent]
     // val serializer = new TypeInformationSerializationSchema[PostEvent](createTypeInformation[PostEvent], env.getConfig)
-    stream.addSink(FlinkUtils.createKafkaProducer("mvrs_posts_test", Settings.config.getString("kafka.brokers"), serializer, None))
+    stream.addSink(topic.producer())
     env.execute("test")
   }
 
   @Ignore("requires Kafka broker on default port, topic mvrs_posts_test")
   @Test
   def writeViaRow(): Unit = {
+    val topic = new KafkaTopic[TestPostEvent]("mvrs_posts_test", cluster)
+    if (!topic.exists()) topic.create(3, 1)
+
     implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.setParallelism(3)
@@ -69,8 +73,7 @@ class KafkaAvroTrials extends AbstractTestBase {
 
     // table.javaStream.print
     table.javaStream.addSink(FlinkUtils.createKafkaProducer(
-      "mvrs_posts_test",
-      Settings.config.getString("kafka.brokers"),
+      topic.name, topic.cluster.servers,
       new AvroRowSerializationSchema(schema.toString),
       None))
 
@@ -93,17 +96,14 @@ class KafkaAvroTrials extends AbstractTestBase {
   @Ignore("requires Kafka broker on default port, topic mvrs_posts_test. NOTE: test does not terminate, reading from kafka topic\"")
   @Test
   def read(): Unit = {
+    val topic = new KafkaTopic("mvrs_posts_test", cluster)
+    if (!topic.exists()) topic.create(3, 1)
+
     implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.setParallelism(3)
 
-    val props = new Properties()
-    props.setProperty("bootstrap.servers", Settings.config.getString("kafka.brokers"))
-
-    props.setProperty("group.id", "test")
-    props.setProperty("isolation.level", "read_committed")
-
-    val stream = env.addSource(FlinkUtils.createKafkaConsumer("mvrs_posts_test", props, Avro4sDeserializationSchema[TestPostEvent]))
+    val stream = env.addSource(topic.consumer("test"))
 
     val start = System.currentTimeMillis()
 
@@ -138,17 +138,17 @@ sealed trait TestForumEvent extends TestTimestampedEvent {
 }
 
 final case class TestPostEvent(postId: Long,
-                           personId: Long,
-                           creationDate: java.sql.Timestamp,
-                           imageFile: Option[String],
-                           locationIP: Option[String],
-                           browserUsed: Option[String],
-                           language: Option[String],
-                           content: Option[String],
-                           // NOTE Set not supported by AvroRowSerializationSchema, exclude for preliminary test
-                           //                              tags: Set[Int], // requires custom cell decoder
-                           forumId: Long,
-                           placeId: Int) extends TestForumEvent {
+                               personId: Long,
+                               creationDate: java.sql.Timestamp,
+                               imageFile: Option[String],
+                               locationIP: Option[String],
+                               browserUsed: Option[String],
+                               language: Option[String],
+                               content: Option[String],
+                               // NOTE Set not supported by AvroRowSerializationSchema, exclude for preliminary test
+                               //                              tags: Set[Int], // requires custom cell decoder
+                               forumId: Long,
+                               placeId: Int) extends TestForumEvent {
 }
 
 
