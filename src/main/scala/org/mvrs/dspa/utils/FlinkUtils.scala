@@ -58,7 +58,7 @@ object FlinkUtils {
     )
 
   def createStreamExecutionEnvironment(localWithUI: Boolean = false): StreamExecutionEnvironment = {
-    // TODO include metrics always? or rely on flink config when running in cluster?
+    // TODO include metrics always? or rely on flink config file only when running in cluster?
     if (localWithUI) {
       val config = new Configuration
       config.setBoolean(ConfigConstants.LOCAL_START_WEBSERVER, true)
@@ -139,31 +139,6 @@ object FlinkUtils {
       case xs@_ => xs.asScala.toSeq
     }
 
-  //  def createAvroKafkaProducer(topicId: String,
-  //                             bootstrapServers: String,
-  //                             partitioner: Option[FlinkKafkaPartitioner[Row]] = None)
-  //                            (implicit env: StreamExecutionEnvironment): FlinkKafkaProducer[Row] = {
-  //    val props = new Properties()
-  //    props.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers)
-  //
-  //    // if no partitioner is specified, use the default Kafka partitioner (round-robin) instead of the FlinkFixedPartitioner
-  //    val part: Optional[FlinkKafkaPartitioner[Row]] = Optional.ofNullable(partitioner.orNull)
-  //
-  //    val schema: Schema = SchemaBuilder.record("a").namespace("x")
-  //      .fields()
-  //      .name("f1").`type`("int").withDefault(1)
-  //      .name("f2").`type`("int").withDefault(1)
-  //      .endRecord()
-  //
-  //    val producer = new FlinkKafkaProducer[Row](topicId, // target topic
-  //      new AvroRowSerializationSchema("") ,
-  //      props, part)
-  //
-  //    // TODO ensure transactional writes
-  //
-  //    producer.setWriteTimestampToKafka(false) // TODO not sure if kafka timestamps will be of any use - deactivate for now
-  //    producer
-  //  }
   def getNormalDelayMillis(rand: scala.util.Random, maximumDelayMilliseconds: Long): Long = {
     var delay = -1L
     val x = maximumDelayMilliseconds / 2
