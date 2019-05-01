@@ -12,7 +12,7 @@ object LoadLikeEventsJob extends FlinkStreamingJob {
     val kafkaTopic = "mvrs_likes"
     val stream = streams.likes()
 
-    stream.addSink(FlinkUtils.createKafkaProducer(kafkaTopic, Settings.config.getString("kafka.brokers"), createTypeInformation[LikeEvent]))
+    stream.addSink(FlinkUtils.createKafkaProducer[LikeEvent](kafkaTopic, Settings.config.getString("kafka.brokers")))
 
     // execute program
     env.execute("Import Like events from csv file to Kafka")

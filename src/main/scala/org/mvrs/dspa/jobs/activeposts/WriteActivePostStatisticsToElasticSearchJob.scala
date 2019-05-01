@@ -23,7 +23,7 @@ object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob {
     props.setProperty("group.id", "test")
     props.setProperty("isolation.level", "read_committed")
 
-    val source = FlinkUtils.createKafkaConsumer("mvrs_poststatistics", createTypeInformation[PostStatistics], props)
+    val source = FlinkUtils.createKafkaConsumer[PostStatistics]("mvrs_poststatistics", props)
 
     val postStatisticsStream = env.addSource(source)
 

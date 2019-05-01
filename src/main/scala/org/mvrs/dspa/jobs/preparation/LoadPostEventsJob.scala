@@ -11,7 +11,7 @@ object LoadPostEventsJob extends FlinkStreamingJob {
     val kafkaTopic = "mvrs_posts"
     val stream = streams.posts()
 
-    stream.addSink(FlinkUtils.createKafkaProducer(kafkaTopic, Settings.config.getString("kafka.brokers"), createTypeInformation[PostEvent]))
+    stream.addSink(FlinkUtils.createKafkaProducer[PostEvent](kafkaTopic, Settings.config.getString("kafka.brokers")))
 
     // execute program
     env.execute("Import post events from csv file to Kafka")

@@ -25,10 +25,9 @@ object ActivePostStatisticsJob extends FlinkStreamingJob {
 
     statsStream
       .keyBy(_.postId)
-      .addSink(FlinkUtils.createKafkaProducer(
+      .addSink(FlinkUtils.createKafkaProducer[PostStatistics](
         "mvrs_poststatistics",
-        Settings.config.getString("kafka.brokers"),
-        createTypeInformation[PostStatistics]))
+        Settings.config.getString("kafka.brokers")))
 
     env.execute("write post statistics to elastic search")
   }
