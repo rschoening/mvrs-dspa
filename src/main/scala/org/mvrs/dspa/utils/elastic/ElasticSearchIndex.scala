@@ -1,9 +1,8 @@
-package org.mvrs.dspa.elastic
+package org.mvrs.dspa.utils.elastic
 
 import com.sksamuel.elastic4s.http.ElasticDsl._
 import com.sksamuel.elastic4s.mappings.FieldDefinition
 import org.mvrs.dspa.utils.ElasticSearchUtils
-
 
 /**
   * Base class for elastic search index gateways, with support for index creation and building stream sinks

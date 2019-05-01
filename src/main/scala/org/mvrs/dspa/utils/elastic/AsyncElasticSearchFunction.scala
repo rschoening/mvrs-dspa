@@ -1,4 +1,4 @@
-package org.mvrs.dspa.elastic
+package org.mvrs.dspa.utils.elastic
 
 import com.sksamuel.elastic4s.http.ElasticClient
 import org.apache.flink.api.common.typeinfo.TypeInformation

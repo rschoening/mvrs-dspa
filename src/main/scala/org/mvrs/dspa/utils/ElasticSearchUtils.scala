@@ -2,7 +2,7 @@ package org.mvrs.dspa.utils
 
 import com.sksamuel.elastic4s.http.index.admin.DeleteIndexResponse
 import com.sksamuel.elastic4s.http.{ElasticClient, ElasticNodeEndpoint, ElasticProperties, Response}
-import org.mvrs.dspa.elastic.ElasticSearchNode
+import org.mvrs.dspa.utils.elastic.ElasticSearchNode
 
 object ElasticSearchUtils {
   def createClient(nodes: ElasticSearchNode*) = ElasticClient(ElasticProperties(nodes.map(createEndpoint)))

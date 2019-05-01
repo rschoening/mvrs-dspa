@@ -1,7 +1,5 @@
 package org.mvrs.dspa.jobs.clustering
 
-import java.util.concurrent.TimeUnit
-
 import com.google.common.base.Splitter
 import org.apache.flink.api.common.serialization.SimpleStringEncoder
 import org.apache.flink.api.common.state.MapStateDescriptor

@@ -2,7 +2,7 @@ package org.mvrs.dspa.db
 
 import com.sksamuel.elastic4s.http.ElasticDsl.{dateField, keywordField, textField}
 import com.sksamuel.elastic4s.mappings.FieldDefinition
-import org.mvrs.dspa.elastic.{ElasticSearchIndexWithUpsertOutputFormat, ElasticSearchNode}
+import org.mvrs.dspa.utils.elastic.{ElasticSearchIndexWithUpsertOutputFormat, ElasticSearchNode}
 
 class ForumFeaturesIndex(indexName: String, nodes: ElasticSearchNode*)
   extends ElasticSearchIndexWithUpsertOutputFormat[(Long, String, List[String])](indexName, nodes: _*) {

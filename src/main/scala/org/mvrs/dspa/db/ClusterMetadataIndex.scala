@@ -4,8 +4,8 @@ import java.util
 
 import com.sksamuel.elastic4s.http.ElasticDsl.{dateField, doubleField, intField, keywordField, nestedField}
 import com.sksamuel.elastic4s.mappings.FieldDefinition
-import org.mvrs.dspa.elastic.{ElasticSearchIndexSink, ElasticSearchNode}
 import org.mvrs.dspa.model.{Cluster, ClusterMetadata}
+import org.mvrs.dspa.utils.elastic.{ElasticSearchIndexSink, ElasticSearchNode}
 
 import scala.collection.JavaConverters._
 

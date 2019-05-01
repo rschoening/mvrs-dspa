@@ -2,8 +2,8 @@ package org.mvrs.dspa.db
 
 import com.sksamuel.elastic4s.http.ElasticDsl._
 import com.sksamuel.elastic4s.mappings.FieldDefinition
-import org.mvrs.dspa.elastic.{ElasticSearchIndexSink, ElasticSearchNode}
 import org.mvrs.dspa.model.PostFeatures
+import org.mvrs.dspa.utils.elastic.{ElasticSearchIndexSink, ElasticSearchNode}
 
 import scala.collection.JavaConverters._
 

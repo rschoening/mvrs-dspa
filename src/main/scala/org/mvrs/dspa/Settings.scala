@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import com.typesafe.config.{Config, ConfigFactory}
 import org.apache.flink.api.common.time.Time
-import org.mvrs.dspa.elastic.ElasticSearchNode
+import org.mvrs.dspa.utils.elastic.ElasticSearchNode
 
 import scala.collection.JavaConverters._
 

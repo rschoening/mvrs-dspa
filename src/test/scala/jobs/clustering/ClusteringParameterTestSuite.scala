@@ -37,7 +37,7 @@ class ClusteringParameterTestSuite extends FlatSpec with Matchers {
 
   private def getErrorMessage(result: List[Either[Throwable, ClusteringParameter]]): String = {
     result match {
-      case List(Left(e : Exception)) => e.getMessage
+      case List(Left(e: Exception)) => e.getMessage
       case _ => ""
     }
   }

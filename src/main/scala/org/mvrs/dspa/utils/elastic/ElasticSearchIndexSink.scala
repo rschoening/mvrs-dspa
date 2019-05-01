@@ -1,4 +1,4 @@
-package org.mvrs.dspa.elastic
+package org.mvrs.dspa.utils.elastic
 
 import org.apache.flink.api.common.functions.RuntimeContext
 import org.apache.flink.streaming.connectors.elasticsearch.{ElasticsearchSinkFunction, RequestIndexer}

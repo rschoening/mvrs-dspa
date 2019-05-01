@@ -7,11 +7,11 @@ import org.apache.flink.api.common.state.{MapStateDescriptor, StateTtlConfig}
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.db.ElasticSearchIndexes
-import org.mvrs.dspa.elastic.ElasticSearchNode
 import org.mvrs.dspa.functions.CollectSetFunction
 import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.model.{CommentEvent, LikeEvent, PostEvent}
 import org.mvrs.dspa.utils.FlinkUtils
+import org.mvrs.dspa.utils.elastic.ElasticSearchNode
 import org.mvrs.dspa.{Settings, streams}
 
 import scala.collection.JavaConverters._
