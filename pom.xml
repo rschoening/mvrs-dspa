@@ -97,7 +97,15 @@ under the License.
 <!--            <version>${flink.version}</version>-->
 <!--        </dependency>-->
 
-		<!-- Add connector dependencies here. They must be in the default scope (compile). -->
+        <!-- kafka - to access admin tools -->
+        <!-- https://mvnrepository.com/artifact/org.apache.kafka/kafka -->
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka_${scala.binary.version}</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+
+        <!-- Add connector dependencies here. They must be in the default scope (compile). -->
 
         <!-- https://mvnrepository.com/artifact/org.apache.flink/flink-connector-kafka -->
         <dependency>
