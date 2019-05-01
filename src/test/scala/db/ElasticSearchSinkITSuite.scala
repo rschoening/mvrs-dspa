@@ -3,7 +3,7 @@ package db
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
 import org.apache.flink.test.util.AbstractTestBase
-import org.junit.Test
+import org.junit.{Ignore, Test}
 import org.junit.experimental.categories.Category
 import org.mvrs.dspa.Settings
 import org.mvrs.dspa.db.ActivePostStatisticsIndex
@@ -12,6 +12,7 @@ import org.mvrs.dspa.model.PostStatistics
 @Category(Array(classOf[categories.ElasticSearchTests]))
 class ElasticSearchSinkITSuite extends AbstractTestBase {
 
+  @Ignore("requires ElasticSearch")
   @Test
   def baselinePerformance(): Unit = {
     val index = new ActivePostStatisticsIndex("mvrs-test-active-post-statistics", Settings.elasticSearchNodes: _*)

@@ -5,7 +5,7 @@ import com.sksamuel.elastic4s.http.get.GetResponse
 import db.RecommendationIndexITSuite._
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.test.util.AbstractTestBase
-import org.junit.Test
+import org.junit.{Ignore, Test}
 import org.junit.experimental.categories.Category
 import org.mvrs.dspa.Settings
 import org.mvrs.dspa.db.RecommendationsIndex
@@ -15,6 +15,7 @@ import org.scalatest.Assertions._
 @Category(Array(classOf[categories.ElasticSearchTests]))
 class RecommendationIndexITSuite extends AbstractTestBase {
 
+  @Ignore("requires ElasticSearch")
   @Test
   def testUpsertToElasticSearch(): Unit = {
 
