@@ -12,7 +12,7 @@ object PostFeaturesJob extends FlinkStreamingJob(parallelism = 4) {
     ElasticSearchIndexes.postFeatures.create()
 
     // val postsStream = streams.posts(Some("post-features"))
-    val postsStream = streams.posts()
+    val postsStream = streams.posts(Some("post-features"))
 
     val postsWithForumFeatures: DataStream[(PostEvent, String, Set[String])] = lookupForumFeatures(postsStream)
 
