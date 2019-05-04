@@ -10,7 +10,9 @@ import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.utils.elastic.ElasticSearchNode
 
 
-object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob {
+object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob(enableGenericTypes = true) {
+  // NOTE generic types have to be enabled due to kafka consumer
+
   def execute(): Unit = {
     implicit val esNodes: Seq[ElasticSearchNode] = Settings.elasticSearchNodes
 
