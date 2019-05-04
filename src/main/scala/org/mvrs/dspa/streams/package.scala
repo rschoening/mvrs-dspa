@@ -83,8 +83,7 @@ package object streams {
     kafkaConsumerGroup.map(
       commentsFromKafka(
         _,
-        Settings.config.getInt("data.speedup-factor"),
-        Settings.config.getInt("data.random-delay"),
+        Settings.config.getInt("data.speedup-factor")
       )
     ).getOrElse(
       commentsFromCsv(
@@ -99,8 +98,7 @@ package object streams {
     kafkaConsumerGroup.map(
       postsFromKafka(
         _,
-        Settings.config.getInt("data.speedup-factor"),
-        Settings.config.getInt("data.random-delay"),
+        Settings.config.getInt("data.speedup-factor")
       )
     ).getOrElse(
       postsFromCsv(
@@ -115,8 +113,7 @@ package object streams {
     kafkaConsumerGroup.map(
       likesFromKafka(
         _,
-        Settings.config.getInt("data.speedup-factor"),
-        Settings.config.getInt("data.random-delay"),
+        Settings.config.getInt("data.speedup-factor")
       )
     ).getOrElse(
       likesFromCsv(
