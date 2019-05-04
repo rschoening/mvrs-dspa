@@ -7,6 +7,7 @@ import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.TimerService
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction
 import org.apache.flink.util.Collector
+import org.mvrs.dspa.jobs.activeposts.PostStatisticsFunction._
 import org.mvrs.dspa.model.{Event, EventType, PostStatistics}
 import org.slf4j.LoggerFactory
 
@@ -172,13 +173,27 @@ class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, coun
     if (bucketMapState.contains(bucketTimestamp))
       bucketMapState.get(bucketTimestamp)
     else {
-      val newBucket = Bucket()
+      val newBucket = Bucket(countPostAuthor)
       bucketMapState.put(bucketTimestamp, newBucket)
       newBucket
     }
   }
 
-  case class Bucket() {
+
+}
+
+object PostStatisticsFunction {
+  def getBucketForTimestamp(timestamp: Long, exclusiveUpperBound: Long, bucketSize: Long): Long = {
+    require(bucketSize > 0, "invalid bucket size")
+
+    val offset = exclusiveUpperBound % bucketSize
+    val index = math.floor((timestamp - offset).toDouble / bucketSize).toLong
+    offset + (index + 1) * bucketSize
+  }
+
+  // NOTE: to ensure seriazability, case classes should be in companion object.
+  // This ensures that there are no references to containing class
+  case class Bucket(countPostAuthor: Boolean) {
     val persons: mutable.Set[Long] = mutable.Set()
     var commentCount: Int = 0
     var replyCount: Int = 0
@@ -206,14 +221,4 @@ class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, coun
     }
   }
 
-}
-
-object PostStatisticsFunction {
-  def getBucketForTimestamp(timestamp: Long, exclusiveUpperBound: Long, bucketSize: Long): Long = {
-    require(bucketSize > 0, "invalid bucket size")
-
-    val offset = exclusiveUpperBound % bucketSize
-    val index = math.floor((timestamp - offset).toDouble / bucketSize).toLong
-    offset + (index + 1) * bucketSize
-  }
 }
