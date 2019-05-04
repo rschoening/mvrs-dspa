@@ -6,7 +6,11 @@ import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
 
-class EventScheduler[OUT](speedupFactor: Double, watermarkIntervalMillis: Long, maximumDelayMillis: Long, delay: OUT => Long) {
+class EventScheduler[OUT](speedupFactor: Double,
+                          watermarkIntervalMillis: Long,
+                          maximumDelayMillis: Long,
+                          delay: OUT => Long,
+                          expectOrdered: Boolean = true) {
   require(watermarkIntervalMillis > 0, s"invalid watermark interval: $watermarkIntervalMillis")
   require(speedupFactor >= 0, s"invalid speedup factor: $speedupFactor")
 
@@ -20,20 +24,16 @@ class EventScheduler[OUT](speedupFactor: Double, watermarkIntervalMillis: Long, 
 
   def schedule(event: OUT, eventTime: Long): Unit = {
     // TODO this can be violated when reading from multiple kafka topics
-    assert(eventTime >= maximumEventTime, s"event time $eventTime < maximum event time $maximumEventTime")
+    if (expectOrdered) assert(eventTime >= maximumEventTime, s"event time $eventTime < maximum $maximumEventTime")
 
-    maximumEventTime = eventTime
+    maximumEventTime = math.max(eventTime, maximumEventTime)
 
     val delayMillis = delay(event) // in processing time, but at the rate of the event time (i.e. subject to speedup)
     assert(delayMillis <= maximumDelayMillis, s"delay $delayMillis exceeds maximum $maximumDelayMillis")
 
-    if (firstEventTime == Long.MinValue) {
-      firstEventTime = eventTime
-    }
+    if (firstEventTime == Long.MinValue) firstEventTime = eventTime
 
-    if (queue.isEmpty) {
-      scheduleWatermark(eventTime)
-    }
+    if (queue.isEmpty) scheduleWatermark(eventTime)
 
     queue += ((eventTime + delayMillis, Left((event, eventTime)))) // schedule the event
   }

@@ -12,14 +12,16 @@ import org.mvrs.dspa.utils.FlinkUtils
 class ScaledReplayFunction[K, I](extractEventTime: I => Long,
                                  speedupFactor: Double,
                                  maximumDelayMillis: Long,
-                                 delay: I => Long) extends KeyedProcessFunction[K, I, I] {
-  @volatile private lazy val scheduler = new EventScheduler[I](speedupFactor, 10000, maximumDelayMillis, delay)
+                                 delay: I => Long, expectOrdered: Boolean) extends KeyedProcessFunction[K, I, I] {
+  @volatile private lazy val scheduler = new EventScheduler[I](speedupFactor, 10000, maximumDelayMillis, delay, expectOrdered)
 
-  def this(extractEventTime: I => Long, speedupFactor: Double) = this(extractEventTime, speedupFactor, 0, (_: I) => 0)
+  def this(extractEventTime: I => Long, speedupFactor: Double, expectOrdered: Boolean) =
+    this(extractEventTime, speedupFactor, 0, (_: I) => 0, expectOrdered)
 
-  def this(extractEventTime: I => Long, speedupFactor: Double, maximumDelayMilliseconds: Long) =
+  def this(extractEventTime: I => Long, speedupFactor: Double, maximumDelayMilliseconds: Long, expectOrdered: Boolean) =
     this(extractEventTime, speedupFactor, maximumDelayMilliseconds,
-      (_: I) => FlinkUtils.getNormalDelayMillis(rand, maximumDelayMilliseconds))
+      (_: I) => FlinkUtils.getNormalDelayMillis(rand, maximumDelayMilliseconds),
+      expectOrdered)
 
   override def processElement(value: I, ctx: KeyedProcessFunction[K, I, I]#Context, out: Collector[I]): Unit = {
     val eventTime: Long = extractEventTime(value)

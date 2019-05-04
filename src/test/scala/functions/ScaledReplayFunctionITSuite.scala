@@ -27,7 +27,7 @@ class ScaledReplayFunctionITSuite extends AbstractTestBase {
 
     val stream: DataStream[(Long, Long)] = env.fromCollection(eventTimes)
       .keyBy(_ => 0L)
-      .process(new ScaledReplayFunction[Long, Long](identity, 1, 0))
+      .process(new ScaledReplayFunction[Long, Long](identity, 1, 0, expectOrdered = true))
       .map((_, System.currentTimeMillis))
 
     val list = DataStreamUtils.collect(stream.javaStream).asScala.toList
@@ -66,7 +66,7 @@ class ScaledReplayFunctionITSuite extends AbstractTestBase {
         case 1000L => 2200
         case 2000L => 1300
         case 3000L => 100
-      }))
+      }, expectOrdered = true))
       .map((_, System.currentTimeMillis))
 
     val list = DataStreamUtils.collect(stream.javaStream).asScala.toList
@@ -100,7 +100,7 @@ class ScaledReplayFunctionITSuite extends AbstractTestBase {
 
     val stream: DataStream[(Long, Long)] = env.fromCollection(eventTimes)
       .keyBy(_ => 0L)
-      .process(new ScaledReplayFunction[Long, Long](identity, 1, 100))
+      .process(new ScaledReplayFunction[Long, Long](identity, 1, 100, expectOrdered = true))
       .map((_, System.currentTimeMillis))
 
     val list = DataStreamUtils.collect(stream.javaStream).asScala.toList

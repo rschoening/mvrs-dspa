@@ -165,7 +165,7 @@ package object streams {
 
     env.addSource(commentsSource)
       .keyBy(_.commentId) // only for scaled replay function (timer)
-      .process(new ScaledReplayFunction[Long, CommentEvent](_.timestamp, speedupFactor, randomDelay))
+      .process(new ScaledReplayFunction[Long, CommentEvent](_.timestamp, speedupFactor, randomDelay, false))
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[CommentEvent](maxOutOfOrderness, _.timestamp))
   }
 
@@ -176,7 +176,7 @@ package object streams {
 
     env.addSource(postsSource)
       .keyBy(_.postId) // only for scaled replay function (timer)
-      .process(new ScaledReplayFunction[Long, PostEvent](_.timestamp, speedupFactor, randomDelay))
+      .process(new ScaledReplayFunction[Long, PostEvent](_.timestamp, speedupFactor, randomDelay, false))
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[PostEvent](maxOutOfOrderness, _.timestamp))
   }
 
@@ -187,7 +187,7 @@ package object streams {
 
     env.addSource(likesSource)
       .keyBy(_.postId) // only for scaled replay function (timer)
-      .process(new ScaledReplayFunction[Long, LikeEvent](_.timestamp, speedupFactor, randomDelay))
+      .process(new ScaledReplayFunction[Long, LikeEvent](_.timestamp, speedupFactor, randomDelay, false))
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[LikeEvent](maxOutOfOrderness, _.timestamp))
   }
 
