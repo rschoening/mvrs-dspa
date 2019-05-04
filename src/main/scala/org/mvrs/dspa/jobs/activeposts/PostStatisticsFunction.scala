@@ -156,11 +156,9 @@ class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, coun
       LOG.debug(s"Early event, to future bucket: $value (current window: $windowEnd)")
     }
     else if (value.timestamp < windowEnd - windowSize.toMilliseconds) {
-      LOG.debug(s"Late event, to past bucket: $value (current window: $windowEnd)")
+      LOG.warn(s"Late event, to past bucket: $value (current window: $windowEnd)")
     }
-    else {
-      LOG.debug(s"Regular event, to current bucket: $value")
-    }
+    else LOG.debug(s"Regular event, to current bucket: $value")
   }
 
   private def updateBucket(bucketTimestamp: Long, f: Bucket => Unit): Unit = {
