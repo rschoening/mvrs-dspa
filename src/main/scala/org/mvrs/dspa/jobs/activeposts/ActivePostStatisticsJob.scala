@@ -18,9 +18,9 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
     val countPostAuthor = Settings.config.getBoolean("jobs.active-post-statistics.count-post-author")
     val stateTtl = FlinkUtils.getTtl(windowSize, Settings.config.getInt("data.speedup-factor"))
 
-    val kafkaTopic = KafkaTopics.postStatistics
+    KafkaTopics.postStatistics.create(3, 1, overwrite = true)
 
-    val consumerGroup = None // Some("active-post-statistics") // None for csv
+    val consumerGroup = Some("active-post-statistics") // None for csv
     val commentsStream = streams.comments(consumerGroup)
     val postsStream = streams.posts(consumerGroup)
     val likesStream = streams.likes(consumerGroup)
@@ -31,7 +31,7 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
 
     statsStream
       .keyBy(_.postId)
-      .addSink(kafkaTopic.producer())
+      .addSink(KafkaTopics.postStatistics.producer())
 
     env.execute("write post statistics to elastic search")
   }

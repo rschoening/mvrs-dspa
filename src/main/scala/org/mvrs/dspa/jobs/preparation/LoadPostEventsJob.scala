@@ -6,6 +6,8 @@ import org.mvrs.dspa.streams.KafkaTopics
 
 object LoadPostEventsJob extends FlinkStreamingJob {
   def execute(): Unit = {
+    KafkaTopics.posts.create(3, 1, overwrite = true)
+
     streams.posts().addSink(KafkaTopics.posts.producer())
 
     // execute program
