@@ -51,13 +51,15 @@ class KafkaCluster(val servers: String) {
     val timedOut = System.currentTimeMillis() + timeoutMillis
     do {
       Thread.sleep(wait)
-      if (! existsTopic(topicName)) return
+      if (!existsTopic(topicName)) return
     } while (System.currentTimeMillis() < timedOut)
 
     throw new Exception("Topic deletion timed out")
   }
 
-  def createTopic(topicName: String, numPartitions: Int, replicationFactor: Short, timeoutMillis: Int = 5000): Unit = {
+  def createTopic(topicName: String, numPartitions: Int, replicationFactor: Short, timeoutMillis: Int = 5000, overwrite: Boolean = false): Unit = {
+    if (overwrite && existsTopic(topicName, timeoutMillis)) deleteTopic(topicName, timeoutMillis)
+
     LOG.debug(s"creating topic $topicName")
 
     val newTopic = new NewTopic(topicName, numPartitions, replicationFactor)

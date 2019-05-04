@@ -22,8 +22,8 @@ class KafkaTopic[T: Decoder : Encoder : TypeInformation](val name: String, val c
     */
   def delete(timeoutMillis: Int = 5000): Unit = cluster.deleteTopic(name, timeoutMillis)
 
-  def create(numPartitions: Int, replicationFactor: Short, timeoutMillis: Int = 5000): Unit =
-    cluster.createTopic(name, numPartitions, replicationFactor, timeoutMillis)
+  def create(numPartitions: Int, replicationFactor: Short, timeoutMillis: Int = 5000, overwrite: Boolean = false): Unit =
+    cluster.createTopic(name, numPartitions, replicationFactor, timeoutMillis, overwrite)
 
   def producer(partitioner: Option[FlinkKafkaPartitioner[T]] = None): FlinkKafkaProducer[T] =
     FlinkUtils.createKafkaProducer(
