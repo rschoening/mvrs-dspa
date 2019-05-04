@@ -37,7 +37,24 @@ class KafkaCluster(val servers: String) {
     val options = new DeleteTopicsOptions()
     options.timeoutMs(timeoutMillis)
 
+    // NOTE: this requires delete.topic.enable=true
     adminClient.deleteTopics(List(topicName).asJava, options).all.get // wait for all
+
+    // NOTE: the future completes before the topic is fully deleted (and can be safely recreated)
+    // see discussion in https://github.com/confluentinc/confluent-kafka-python/issues/524,
+    // with "best" solution: https://github.com/confluentinc/confluent-kafka-python/issues/524#issuecomment-456808164
+
+    waitForDeletion(topicName, options.timeoutMs())
+  }
+
+  private def waitForDeletion(topicName: String, timeoutMillis: Int, wait: Int = 500): Unit = {
+    val timedOut = System.currentTimeMillis() + timeoutMillis
+    do {
+      Thread.sleep(wait)
+      if (! existsTopic(topicName)) return
+    } while (System.currentTimeMillis() < timedOut)
+
+    throw new Exception("Topic deletion timed out")
   }
 
   def createTopic(topicName: String, numPartitions: Int, replicationFactor: Short, timeoutMillis: Int = 5000): Unit = {
