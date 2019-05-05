@@ -38,7 +38,7 @@ class Avro4sTrials extends FlatSpec with Matchers {
 
     val s = StringUtils.repeat("xyzä$&", 100)
     val deserialized =
-      (0 until 1000000)
+      (0 until 100000)
         .toVector
         .map(i => serializer.serialize(
           PostEvent(i, i * 1000, new java.util.Date(i * 10000), None, None, None, None, Some(s), Set(1, 2, i), i, i)))
