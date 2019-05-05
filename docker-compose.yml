@@ -30,6 +30,10 @@ services:
     command: jobmanager
     environment:
       - JOB_MANAGER_RPC_ADDRESS=jobmanager
+    volumes:
+     - type: bind
+       source: ./data
+       target: /usr/share/flink/data
 
   taskmanager:
     image:  flink:1.7.2-scala_2.12
@@ -43,6 +47,10 @@ services:
       - "jobmanager:jobmanager"
     environment:
       - JOB_MANAGER_RPC_ADDRESS=jobmanager
+    volumes:
+     - type: bind
+       source: ./data
+       target: /usr/share/flink/data
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:6.7.2
