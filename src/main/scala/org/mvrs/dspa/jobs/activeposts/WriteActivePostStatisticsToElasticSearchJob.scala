@@ -34,7 +34,7 @@ object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob(ena
     FlinkUtils.asyncStream(
       postStatisticsStream,
       new AsyncEnrichPostStatisticsFunction(
-        ElasticSearchIndexes.postFeatures.indexName,
+        ElasticSearchIndexes.postInfos.indexName,
         elasticSearchNodes: _*
       )
     )
