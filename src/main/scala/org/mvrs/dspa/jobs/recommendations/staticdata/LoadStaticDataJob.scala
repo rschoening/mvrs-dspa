@@ -1,7 +1,5 @@
 package org.mvrs.dspa.jobs.recommendations.staticdata
 
-import java.nio.file.Paths
-
 import com.twitter.algebird.MinHashSignature
 import org.apache.flink.api.scala.DataSet
 import org.apache.flink.streaming.api.scala._
@@ -12,15 +10,17 @@ import org.mvrs.dspa.jobs.recommendations.{FeaturePrefix, RecommendationUtils}
 import org.mvrs.dspa.utils.FlinkUtils
 
 object LoadStaticDataJob extends FlinkBatchJob {
+  private def path(directory: String, fileName: String): String = s"$directory/$fileName"
+
   def execute(): Unit = {
 
-    val rootPath = Settings.config.getString("data.tables-directory")
-    val hasInterestInTagCsv = Paths.get(rootPath, "person_hasInterest_tag.csv").toString
-    val forumTagsCsv = Paths.get(rootPath, "forum_hasTag_tag.csv").toString
-    val worksAtCsv = Paths.get(rootPath, "person_workAt_organisation.csv").toString
-    val studyAtCsv = Paths.get(rootPath, "person_studyAt_organisation.csv").toString
-    val knownPersonsCsv = Paths.get(rootPath, "person_knows_person.csv").toString
-    val forumsCsv = Paths.get(rootPath, "forum.csv").toString
+    val directory = Settings.config.getString("data.tables-directory")
+    val hasInterestInTagCsv = path(directory, "person_hasInterest_tag.csv")
+    val forumTagsCsv = path(directory, "forum_hasTag_tag.csv")
+    val worksAtCsv = path(directory, "person_workAt_organisation.csv")
+    val studyAtCsv = path(directory, "person_studyAt_organisation.csv")
+    val knownPersonsCsv = path(directory, "person_knows_person.csv")
+    val forumsCsv = path(directory, "forum.csv")
 
     ElasticSearchIndexes.personFeatures.create()
     ElasticSearchIndexes.forumFeatures.create()

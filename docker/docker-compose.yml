@@ -20,32 +20,36 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
       KAFKA_DELETE_TOPIC_ENABLE: "true"
+    # NOTE kafka starts up with no topics - topics are created by flink jobs
+    # this could be changed by specifying persistent volume (NOTE: this is also required for zookeeper,
+    # otherwise topics are effectively gone even if the log files still exist!)
 
   jobmanager:
     image: flink:1.7.2-scala_2.12
     expose:
       - "6123"
-      - "9249" # prometheus metrics
+      - "9249" # to publish prometheus metrics
     ports:
       - "8082:8081" # map to 8082 on host, to differentiate from the dev minicluster UI (on 8081)
     command: jobmanager
     environment:
       - JOB_MANAGER_RPC_ADDRESS=jobmanager
-      - MVRS_DSPA_KAFKA_BROKERS=kafka:9093
-      - MVRS_DSPA_DATA_DIR=/usr/share/flink/data
+      - MVRS_DSPA_KAFKA_BROKERS=kafka:9093         # instead of localhost:9092 when connecting from local machine
+      - MVRS_DSPA_ELASTICSEARCH_NODE=elasticsearch # instead of localhost when connecting from local machine
+      - MVRS_DSPA_DATA_DIR=file:///usr/share/flink/data
     volumes:
       - ./flink/conf/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
       - ./flink/lib/flink-metrics-prometheus-1.7.2.jar:/opt/flink/lib/flink-metrics-prometheus-1.7.2.jar
-      - type: bind
+      - type: bind                                 # bind mapping for test data
         source: ${MVRS_DSPA_DATA_DIR_HOST:-./data} # default: ./data
-        target: /usr/share/flink/data
+        target: /usr/share/flink/data              # path in container
 
   taskmanager:
     image:  flink:1.7.2-scala_2.12
     expose:
       - "6121"
       - "6122"
-      - "9249" # prometheus metrics
+      - "9249" # to publish prometheus metrics
     depends_on:
       - jobmanager
     command: taskmanager
@@ -53,14 +57,15 @@ services:
       - "jobmanager:jobmanager"
     environment:
       - JOB_MANAGER_RPC_ADDRESS=jobmanager
-      - MVRS_DSPA_KAFKA_BROKERS=kafka:9093
-      - MVRS_DSPA_DATA_DIR=/usr/share/flink/data
+      - MVRS_DSPA_KAFKA_BROKERS=kafka:9093         # instead of localhost:9092 when connecting from local machine
+      - MVRS_DSPA_ELASTICSEARCH_NODE=elasticsearch # instead of localhost when connecting from local machine
+      - MVRS_DSPA_DATA_DIR=file:///usr/share/flink/data
     volumes:
       - ./flink/conf/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
       - ./flink/lib/flink-metrics-prometheus-1.7.2.jar:/opt/flink/lib/flink-metrics-prometheus-1.7.2.jar
-      - type: bind
+      - type: bind                                 # bind mapping for test data
         source: ${MVRS_DSPA_DATA_DIR_HOST:-./data} # default: ./data
-        target: /usr/share/flink/data
+        target: /usr/share/flink/data              # path in container
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:6.7.2
@@ -111,9 +116,9 @@ services:
     depends_on:
       - prometheus
     volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/custom.ini:/usr/share/grafana/conf/custom.ini
-      - ./grafana/provisioning/:/etc/grafana/provisioning/
+      - grafana_data:/var/lib/grafana                           # to keep dashboards etc.
+      - ./grafana/custom.ini:/usr/share/grafana/conf/custom.ini # TODO verify that this is loaded (see note on https://grafana.com/docs/installation/configuration/)
+      - ./grafana/provisioning/:/etc/grafana/provisioning/      # NOTE not sure what this will be useful for...
   # uid/pwd?
 
 volumes:
