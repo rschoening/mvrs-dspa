@@ -30,10 +30,15 @@ services:
     command: jobmanager
     environment:
       - JOB_MANAGER_RPC_ADDRESS=jobmanager
+      - MVRS_DSPA_KAFKA_BROKERS=kafka:9093
+      - MVRS_DSPA_DATA_DIR=/usr/share/flink/data
     volumes:
      - type: bind
-       source: ./data
+       source: ${MVRS_DSPA_DATA_DIR_HOST:-./data} # default: ./data
        target: /usr/share/flink/data
+# TODO prometheus configuration
+# TODO grafana configuration
+# TODO multiple task managers
 
   taskmanager:
     image:  flink:1.7.2-scala_2.12
@@ -47,9 +52,11 @@ services:
       - "jobmanager:jobmanager"
     environment:
       - JOB_MANAGER_RPC_ADDRESS=jobmanager
+      - MVRS_DSPA_KAFKA_BROKERS=kafka:9093
+      - MVRS_DSPA_DATA_DIR=/usr/share/flink/data
     volumes:
      - type: bind
-       source: ./data
+       source: ${MVRS_DSPA_DATA_DIR_HOST:-./data} # default: ./data
        target: /usr/share/flink/data
 
   elasticsearch:
