@@ -26,14 +26,14 @@ services:
     expose:
       - "6123"
     ports:
-      - "8081:8081"
+      - "8082:8081" # map to 8082 on host, to differentiate from the dev minicluster UI (on 8081)
     command: jobmanager
     environment:
       - JOB_MANAGER_RPC_ADDRESS=jobmanager
       - MVRS_DSPA_KAFKA_BROKERS=kafka:9093
       - MVRS_DSPA_DATA_DIR=/usr/share/flink/data
     volumes:
-      - ./flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
+      - ./flink/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
       - type: bind
         source: ${MVRS_DSPA_DATA_DIR_HOST:-./data} # default: ./data
         target: /usr/share/flink/data
@@ -53,7 +53,7 @@ services:
       - MVRS_DSPA_KAFKA_BROKERS=kafka:9093
       - MVRS_DSPA_DATA_DIR=/usr/share/flink/data
     volumes:
-      - ./flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
+      - ./flink/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
       - type: bind
         source: ${MVRS_DSPA_DATA_DIR_HOST:-./data} # default: ./data
         target: /usr/share/flink/data
@@ -88,7 +88,7 @@ services:
   prom:
     image: quay.io/prometheus/prometheus:v2.8.1
     volumes:
-      - ./monitor/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prom/prometheus.yml:/etc/prometheus/prometheus.yml
     command: "--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus"
     ports:
       - 9090:9090
@@ -108,6 +108,7 @@ services:
       - prom
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./grafana/custom.ini:/usr/share/grafana/conf/custom.ini
       - ./grafana/provisioning/:/etc/grafana/provisioning/
   # uid/pwd?
 
