@@ -104,11 +104,12 @@ object FlinkUtils {
     producer
   }
 
-
-  def readCsv[T: ClassTag](path: String)(implicit env: ExecutionEnvironment, typeInformation: TypeInformation[T]): DataSet[T] =
+  def readCsv[T: ClassTag](path: String)
+                          (implicit env: ExecutionEnvironment, typeInformation: TypeInformation[T]): DataSet[T] =
     env.readCsvFile[T](path, fieldDelimiter = "|", ignoreFirstLine = true)
 
-  def createKafkaConsumer[T](topic: String, typeInfo: TypeInformation[T], props: Properties)(implicit env: StreamExecutionEnvironment): FlinkKafkaConsumer[T] = {
+  def createKafkaConsumer[T](topic: String, typeInfo: TypeInformation[T], props: Properties)
+                            (implicit env: StreamExecutionEnvironment): FlinkKafkaConsumer[T] = {
     val consumer = new FlinkKafkaConsumer[T](
       topic, new TypeInformationSerializationSchema[T](typeInfo, env.getConfig), props)
     consumer.setStartFromEarliest()
