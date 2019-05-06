@@ -26,4 +26,4 @@ scrape_configs:
     # scheme defaults to 'http'.
 
     static_configs:
-    - targets: ['jobmanager:9249']
+    - targets: ['jobmanager:9249', 'taskmanager:9249']

@@ -34,7 +34,8 @@ services:
       - MVRS_DSPA_KAFKA_BROKERS=kafka:9093
       - MVRS_DSPA_DATA_DIR=/usr/share/flink/data
     volumes:
-      - ./flink/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
+      - ./flink/conf/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
+      - ./flink/lib/flink-metrics-prometheus-1.7.2.jar:/opt/flink/lib/flink-metrics-prometheus-1.7.2.jar
       - type: bind
         source: ${MVRS_DSPA_DATA_DIR_HOST:-./data} # default: ./data
         target: /usr/share/flink/data
@@ -44,6 +45,7 @@ services:
     expose:
       - "6121"
       - "6122"
+      - "9249" # prometheus metrics
     depends_on:
       - jobmanager
     command: taskmanager
@@ -54,7 +56,8 @@ services:
       - MVRS_DSPA_KAFKA_BROKERS=kafka:9093
       - MVRS_DSPA_DATA_DIR=/usr/share/flink/data
     volumes:
-      - ./flink/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
+      - ./flink/conf/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
+      - ./flink/lib/flink-metrics-prometheus-1.7.2.jar:/opt/flink/lib/flink-metrics-prometheus-1.7.2.jar
       - type: bind
         source: ${MVRS_DSPA_DATA_DIR_HOST:-./data} # default: ./data
         target: /usr/share/flink/data
