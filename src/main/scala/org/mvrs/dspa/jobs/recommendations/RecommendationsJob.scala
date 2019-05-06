@@ -9,14 +9,15 @@ import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.functions.CollectSetFunction
 import org.mvrs.dspa.jobs.FlinkStreamingJob
-import org.mvrs.dspa.model.{CommentEvent, LikeEvent, PostEvent}
+import org.mvrs.dspa.model.{CommentEvent, LikeEvent, PostEvent, PostFeatures}
 import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.utils.elastic.ElasticSearchNode
 import org.mvrs.dspa.{Settings, streams}
 
 import scala.collection.JavaConverters._
 
-object RecommendationsJob extends FlinkStreamingJob {
+// TODO name operators
+object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
   def execute(): Unit = {
     val windowSize = Settings.duration("jobs.recommendation.activity-window-size")
     val windowSlide = Settings.duration("jobs.recommendation.activity-window-slide")
@@ -28,23 +29,40 @@ object RecommendationsJob extends FlinkStreamingJob {
     implicit val esNodes: Seq[ElasticSearchNode] = Settings.elasticSearchNodes
     implicit val minHasher: MinHasher32 = RecommendationUtils.minHasher
 
-    // (re)create the index for storing recommendations (person-id -> List((person-id, similarity))
+    // (re)create the indexes for post features and for storing recommendations (person-id -> List((person-id, similarity))
+    ElasticSearchIndexes.postFeatures.create()
     ElasticSearchIndexes.recommendations.create()
 
-    // val kafkaConsumerGroup = Some("recommendations")
-    val commentsStream: DataStream[CommentEvent] = streams.comments()
-    val postsStream: DataStream[PostEvent] = streams.posts()
-    val likesStream: DataStream[LikeEvent] = streams.likes()
 
+    // consume post stream for writing post features, with separate consumer group (to avoid back pressure on main recommendation)
+    val postFeaturesStream: DataStream[PostEvent] = streams.posts(Some("recommendations-post-features"))
+
+    // look up forum features for posts
+    // TODO consider caching (forum id -> features)? frequency of/reaction to cache misses?
+    val postsWithForumFeatures: DataStream[(PostEvent, String, Set[String])] = lookupForumFeatures(postFeaturesStream)
+
+    val postFeatures = postsWithForumFeatures.map(createPostRecord _)
+
+
+    // read input streams
+    val kafkaConsumerGroup: Option[String] = Some("recommendations")  // None for csv
+
+    val commentsStream: DataStream[CommentEvent] = streams.comments(kafkaConsumerGroup)
+    val postsStream: DataStream[PostEvent] = streams.posts(kafkaConsumerGroup)
+    val likesStream: DataStream[LikeEvent] = streams.likes(kafkaConsumerGroup)
+
+    // union all streams for all event types
     val forumEvents: DataStream[(Long, Long)] = unionEvents(commentsStream, postsStream, likesStream)
 
     // gather the posts that the user interacted with in a sliding window
     val postIds: DataStream[(Long, Set[Long])] = collectPostsInteractedWith(forumEvents, windowSize, windowSlide)
 
     // look up the tags for these posts (from post and from the post's forum) => (person id -> set of features)
+    // TODO consider caching (post id -> features)? frequency of/reaction to cache misses?
     val personActivityFeatures: DataStream[(Long, Set[String])] = lookupPostFeaturesForPerson(postIds)
 
     // combine with stored interests of person (person id -> set of features)
+    // TODO consider caching (person id -> features)? frequency of/reaction to cache misses?
     val allPersonFeatures: DataStream[(Long, Set[String])] = unionWithPersonFeatures(personActivityFeatures)
 
     // calculate minhash per person id, based on person features
@@ -65,6 +83,7 @@ object RecommendationsJob extends FlinkStreamingJob {
 
     tracePersons(tracedPersonIds)
 
+    postFeatures.addSink(ElasticSearchIndexes.postFeatures.createSink(10))
     recommendations.addSink(ElasticSearchIndexes.recommendations.createSink(batchSize = 100))
 
     env.execute("recommendations")
@@ -82,6 +101,31 @@ object RecommendationsJob extends FlinkStreamingJob {
         recommendations.filter(t => personIds.contains(t._1)).print("-> RESULT:".padTo(length, ' '))
       }
     }
+  }
+
+  def lookupForumFeatures(postsStream: DataStream[PostEvent]): DataStream[(PostEvent, String, Set[String])] = {
+    FlinkUtils.asyncStream(
+      postsStream,
+      new AsyncForumLookupFunction(
+        ElasticSearchIndexes.forumFeatures.indexName,
+        Settings.elasticSearchNodes: _*))
+  }
+
+  def createPostRecord(t: (PostEvent, String, Set[String])): PostFeatures = {
+    val postEvent = t._1
+    val forumTitle = t._2
+    val forumFeatures = t._3
+
+    PostFeatures(
+      postEvent.postId,
+      postEvent.personId,
+      postEvent.forumId,
+      forumTitle,
+      postEvent.timestamp,
+      postEvent.content.getOrElse(""),
+      postEvent.imageFile.getOrElse(""),
+      forumFeatures ++ postEvent.tags.map(RecommendationUtils.toFeature(_, FeaturePrefix.Tag))
+    )
   }
 
   def lookupPostFeaturesForPerson(postIds: DataStream[(Long, Set[Long])])
