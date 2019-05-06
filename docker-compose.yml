@@ -8,11 +8,11 @@ services:
   kafka:
     image: wurstmeister/kafka:latest
     depends_on:
-    - zookeeper
+      - zookeeper
     ports:
       - "9092:9092"
     expose:
-    - "9093"
+      - "9093"
     environment:
       KAFKA_ADVERTISED_LISTENERS: INSIDE://kafka:9093,OUTSIDE://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
@@ -33,12 +33,10 @@ services:
       - MVRS_DSPA_KAFKA_BROKERS=kafka:9093
       - MVRS_DSPA_DATA_DIR=/usr/share/flink/data
     volumes:
-     - type: bind
-       source: ${MVRS_DSPA_DATA_DIR_HOST:-./data} # default: ./data
-       target: /usr/share/flink/data
-# TODO prometheus configuration
-# TODO grafana configuration
-# TODO multiple task managers
+      - ./flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
+      - type: bind
+        source: ${MVRS_DSPA_DATA_DIR_HOST:-./data} # default: ./data
+        target: /usr/share/flink/data
 
   taskmanager:
     image:  flink:1.7.2-scala_2.12
@@ -55,9 +53,10 @@ services:
       - MVRS_DSPA_KAFKA_BROKERS=kafka:9093
       - MVRS_DSPA_DATA_DIR=/usr/share/flink/data
     volumes:
-     - type: bind
-       source: ${MVRS_DSPA_DATA_DIR_HOST:-./data} # default: ./data
-       target: /usr/share/flink/data
+      - ./flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
+      - type: bind
+        source: ${MVRS_DSPA_DATA_DIR_HOST:-./data} # default: ./data
+        target: /usr/share/flink/data
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:6.7.2
@@ -86,6 +85,33 @@ services:
     depends_on:
       - elasticsearch
 
+  prom:
+    image: quay.io/prometheus/prometheus:v2.8.1
+    volumes:
+      - ./monitor/prometheus.yml:/etc/prometheus/prometheus.yml
+    command: "--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus"
+    ports:
+      - 9090:9090
+    depends_on:
+      - exporter
+  exporter:
+    image: prom/node-exporter:latest
+    ports:
+      - "9100:9100"
+  #    network_mode: host
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "8080:3000"
+    depends_on:
+      - prom
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+  # uid/pwd?
+
 volumes:
   esdata1:
   logs:
+  grafana_data:
