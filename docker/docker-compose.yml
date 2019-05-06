@@ -89,10 +89,10 @@ services:
     depends_on:
       - elasticsearch
 
-  prom:
+  prometheus:
     image: quay.io/prometheus/prometheus:v2.8.1
     volumes:
-      - ./prom/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     command: "--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus"
     ports:
       - 9090:9090
@@ -109,7 +109,7 @@ services:
     ports:
       - "8080:3000"
     depends_on:
-      - prom
+      - prometheus
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/custom.ini:/usr/share/grafana/conf/custom.ini
