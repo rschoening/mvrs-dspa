@@ -13,8 +13,8 @@ object PostFeaturesJob extends FlinkStreamingJob(parallelism = 4, enableGenericT
   def execute(): Unit = {
     ElasticSearchIndexes.postFeatures.create()
 
-    // val postsStream = streams.posts(Some("post-features"))
-    val postsStream = streams.posts(Some("post-features"))
+    val kafkaConsumerGroup = Some("post-features") // None for csv
+    val postsStream = streams.posts(kafkaConsumerGroup)
 
     val postsWithForumFeatures: DataStream[(PostEvent, String, Set[String])] = lookupForumFeatures(postsStream)
 
