@@ -7,7 +7,9 @@ import org.mvrs.dspa.model.{PostEvent, PostFeatures}
 import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.{Settings, streams}
 
-object PostFeaturesJob extends FlinkStreamingJob(parallelism = 4) {
+// NOTE generic types have to be enabled when reading from Kafka. Otherwise:
+// java.lang.UnsupportedOperationException: Generic types have been disabled in the ExecutionConfig and type org.apache.flink.streaming.connectors.kafka.internals.KafkaTopicPartition is treated as a generic type.
+object PostFeaturesJob extends FlinkStreamingJob(parallelism = 4, enableGenericTypes = true) {
   def execute(): Unit = {
     ElasticSearchIndexes.postFeatures.create()
 
