@@ -25,6 +25,7 @@ services:
     image: flink:1.7.2-scala_2.12
     expose:
       - "6123"
+      - "9249" # prometheus metrics
     ports:
       - "8082:8081" # map to 8082 on host, to differentiate from the dev minicluster UI (on 8081)
     command: jobmanager
