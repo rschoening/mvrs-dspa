@@ -8,3 +8,5 @@ case class PostFeatures(postId: Long,
                         content: String,
                         imageFile: String,
                         features: Set[String])
+
+
