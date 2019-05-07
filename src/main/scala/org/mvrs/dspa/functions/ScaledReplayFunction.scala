@@ -13,7 +13,7 @@ class ScaledReplayFunction[K, I](extractEventTime: I => Long,
                                  speedupFactor: Double,
                                  maximumDelayMillis: Long,
                                  delay: I => Long, expectOrdered: Boolean) extends KeyedProcessFunction[K, I, I] {
-  @transient private lazy val scheduler = new EventScheduler[I](speedupFactor, 10000, maximumDelayMillis, delay, expectOrdered)
+  private lazy val scheduler = new EventScheduler[I](speedupFactor, None, maximumDelayMillis, delay, expectOrdered)
 
   def this(extractEventTime: I => Long, speedupFactor: Double, expectOrdered: Boolean) =
     this(extractEventTime, speedupFactor, 0, (_: I) => 0, expectOrdered)

@@ -6,24 +6,33 @@ import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
 
-class EventScheduler[OUT](speedupFactor: Double,
-                          watermarkIntervalMillis: Long,
-                          maximumDelayMillis: Long,
-                          delay: OUT => Long,
-                          expectOrdered: Boolean = true) {
-  require(watermarkIntervalMillis > 0, s"invalid watermark interval: $watermarkIntervalMillis")
+/**
+  *
+  * @param speedupFactor           the speedup factor relative to event time
+  * @param watermarkIntervalMillis the watermark interval in milliseconds. No watermarks are scheduled if None(when used in function)
+  * @param maximumDelayMillis      the maximum expected random delay in milliseconds (if actual delays are longer, late elements may be produced)
+  * @param delay                   function to determine delay (in milliseconds) for an element
+  * @param expectOrderedInput      indicates if inputs are expected to be ordered (assertion is used in this case)
+  * @tparam E The type of scheduled elements
+  */
+class EventScheduler[E](speedupFactor: Double,
+                        watermarkIntervalMillis: Option[Long],
+                        maximumDelayMillis: Long,
+                        delay: E => Long,
+                        expectOrderedInput: Boolean = true) {
+  watermarkIntervalMillis.foreach(v => require(v > 0, "invalid watermark interval"))
   require(speedupFactor >= 0, s"invalid speedup factor: $speedupFactor")
 
   private lazy val replayStartTime: Long = System.currentTimeMillis
-  private val queue = mutable.PriorityQueue.empty[(Long, Either[(OUT, Long), Watermark])](Ordering.by((_: (Long, Either[(OUT, Long), Watermark]))._1).reverse)
+  private lazy val queue = mutable.PriorityQueue.empty[(Long, Either[(E, Long), Watermark])](Ordering.by((_: (Long, Either[(E, Long), Watermark]))._1).reverse)
 
   private var firstEventTime = Long.MinValue
   private var maximumEventTime: Long = Long.MinValue
 
-  private val LOG = LoggerFactory.getLogger(classOf[EventScheduler[OUT]])
+  @transient private lazy val LOG = LoggerFactory.getLogger(classOf[EventScheduler[E]])
 
-  def schedule(event: OUT, eventTime: Long): Unit = {
-    if (expectOrdered) assert(eventTime >= maximumEventTime, s"event time $eventTime < maximum $maximumEventTime")
+  def schedule(event: E, eventTime: Long): Unit = {
+    if (expectOrderedInput) assert(eventTime >= maximumEventTime, s"event time $eventTime < maximum $maximumEventTime")
 
     maximumEventTime = math.max(eventTime, maximumEventTime)
 
@@ -32,12 +41,13 @@ class EventScheduler[OUT](speedupFactor: Double,
 
     if (firstEventTime == Long.MinValue) firstEventTime = eventTime
 
-    if (queue.isEmpty) scheduleWatermark(eventTime)
+    if (queue.isEmpty && watermarkIntervalMillis.isDefined) scheduleWatermark(eventTime, watermarkIntervalMillis.get)
+    //     if (queue.isEmpty) watermarkIntervalMillis.foreach(scheduleWatermark(eventTime, _)) // schedule first watermark
 
     queue += ((eventTime + delayMillis, Left((event, eventTime)))) // schedule the event
   }
 
-  def processPending(emitEvent: (OUT, Long) => Unit,
+  def processPending(emitEvent: (E, Long) => Unit,
                      emitWatermark: Watermark => Unit,
                      wait: Long => Unit,
                      isCancelled: () => Boolean,
@@ -67,8 +77,10 @@ class EventScheduler[OUT](speedupFactor: Double,
 
           // if not cancelled: schedule next watermark if there are events left in the queue or if the queue is empty,
           // but the previous watermark does not cover the maximum event time
+
           if (!isCancelled() && (queue.nonEmpty || maximumEventTime > watermark.getTimestamp)) {
-            scheduleWatermark(delayedEventTime)
+            scheduleWatermark(delayedEventTime, watermarkIntervalMillis.get)
+            // watermarkIntervalMillis.foreach(scheduleWatermark(delayedEventTime, _))
           }
       }
     }
@@ -79,8 +91,9 @@ class EventScheduler[OUT](speedupFactor: Double,
 
   def updateMaximumEventTime(timestamp: Long): Unit = maximumEventTime = math.max(maximumEventTime, timestamp)
 
-  private def scheduleWatermark(delayedEventTime: Long): Unit = {
-    val nextEmitTime = delayedEventTime + watermarkIntervalMillis
+  private def scheduleWatermark(delayedEventTime: Long, intervalMillis: Long): Unit = {
+    require(intervalMillis > 0, "positive watermark interval expected")
+    val nextEmitTime = delayedEventTime + intervalMillis
     val nextEventTime = nextEmitTime - maximumDelayMillis - 1
     val nextWatermark = new Watermark(nextEventTime)
 

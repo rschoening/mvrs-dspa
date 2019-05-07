@@ -15,7 +15,7 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
   "the event scheduler" must "schedule correctly if no delay and no scaling" in {
     val scheduler = new EventScheduler[String](
       speedupFactor = 0,
-      watermarkIntervalMillis = 15000,
+      watermarkIntervalMillis = Some(15000),
       maximumDelayMillis = 0,
       delay = _ => 0)
 
@@ -43,7 +43,7 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
   it must "schedule correctly if no delay" in {
     val scheduler = new EventScheduler[String](
       speedupFactor = 100,
-      watermarkIntervalMillis = 15000,
+      watermarkIntervalMillis = Some(15000),
       maximumDelayMillis = 0,
       delay = _ => 0)
 
@@ -70,7 +70,7 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
   it must "schedule correctly with defined maximum delay" in {
     val scheduler = new EventScheduler[String](
       speedupFactor = 100,
-      watermarkIntervalMillis = 15000,
+      watermarkIntervalMillis = Some(15000),
       maximumDelayMillis = 10000,
       delay = _ => 0)
 
@@ -98,7 +98,7 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
   it must "schedule correctly with reordered event times" in {
     val scheduler = new EventScheduler[String](
       speedupFactor = 10,
-      watermarkIntervalMillis = 2000,
+      watermarkIntervalMillis = Some(2000),
       maximumDelayMillis = 1300,
       {
         case "e1" => 1300 // delay the first event so that it schedules after the second
@@ -129,7 +129,7 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
   it must "schedule correctly with reordered event times, incrementally" in {
     val scheduler = new EventScheduler[String](
       speedupFactor = 10,
-      watermarkIntervalMillis = 2000,
+      watermarkIntervalMillis = Some(2000),
       maximumDelayMillis = 1300,
       {
         case "e1" => 1300 // delay the first event so that it schedules after the second
@@ -166,7 +166,7 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
   it must "schedule correctly if with reordered event times and watermark interval shorter than delay" in {
     val scheduler = new EventScheduler[String](
       speedupFactor = 10,
-      watermarkIntervalMillis = 800,
+      watermarkIntervalMillis = Some(800),
       maximumDelayMillis = 1300,
       {
         case "e1" => 1300 // delay the first event so that it schedules after the second
