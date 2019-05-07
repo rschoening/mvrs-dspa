@@ -8,14 +8,17 @@ import org.slf4j.LoggerFactory
 import scala.util.Random
 
 /**
+  * Base class for source functions that replay events from an underlying source (defined in the subclass), optionally
+  * applying a speedup factor relative to the event times, and
   *
   * @param parse                   function to convert from input element to output element
   * @param extractEventTime        function to extract event time from output element
   * @param speedupFactor           the speedup factor relative to the event times
-  * @param maximumDelayMillis      the upper bound to the expected delays (non-late elements). The emitted watermark will be based on this value.
+  * @param maximumDelayMillis      the upper bound for the expected delays (non-late elements). The emitted watermark values will be based on this value.
   * @param delay                   the function to determine the delay based on a parsed element. For unit testing, a function that
   *                                returns defined delays for given elements can be used.
-  * @param watermarkIntervalMillis the interval for emitting watermarks
+  * @param watermarkIntervalMillis the interval for emitting watermarks, at scale of event time (watermarks will be
+  *                                inserted into the event-time based schedule based on this value)
   * @tparam IN  the type of input elements (read from the concrete source as defined in the subclass)
   * @tparam OUT the type of output elements
   */
@@ -25,6 +28,9 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
                                                maximumDelayMillis: Int,
                                                delay: OUT => Long,
                                                watermarkIntervalMillis: Long) extends RichSourceFunction[OUT] {
+  // TODO there should be a lower bound to the watermark interval (in resulting processing time). This is straightforward
+  //      when there is a speedup factor, but needs more thought when there is no defined (i.e. infinite) speedup - in this
+  //      case the watermarks cannot be scheduled as they are now (scheduled based on scaled event time)
   @transient private lazy val scheduler = new EventScheduler[OUT](speedupFactor, Some(watermarkIntervalMillis), maximumDelayMillis, delay)
   @transient private lazy val LOG = LoggerFactory.getLogger(classOf[ReplayedSourceFunction[IN, OUT]])
   @transient private var isCancelled = false
@@ -34,11 +40,11 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
                      extractEventTime: OUT => Long,
                      speedupFactor: Double = 0,
                      maximumDelayMilliseconds: Int = 0,
-                     watermarkInterval: Long = 1000) =
+                     watermarkIntervalMillis: Long = 1000) =
     this(parse, extractEventTime, speedupFactor, maximumDelayMilliseconds,
       if (maximumDelayMilliseconds <= 0) (_: OUT) => 0L
       else (_: OUT) => FlinkUtils.getNormalDelayMillis(rand, maximumDelayMilliseconds),
-      watermarkInterval)
+      watermarkIntervalMillis)
 
   override def run(ctx: SourceFunction.SourceContext[OUT]): Unit = {
     rowIndex = 0
