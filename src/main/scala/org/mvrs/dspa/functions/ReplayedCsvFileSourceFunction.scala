@@ -19,7 +19,7 @@ class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
                                                         watermarkInterval: Long)(implicit rowDecoder: RowDecoder[OUT])
   extends ReplayedSourceFunction[OUT, OUT](identity[OUT], extractEventTime, speedupFactor, maximumDelayMillis, delay, watermarkInterval) {
 
-  @volatile private var csvReader: Option[CsvReader[ReadResult[OUT]]] = None
+  @transient private var csvReader: Option[CsvReader[ReadResult[OUT]]] = None
 
   def this(filePath: String,
            skipFirstLine: Boolean,

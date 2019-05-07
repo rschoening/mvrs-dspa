@@ -18,7 +18,7 @@ class ReplayedTextFileSourceFunction[OUT](filePath: String,
                                           watermarkInterval: Long)
   extends ReplayedSourceFunction[String, OUT](parse, extractEventTime, speedupFactor, maximumDelayMillis, delay, watermarkInterval) {
 
-  @volatile private var source: Option[BufferedSource] = None
+  @transient private var source: Option[BufferedSource] = None
 
   def this(filePath: String,
            skipFirstLine: Boolean,

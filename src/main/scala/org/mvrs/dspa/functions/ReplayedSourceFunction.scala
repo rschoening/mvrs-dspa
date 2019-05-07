@@ -13,11 +13,10 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
                                                maximumDelayMillis: Int,
                                                delay: OUT => Long,
                                                watermarkIntervalMillis: Long) extends RichSourceFunction[OUT] {
-  @volatile private lazy val scheduler = new EventScheduler[OUT](speedupFactor, watermarkIntervalMillis, maximumDelayMillis, delay)
-  @volatile private lazy val LOG = LoggerFactory.getLogger(classOf[ReplayedSourceFunction[IN, OUT]])
-  @volatile private var isCancelled = false
-
-  private var rowIndex: Int = _
+  @transient private lazy val scheduler = new EventScheduler[OUT](speedupFactor, watermarkIntervalMillis, maximumDelayMillis, delay)
+  @transient private lazy val LOG = LoggerFactory.getLogger(classOf[ReplayedSourceFunction[IN, OUT]])
+  @transient private var isCancelled = false
+  @transient private var rowIndex: Int = _
 
   protected def this(parse: IN => OUT,
                      extractEventTime: OUT => Long,
