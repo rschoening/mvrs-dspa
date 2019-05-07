@@ -12,13 +12,14 @@ import com.sksamuel.elastic4s.mappings.FieldDefinition
 abstract class ElasticSearchIndex(val indexName: String, nodes: ElasticSearchNode*) extends Serializable {
   val typeName = s"$indexName-type" // type name derived, now that ES supports only one type per index
 
-  def create(dropFirst: Boolean = true): Unit = {
+  def create(dropFirst: Boolean = true, shards: Int = 5): Unit = {
     val client = createClient(nodes: _*)
     try {
       if (dropFirst) dropIndex(client, indexName)
 
       client.execute {
         createIndex(indexName)
+          .shards(shards)
           .mappings(
             mapping(typeName).fields(
               createFields())
