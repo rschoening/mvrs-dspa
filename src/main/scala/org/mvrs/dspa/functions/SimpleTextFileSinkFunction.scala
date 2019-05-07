@@ -4,8 +4,13 @@ import java.io.{BufferedWriter, File, FileWriter, Writer}
 
 import org.apache.flink.streaming.api.functions.sink.{RichSinkFunction, SinkFunction}
 
+/**
+  * Simplest-possible text file sink, used for debugging
+  *
+  * @param pathPrefix the prefix of the output files (one per parallel task)
+  */
 class SimpleTextFileSinkFunction(pathPrefix: String) extends RichSinkFunction[String] {
-  private var writer: Option[Writer] = None
+  @transient private var writer: Option[Writer] = None
 
   override def invoke(value: String, context: SinkFunction.Context[_]): Unit = {
     val index: Int = getRuntimeContext.getIndexOfThisSubtask

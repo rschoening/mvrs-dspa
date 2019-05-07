@@ -40,6 +40,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   @transient private var throughputMeter: Meter = _
   @transient private var danglingRepliesCount: Gauge[Int] = _
 
+  // TODO revise watermark-related logic
   private var currentCommentWatermark: Long = Long.MinValue
   private var currentBroadcastWatermark: Long = Long.MinValue
   private var currentMinimumWatermark: Long = Long.MinValue

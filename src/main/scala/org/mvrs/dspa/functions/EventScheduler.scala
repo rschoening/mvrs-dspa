@@ -23,7 +23,6 @@ class EventScheduler[OUT](speedupFactor: Double,
   private val LOG = LoggerFactory.getLogger(classOf[EventScheduler[OUT]])
 
   def schedule(event: OUT, eventTime: Long): Unit = {
-    // TODO this can be violated when reading from multiple kafka topics
     if (expectOrdered) assert(eventTime >= maximumEventTime, s"event time $eventTime < maximum $maximumEventTime")
 
     maximumEventTime = math.max(eventTime, maximumEventTime)
