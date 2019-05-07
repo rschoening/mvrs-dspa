@@ -4,7 +4,7 @@ import kantan.csv.RowDecoder
 import org.apache.flink.api.common.time
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.scala.{DataStream, OutputTag, StreamExecutionEnvironment, createTypeInformation}
-import org.mvrs.dspa.functions.{ReplayedCsvFileSourceFunction, ScaledReplayFunction}
+import org.mvrs.dspa.functions.{ReplayedCsvFileSourceFunction, SimpleScaledReplayFunction}
 import org.mvrs.dspa.jobs.preparation.BuildReplyTreeProcessFunction
 import org.mvrs.dspa.model.{CommentEvent, LikeEvent, PostEvent, RawCommentEvent}
 import org.mvrs.dspa.utils.FlinkUtils
@@ -161,8 +161,7 @@ package object streams {
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
 
     env.addSource(commentsSource)
-      .keyBy(_.commentId) // only for scaled replay function (timer)
-      .process(new ScaledReplayFunction[Long, CommentEvent](_.timestamp, speedupFactor, randomDelay, false))
+      .map(new SimpleScaledReplayFunction[CommentEvent](_.timestamp, speedupFactor))
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[CommentEvent](maxOutOfOrderness, _.timestamp))
   }
 
@@ -172,8 +171,7 @@ package object streams {
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
 
     env.addSource(postsSource)
-      .keyBy(_.postId) // only for scaled replay function (timer)
-      .process(new ScaledReplayFunction[Long, PostEvent](_.timestamp, speedupFactor, randomDelay, false))
+      .map(new SimpleScaledReplayFunction[PostEvent](_.timestamp, speedupFactor))
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[PostEvent](maxOutOfOrderness, _.timestamp))
   }
 
@@ -183,8 +181,7 @@ package object streams {
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
 
     env.addSource(likesSource)
-      .keyBy(_.postId) // only for scaled replay function (timer)
-      .process(new ScaledReplayFunction[Long, LikeEvent](_.timestamp, speedupFactor, randomDelay, false))
+      .map(new SimpleScaledReplayFunction[LikeEvent](_.timestamp, speedupFactor))
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[LikeEvent](maxOutOfOrderness, _.timestamp))
   }
 
