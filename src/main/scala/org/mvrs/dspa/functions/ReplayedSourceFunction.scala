@@ -7,6 +7,18 @@ import org.slf4j.LoggerFactory
 
 import scala.util.Random
 
+/**
+  *
+  * @param parse                   function to convert from input element to output element
+  * @param extractEventTime        function to extract event time from output element
+  * @param speedupFactor           the speedup factor relative to the event times
+  * @param maximumDelayMillis      the upper bound to the expected delays (non-late elements). The emitted watermark will be based on this value.
+  * @param delay                   the function to determine the delay based on a parsed element. For unit testing, a function that
+  *                                returns defined delays for given elements can be used.
+  * @param watermarkIntervalMillis the interval for emitting watermarks
+  * @tparam IN  the type of input elements (read from the concrete source as defined in the subclass)
+  * @tparam OUT the type of output elements
+  */
 abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
                                                extractEventTime: OUT => Long,
                                                speedupFactor: Double,

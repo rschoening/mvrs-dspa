@@ -3,6 +3,11 @@ package org.mvrs.dspa.functions
 import org.mvrs.dspa.functions.ReplayedSourceFunction.rand
 import org.mvrs.dspa.utils.FlinkUtils
 
+/**
+  * Source function to replay from a collection. Used in integration tests
+  *
+  * @param sequence the sequence to read from
+  */
 class ReplayedSequenceSourceFunction[T](sequence: Seq[T],
                                         extractEventTime: T => Long,
                                         speedupFactor: Double,

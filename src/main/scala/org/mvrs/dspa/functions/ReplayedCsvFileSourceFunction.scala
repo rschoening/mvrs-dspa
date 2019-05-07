@@ -12,6 +12,23 @@ import org.mvrs.dspa.utils.FlinkUtils
 
 import scala.io.Codec
 
+/**
+  * Source function for reading from csv file and applying a speedup factor and optionally, a delay to the emitted
+  * elements.
+  *
+  * @inheritdoc
+  * @param filePath                path to csv file
+  * @param skipFirstLine           indicates if the first (header) line should be skipped
+  * @param cellSeparator           the csv cell separator character
+  * @param extractEventTime        the function to extract the event time from a parsed element
+  * @param speedupFactor           the speedup factor relative to the event times
+  * @param maximumDelayMillis      the upper bound to the expected delays (non-late elements). The emitted watermark will be based on this value.
+  * @param delay                   the function to determine the delay based on a parsed element. For unit testing, a function that
+  * @param watermarkIntervalMillis the interval for emitting watermarks
+  * @param charsetName             the java.nio charset name. Default: UTF8
+  * @param rowDecoder              required implicit row decoder for the type (kantan.csv)
+  * @tparam OUT type of emitted elements
+  */
 class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
                                                         skipFirstLine: Boolean,
                                                         cellSeparator: Char,
