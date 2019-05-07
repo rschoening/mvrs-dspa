@@ -19,13 +19,13 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
       maximumDelayMillis = 0,
       delay = _ => 0)
 
-    scheduler.schedule("e1", 10000)
-    scheduler.schedule("e2", 20000)
-    scheduler.schedule("e3", 30000)
-
-    val schedule = getSchedule(scheduler)
-
-    println(schedule.mkString("\n"))
+    val schedule = scheduleEvents(
+      scheduler,
+      List(
+        ("e1", 10000),
+        ("e2", 20000),
+        ("e3", 30000))
+    )
 
     val events = schedule.collect { case s: ScheduledEvent => s }
     val watermarks = schedule.collect { case s: ScheduledWatermark => s }
@@ -38,6 +38,7 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
     assert(math.abs(events(2).replayTimeOffset - events(1).replayTimeOffset) <= timeTolerance)
 
     assertWatermarkCoversAllEvents(schedule)
+    assertNoLateEvents(schedule)
   }
 
   it must "schedule correctly if no delay" in {
@@ -47,13 +48,13 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
       maximumDelayMillis = 0,
       delay = _ => 0)
 
-    scheduler.schedule("e1", 10000)
-    scheduler.schedule("e2", 20000)
-    scheduler.schedule("e3", 30000)
-
-    val schedule = getSchedule(scheduler)
-
-    println(schedule.mkString("\n"))
+    val schedule = scheduleEvents(
+      scheduler,
+      List(
+        ("e1", 10000),
+        ("e2", 20000),
+        ("e3", 30000))
+    )
 
     val events = schedule.collect { case s: ScheduledEvent => s }
     val watermarks = schedule.collect { case s: ScheduledWatermark => s }
@@ -66,6 +67,7 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
     assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
 
     assertWatermarkCoversAllEvents(schedule)
+    assertNoLateEvents(schedule)
   }
   it must "schedule correctly with defined maximum delay" in {
     val scheduler = new EventScheduler[String](
@@ -74,13 +76,13 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
       maximumDelayMillis = 10000,
       delay = _ => 0)
 
-    scheduler.schedule("e1", 10000)
-    scheduler.schedule("e2", 20000)
-    scheduler.schedule("e3", 30000)
-
-    val schedule = getSchedule(scheduler)
-
-    println(schedule.mkString("\n"))
+    val schedule = scheduleEvents(
+      scheduler,
+      List(
+        ("e1", 10000),
+        ("e2", 20000),
+        ("e3", 30000))
+    )
 
     val events = schedule.collect { case s: ScheduledEvent => s }
     val watermarks = schedule.collect { case s: ScheduledWatermark => s }
@@ -93,6 +95,7 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
     assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
 
     assertWatermarkCoversAllEvents(schedule)
+    assertNoLateEvents(schedule)
   }
 
   it must "schedule correctly with reordered event times" in {
@@ -105,13 +108,13 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
         case _ => 0
       })
 
-    scheduler.schedule("e1", 1000)
-    scheduler.schedule("e2", 2000)
-    scheduler.schedule("e3", 3000)
-
-    val schedule = getSchedule(scheduler)
-
-    println(schedule.mkString("\n"))
+    val schedule = scheduleEvents(
+      scheduler,
+      List(
+        ("e1", 1000),
+        ("e2", 2000),
+        ("e3", 3000))
+    )
 
     val events = schedule.collect { case s: ScheduledEvent => s }
     val watermarks = schedule.collect { case s: ScheduledWatermark => s }
@@ -124,6 +127,79 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
     assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
 
     assertWatermarkCoversAllEvents(schedule)
+    assertNoLateEvents(schedule)
+  }
+
+  it must "schedule correctly with reordered/scaled event times and LATE events" in {
+    val scheduler = new EventScheduler[String](
+      speedupFactor = 10,
+      watermarkIntervalMillis = Some(2000),
+      maximumDelayMillis = 1300,
+      {
+        case "e2" => 12500 // delay the first event so that it schedules before the last (2000 + 12500 = 14500)
+        case _ => 0
+      },
+      allowLateEvents = true)
+
+    val schedule = scheduleEvents(
+      scheduler,
+      List(
+        ("e1", 1000),
+        ("e2", 2000),
+        ("e3", 3000),
+        ("e4", 14000),
+        ("e5", 15000),
+      )
+    )
+
+    val events = schedule.collect { case s: ScheduledEvent => s }
+    val watermarks = schedule.collect { case s: ScheduledWatermark => s }
+
+    assertResult(List("e1", "e3", "e4", "e2", "e5"))(events.map(_.event))
+    assertResult(List(1699, 3699, 5699, 7699, 9699, 11699, 13699, 15699))(watermarks.map(_.watermark.getTimestamp))
+
+    assert(math.abs(events(0).replayTimeOffset - 100) <= timeTolerance) // e1
+    assert(math.abs(events(1).replayTimeOffset - 130) <= timeTolerance) // e3
+    assert(math.abs(events(2).replayTimeOffset - 1300) <= timeTolerance) // e4
+    assert(math.abs(events(3).replayTimeOffset - 1350) <= timeTolerance) // e2
+    assert(math.abs(events(4).replayTimeOffset - 1400) <= timeTolerance) // e5
+
+    assertWatermarkCoversAllEvents(schedule)
+    assertResult(Set("e2"))(getLateEvents(schedule))
+  }
+
+  it must "schedule correctly with reordered/UNscaled event times and LATE events" in {
+    val scheduler = new EventScheduler[String](
+      speedupFactor = 0,
+      watermarkIntervalMillis = Some(2000),
+      maximumDelayMillis = 1300,
+      {
+        case "e2" => 12500 // delay the first event so that it schedules before the last (2000 + 12500 = 14500)
+        case _ => 0
+      },
+      allowLateEvents = true)
+
+    val schedule = scheduleEvents(
+      scheduler,
+      List(
+        ("e1", 1000),
+        ("e2", 2000),
+        ("e3", 3000),
+        ("e4", 14000),
+        ("e5", 15000),
+      )
+    )
+
+    val events = schedule.collect { case s: ScheduledEvent => s }
+    val watermarks = schedule.collect { case s: ScheduledWatermark => s }
+
+    assertResult(List("e1", "e3", "e4", "e2", "e5"))(events.map(_.event))
+    assertResult(List(1699, 3699, 5699, 7699, 9699, 11699, 13699, 15699))(watermarks.map(_.watermark.getTimestamp))
+
+    events.foreach(e => assert(e.replayTimeOffset <= timeTolerance, e))
+
+    assertWatermarkCoversAllEvents(schedule)
+    assertResult(Set("e2"))(getLateEvents(schedule))
   }
 
   it must "schedule correctly with reordered event times, incrementally" in {
@@ -161,6 +237,7 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
     assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
 
     assertWatermarkCoversAllEvents(schedule)
+    assertNoLateEvents(schedule)
   }
 
   it must "schedule correctly if with reordered event times and watermark interval shorter than delay" in {
@@ -173,13 +250,13 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
         case _ => 0
       })
 
-    scheduler.schedule("e1", 1000)
-    scheduler.schedule("e2", 2000)
-    scheduler.schedule("e3", 3000)
-
-    val schedule = getSchedule(scheduler)
-
-    println(schedule.mkString("\n"))
+    val schedule = scheduleEvents(
+      scheduler,
+      List(
+        ("e1", 1000),
+        ("e2", 2000),
+        ("e3", 3000))
+    )
 
     val events = schedule.collect { case s: ScheduledEvent => s }
     val watermarks = schedule.collect { case s: ScheduledWatermark => s }
@@ -192,6 +269,7 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
     assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
 
     assertWatermarkCoversAllEvents(schedule)
+    assertNoLateEvents(schedule)
   }
 
   it must "correctly calculate replay time" in {
@@ -222,6 +300,41 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
       "watermarks must cover all events")
   }
 
+  private def assertNoLateEvents(schedule: Seq[ScheduledItem], exceptions: Set[String] = Set()): Unit = {
+    assertResult(Set())(getLateEvents(schedule))
+  }
+
+  private def getLateEvents(schedule: Seq[ScheduledItem]): Set[String] =
+    schedule.foldLeft( // initial value:
+      (
+        Set[String](), // set of late events
+        Long.MinValue // the maximum watermark value seen so far
+      )
+    ) {
+      case ((late, maxWm), ScheduledWatermark(wm, _)) => (late, math.max(maxWm, wm.getTimestamp))
+      case ((late, maxWm), ScheduledEvent(e, timestamp, _)) => (if (timestamp < maxWm) late + e else late, maxWm)
+      case (acc, _) => acc // just pass it on
+    }._1
+
+  private def scheduleEvents(scheduler: EventScheduler[String], events: Iterable[(String, Long)]): Seq[ScheduledItem] = {
+    println(s"speedup factor: ${scheduler.speedupFactor}")
+    println(s"watermark interval (ms): ${scheduler.watermarkIntervalMillis}")
+    println(s"maximum delay (ms): ${scheduler.maximumDelayMillis}")
+    println()
+    println("Input events:")
+    events.foreach(e => println(s"- $e"))
+
+    scheduler.schedule(events)
+
+    val schedule = getSchedule(scheduler)
+
+    println()
+    println("=> schedule:")
+    schedule.foreach(e => println(s"- $e"))
+
+    schedule
+  }
+
   private def getSchedule(scheduler: EventScheduler[String],
                           flush: Boolean = true,
                           startTime: Long = System.currentTimeMillis()): Seq[ScheduledItem] = {
@@ -240,9 +353,7 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
     result
   }
 
-  private def currentOffset(start: Long) = {
-    System.currentTimeMillis() - start
-  }
+  private def currentOffset(start: Long) = System.currentTimeMillis() - start
 
   sealed trait ScheduledItem
 

@@ -9,17 +9,21 @@ import scala.collection.mutable
 /**
   *
   * @param speedupFactor           the speedup factor relative to event time
-  * @param watermarkIntervalMillis the watermark interval in milliseconds. No watermarks are scheduled if None(when used in function)
-  * @param maximumDelayMillis      the maximum expected random delay in milliseconds (if actual delays are longer, late elements may be produced)
-  * @param delay                   function to determine delay (in milliseconds) for an element
+  * @param watermarkIntervalMillis the watermark interval in milliseconds, at event time scale (to be scaled by speedupFactor).
+  *                                No watermarks are scheduled if None is specified (when used in non-source function, where no watermarks can be
+  *                                issued)
+  * @param maximumDelayMillis      the maximum expected random delay in milliseconds, at event time scale (if actual delays are longer, late elements may be produced)
+  * @param delay                   function to determine delay (in milliseconds, at event time scale) for an element
   * @param expectOrderedInput      indicates if inputs are expected to be ordered (assertion is used in this case)
+  * @param allowLateEvents         indicates if late events are allowed to be scheduled
   * @tparam E The type of scheduled elements
   */
-class EventScheduler[E](speedupFactor: Double,
-                        watermarkIntervalMillis: Option[Long],
-                        maximumDelayMillis: Long,
+class EventScheduler[E](val speedupFactor: Double,
+                        val watermarkIntervalMillis: Option[Long],
+                        val maximumDelayMillis: Long,
                         delay: E => Long,
-                        expectOrderedInput: Boolean = true) {
+                        expectOrderedInput: Boolean = true,
+                        allowLateEvents: Boolean = false) {
   watermarkIntervalMillis.foreach(v => require(v > 0, "invalid watermark interval"))
   require(speedupFactor >= 0, s"invalid speedup factor: $speedupFactor")
 
@@ -31,13 +35,17 @@ class EventScheduler[E](speedupFactor: Double,
 
   @transient private lazy val LOG = LoggerFactory.getLogger(classOf[EventScheduler[E]])
 
+  def schedule(events: Iterable[(E, Long)]): Unit = events.foreach { case (event, eventTime) => schedule(event, eventTime) }
+
   def schedule(event: E, eventTime: Long): Unit = {
     if (expectOrderedInput) assert(eventTime >= maximumEventTime, s"event time $eventTime < maximum $maximumEventTime")
 
     maximumEventTime = math.max(eventTime, maximumEventTime)
 
     val delayMillis = delay(event) // in processing time, but at the rate of the event time (i.e. subject to speedup)
-    assert(delayMillis <= maximumDelayMillis, s"delay $delayMillis exceeds maximum $maximumDelayMillis")
+
+    if (!allowLateEvents)
+      assert(delayMillis <= maximumDelayMillis, s"delay $delayMillis exceeds maximum $maximumDelayMillis")
 
     if (firstEventTime == Long.MinValue) firstEventTime = eventTime
 
@@ -80,7 +88,6 @@ class EventScheduler[E](speedupFactor: Double,
 
           if (!isCancelled() && (queue.nonEmpty || maximumEventTime > watermark.getTimestamp)) {
             scheduleWatermark(delayedEventTime, watermarkIntervalMillis.get)
-            // watermarkIntervalMillis.foreach(scheduleWatermark(delayedEventTime, _))
           }
       }
     }
@@ -89,7 +96,9 @@ class EventScheduler[E](speedupFactor: Double,
     if (queue.nonEmpty && queue.head._2.isLeft) Some(queue.head._1) else None
   }
 
-  def updateMaximumEventTime(timestamp: Long): Unit = maximumEventTime = math.max(maximumEventTime, timestamp)
+  def updateMaximumEventTime(timestamp: Long): Unit = {
+    maximumEventTime = math.max(maximumEventTime, timestamp)
+  }
 
   private def scheduleWatermark(delayedEventTime: Long, intervalMillis: Long): Unit = {
     require(intervalMillis > 0, "positive watermark interval expected")
