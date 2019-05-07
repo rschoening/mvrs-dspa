@@ -21,6 +21,12 @@ class SimpleScaledReplayFunctionITSuite extends AbstractTestBase {
       assertExpectedSpeedup(List(1000L, 2000L, 3000L, 2500L, 2700L, 3000L, 3100L), speedupFactor)
     }
 
+  @Test
+  def testScaledReplayInfiniteSpeedup(): Unit = assertExpectedSpeedup(List(1000L, 2000L, 3000L), 0.0)
+
+  @Test
+  def testScaledReplaySingleElement(): Unit = assertExpectedSpeedup(List(1000L), 1)
+
   private def assertExpectedSpeedup(eventTimes: Seq[Long], speedupFactor: Double): Unit = {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
 
@@ -42,7 +48,7 @@ class SimpleScaledReplayFunctionITSuite extends AbstractTestBase {
 
     val endTime = System.currentTimeMillis
     val duration = endTime - startTime
-    val minDuration = (eventTimes.max - eventTimes.min) / speedupFactor
+    val minDuration = if (speedupFactor == 0) 0 else (eventTimes.max - eventTimes.min) / speedupFactor
 
     println(s"Speedup factor: $speedupFactor")
     println(s"Duration: $duration")
@@ -62,17 +68,20 @@ class SimpleScaledReplayFunctionITSuite extends AbstractTestBase {
         .zip(eventAndProcessingTimes) // zip with predecessor
         .map {
         case ((eventTime, procTime), (prevEventTime, prevProcTime)) =>
-          val eventTimeDiff = eventTime - prevEventTime
-          val procTimeDiff = procTime - prevProcTime
-
-          (eventTimeDiff, procTimeDiff)
+          (
+            eventTime - prevEventTime, // event time difference
+            procTime - prevProcTime // processing time difference
+          )
       }
 
     println(s"Time differences: $timeDiffs")
 
     val tolerance = 10L
     timeDiffs.foreach {
-      case (eventTimeDiff, procTimeDiff) => assert(math.abs(math.max(eventTimeDiff, 0) / speedupFactor - procTimeDiff) <= tolerance)
+      case (eventTimeDiff, procTimeDiff) => assert(
+        math.abs(
+          if (speedupFactor <= 0) 0
+          else math.max(eventTimeDiff, 0) / speedupFactor - procTimeDiff) <= tolerance)
     }
   }
 }
