@@ -108,6 +108,6 @@ object EventScheduler {
     require(speedupFactor > 0, s"invalid speedup factor: $speedupFactor")
 
     val eventTimeSinceStart = eventTime - firstEventTime
-    replayStartTime + (eventTimeSinceStart / speedupFactor).toLong
+    replayStartTime + (eventTimeSinceStart / speedupFactor).ceil.toLong // round up
   }
 }
