@@ -1,6 +1,7 @@
 package org.mvrs.dspa.functions
 
 import java.net.URI
+import java.nio.charset.Charset
 
 import kantan.csv._
 import kantan.csv.ops._
@@ -9,6 +10,8 @@ import org.apache.flink.streaming.api.functions.source.SourceFunction
 import org.mvrs.dspa.functions.ReplayedSourceFunction._
 import org.mvrs.dspa.utils.FlinkUtils
 
+import scala.io.Codec
+
 class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
                                                         skipFirstLine: Boolean,
                                                         cellSeparator: Char,
@@ -16,8 +19,9 @@ class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
                                                         speedupFactor: Double,
                                                         maximumDelayMillis: Int,
                                                         delay: OUT => Long,
-                                                        watermarkInterval: Long)(implicit rowDecoder: RowDecoder[OUT])
-  extends ReplayedSourceFunction[OUT, OUT](identity[OUT], extractEventTime, speedupFactor, maximumDelayMillis, delay, watermarkInterval) {
+                                                        watermarkIntervalMillis: Long,
+                                                        charsetName: Option[String])(implicit rowDecoder: RowDecoder[OUT])
+  extends ReplayedSourceFunction[OUT, OUT](identity[OUT], extractEventTime, speedupFactor, maximumDelayMillis, delay, watermarkIntervalMillis) {
 
   @transient private var csvReader: Option[CsvReader[ReadResult[OUT]]] = None
 
@@ -27,16 +31,20 @@ class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
            extractEventTime: OUT => Long,
            speedupFactor: Double = 0,
            maximumDelayMilliseconds: Int = 0,
-           watermarkInterval: Long = 1000)(implicit rowDecoder: RowDecoder[OUT]) =
+           watermarkInterval: Long = 1000,
+           charsetName: Option[String] = None)(implicit rowDecoder: RowDecoder[OUT]) =
     this(filePath, skipFirstLine, cellSeparator, extractEventTime, speedupFactor, maximumDelayMilliseconds,
       if (maximumDelayMilliseconds <= 0) (_: OUT) => 0L
       else (_: OUT) => FlinkUtils.getNormalDelayMillis(rand, maximumDelayMilliseconds),
-      watermarkInterval)
+      watermarkInterval, charsetName)
 
   override def open(parameters: Configuration): Unit = {
     val uri = new URI(filePath)
     val file = new java.io.File(uri)
     val config = (if (skipFirstLine) rfc.withHeader() else rfc).withCellSeparator(cellSeparator)
+
+    implicit val coded: Codec = charsetName.map(name => Codec(Charset.forName(name))).getOrElse(Codec.UTF8)
+
     csvReader = Some(file.asCsvReader[OUT](config))
   }
 
