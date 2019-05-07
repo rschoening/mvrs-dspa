@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory
 class SimpleScaledReplayFunction[I](extractEventTime: I => Long,
                                     speedupFactor: Double,
                                     wait: Long => Unit) extends MapFunction[I, I] {
+  require(speedupFactor >= 0, s"invalid speedup factor: $speedupFactor")
 
   def this(extractEventTime: I => Long, speedupFactor: Double) =
     this(
@@ -31,6 +32,12 @@ class SimpleScaledReplayFunction[I](extractEventTime: I => Long,
   private def log(msg: => String): Unit = if (LOG.isDebugEnabled()) LOG.debug(msg)
 
   override def map(value: I): I = {
+    if (speedupFactor == 0) value
+    else delay(value)
+  }
+
+  private def delay(value: I): I = {
+    require(speedupFactor > 0, "positive speedup factor expected")
 
     val eventTime = extractEventTime(value)
 
