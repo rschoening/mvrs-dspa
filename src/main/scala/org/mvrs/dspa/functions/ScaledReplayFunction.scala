@@ -2,7 +2,9 @@ package org.mvrs.dspa.functions
 
 import java.util.Random
 
+import org.apache.flink.runtime.state.{FunctionInitializationContext, FunctionSnapshotContext}
 import org.apache.flink.streaming.api.TimerService
+import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction
 import org.apache.flink.util.Collector
 import org.mvrs.dspa.functions.ScaledReplayFunction._
@@ -12,7 +14,9 @@ import org.mvrs.dspa.utils.FlinkUtils
 class ScaledReplayFunction[K, I](extractEventTime: I => Long,
                                  speedupFactor: Double,
                                  maximumDelayMillis: Long,
-                                 delay: I => Long, expectOrdered: Boolean) extends KeyedProcessFunction[K, I, I] {
+                                 delay: I => Long, expectOrdered: Boolean) extends KeyedProcessFunction[K, I, I] with CheckpointedFunction {
+  // TODO this must be checkpointed, otherwise pending events are lost on failure recovery
+  // TODO how to implement split/merge of this state?
   private lazy val scheduler = new EventScheduler[I](speedupFactor, None, maximumDelayMillis, delay, expectOrdered)
 
   def this(extractEventTime: I => Long, speedupFactor: Double, expectOrdered: Boolean) =
@@ -31,7 +35,7 @@ class ScaledReplayFunction[K, I](extractEventTime: I => Long,
   }
 
   private def processPending(out: Collector[I], timerService: TimerService): Unit = {
-    val upcomingEventTime = scheduler.processPending(
+    val upcomingEventTime: Option[Long] = scheduler.processPending(
       (e, _) => out.collect(e),
       _ => (), // cannot emit watermark outside of source function
       sleep,
@@ -53,6 +57,13 @@ class ScaledReplayFunction[K, I](extractEventTime: I => Long,
     timerService.registerEventTimeTimer(time)
   }
 
+  override def snapshotState(context: FunctionSnapshotContext): Unit = {
+    // TODO
+  }
+
+  override def initializeState(context: FunctionInitializationContext): Unit = {
+    // TODO
+  }
 }
 
 object ScaledReplayFunction {

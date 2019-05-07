@@ -10,7 +10,7 @@ import scala.collection.mutable
 
 //noinspection ZeroIndexToHead
 class EventSchedulerTestSuite extends FlatSpec with Matchers {
-  val timeTolerance = 50
+  val timeTolerance = 100 // loose tolerance required when running on battery
 
   "the event scheduler" must "schedule correctly if no delay and no scaling" in {
     val scheduler = new EventScheduler[String](

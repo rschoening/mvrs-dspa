@@ -41,7 +41,7 @@ class ScaledReplayFunctionITSuite extends AbstractTestBase {
 
     // job overhead is ~ 500 ms
 
-    // TODO come up with tighter assertion (based on processing times in collected tuples)
+    // NOTE tighter assertions are applied in unit tests for event scheduler
     assertResult(eventTimes.length)(list.length)
     assert(duration >= minDuration)
   }

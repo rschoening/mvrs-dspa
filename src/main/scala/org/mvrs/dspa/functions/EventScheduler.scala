@@ -41,8 +41,8 @@ class EventScheduler[E](speedupFactor: Double,
 
     if (firstEventTime == Long.MinValue) firstEventTime = eventTime
 
-    if (queue.isEmpty && watermarkIntervalMillis.isDefined) scheduleWatermark(eventTime, watermarkIntervalMillis.get)
-    //     if (queue.isEmpty) watermarkIntervalMillis.foreach(scheduleWatermark(eventTime, _)) // schedule first watermark
+    if (queue.isEmpty && watermarkIntervalMillis.isDefined)
+      scheduleWatermark(eventTime, watermarkIntervalMillis.get)
 
     queue += ((eventTime + delayMillis, Left((event, eventTime)))) // schedule the event
   }
