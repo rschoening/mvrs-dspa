@@ -10,15 +10,14 @@ import org.apache.flink.streaming.api.functions.sink.{RichSinkFunction, SinkFunc
   * @param pathPrefix the prefix of the output files (one per parallel task)
   */
 class SimpleTextFileSinkFunction(pathPrefix: String) extends RichSinkFunction[String] {
-  @transient private var writer: Option[Writer] = None
+  @transient private var writer: Writer = _ // NOTE Option[Writer] observed to be set to null with @transient ... = None
 
   override def invoke(value: String, context: SinkFunction.Context[_]): Unit = {
     val index: Int = getRuntimeContext.getIndexOfThisSubtask
 
-    if (writer.isEmpty) {
-      writer = Some(createWriter(pathPrefix, index))
-    }
-    writer.foreach(_.write(s"$value\n"))
+    if (writer == null) writer = createWriter(pathPrefix, index)
+
+    writer.write(s"$value\n")
   }
 
   private def createWriter(path: String, index: Int): BufferedWriter = {
@@ -28,7 +27,7 @@ class SimpleTextFileSinkFunction(pathPrefix: String) extends RichSinkFunction[St
 
   // note: flush happens only when stream ends
   override def close(): Unit = {
-    writer.foreach(_.close())
-    writer = None
+    if (writer != null) writer.close()
+    writer = null
   }
 }
