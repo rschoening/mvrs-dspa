@@ -24,8 +24,10 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   // - since state has to be accessed from the broadcast side also (outside of keyed context), unkeyed state is used.
   //   An alternative would be the use of applyToKeyedState(), however this processes all keyed states in sequence,
   //   which might become too slow if many keys are active
-  private val danglingReplies: mutable.Map[Long, (Long, mutable.Set[RawCommentEvent])] = mutable.Map[Long, (Long, mutable.Set[RawCommentEvent])]()
-  private val postForComment: mutable.Map[Long, Long] = mutable.Map() // TODO persist to ElasticSearch, use as cache (then no longer in operator state)
+  @transient private lazy val danglingReplies: mutable.Map[Long, (Long, mutable.Set[RawCommentEvent])] = mutable.Map[Long, (Long, mutable.Set[RawCommentEvent])]()
+
+  // TODO persist to ElasticSearch, use as cache (then no longer in operator state)
+  @transient private lazy val postForComment: mutable.Map[Long, Long] = mutable.Map()
 
   @transient private var danglingRepliesListState: ListState[Map[Long, Set[RawCommentEvent]]] = _
   @transient private var postForCommentListState: ListState[Map[Long, Long]] = _
@@ -36,22 +38,25 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   @transient private var danglingRepliesCount: Gauge[Int] = _
 
   // TODO revise watermark-related logic
-  private var currentCommentWatermark: Long = Long.MinValue
-  private var currentBroadcastWatermark: Long = Long.MinValue
-  private var currentMinimumWatermark: Long = Long.MinValue
+  private var currentCommentWatermark: Long = Long.MinValue // TODO revise usages, subtraction may wrap
+  private var currentBroadcastWatermark: Long = Long.MinValue // TODO revise, subtraction may wrap
+  private var currentMinimumWatermark: Long = Long.MinValue // TODO revise, subtraction may wrap
 
   override def open(parameters: Configuration): Unit = {
+    // prepare metrics
     val group = getRuntimeContext.getMetricGroup
 
     resolvedReplyCount = group.counter("rootedreply-counter")
     droppedReplyCounter = group.counter("droppedreply-counter")
-    danglingRepliesCount = group.gauge[Int, ScalaGauge[Int]]("dangling-replies-gauge", ScalaGauge[Int](() => danglingReplies.size))
+    danglingRepliesCount = group.gauge[Int, ScalaGauge[Int]]("dangling-replies-gauge",
+      ScalaGauge[Int](() => danglingReplies.size))
   }
 
   override def processElement(firstLevelComment: CommentEvent,
                               ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, RawCommentEvent, CommentEvent]#ReadOnlyContext,
                               out: Collector[CommentEvent]): Unit = {
     val postId = firstLevelComment.postId
+
     assert(ctx.getCurrentKey == postId) // must be keyed by post id
 
     // this state is unbounded, replies may refer to arbitrarily old comments
@@ -83,7 +88,8 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     ctx.timerService().registerEventTimeTimer(firstLevelComment.timestamp)
   }
 
-  private def processWatermark(newWatermark: Long, currentWatermark: Long,
+  private def processWatermark(newWatermark: Long,
+                               currentWatermark: Long,
                                collector: Collector[CommentEvent],
                                sideOutput: (OutputTag[RawCommentEvent], RawCommentEvent) => Unit): Long = {
     if (newWatermark > currentWatermark) {
@@ -135,6 +141,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
       "child-replies",
       createTypeInformation[Map[Long, Set[RawCommentEvent]]]
     )
+
     val postForCommentDescriptor = new ListStateDescriptor[Map[Long, Long]](
       "post-for-comment",
       createTypeInformation[Map[Long, Long]])
@@ -143,14 +150,20 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     postForCommentListState = context.getOperatorStateStore.getListState(postForCommentDescriptor)
 
     if (context.isRestored) {
+
       // merge maps of parent comment id -> dangling replies (with maximum timestamp)
       danglingReplies.clear()
+
       for (element <- danglingRepliesListState.get().asScala) {
         for {(parentCommentId, replies) <- element} {
+
           val earliestReplyTimestamp = replies.foldLeft(Long.MinValue)((z, r) => math.min(z, r.timestamp))
           val set = mutable.Set(replies.toSeq: _*)
-          if (danglingReplies.get(parentCommentId).isEmpty) danglingReplies(parentCommentId) = (earliestReplyTimestamp, set)
-          else danglingReplies(parentCommentId) = (earliestReplyTimestamp, set ++ danglingReplies(parentCommentId)._2)
+
+          if (danglingReplies.get(parentCommentId).isEmpty)
+            danglingReplies(parentCommentId) = (earliestReplyTimestamp, set)
+          else
+            danglingReplies(parentCommentId) = (earliestReplyTimestamp, set ++ danglingReplies(parentCommentId)._2)
         }
       }
 
@@ -160,10 +173,13 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     }
   }
 
-  private def reportDropped(reply: RawCommentEvent, output: (OutputTag[RawCommentEvent], RawCommentEvent) => Unit): Unit =
+  private def reportDropped(reply: RawCommentEvent,
+                            output: (OutputTag[RawCommentEvent], RawCommentEvent) => Unit): Unit =
     outputTagDroppedReplies.foreach(output(_, reply))
 
-  private def processDanglingReplies(timestamp: Long, out: Collector[CommentEvent], reportDroppedReply: RawCommentEvent => Unit): Unit = {
+  private def processDanglingReplies(timestamp: Long,
+                                     out: Collector[CommentEvent],
+                                     reportDroppedReply: RawCommentEvent => Unit): Unit = {
     // first, let all known parents resolve their children
     for {(parentCommentId, (_, replies)) <- danglingReplies} {
       // check if the post id for the parent comment id is now known
@@ -183,7 +199,8 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     for {(parentCommentId, (earliestReplyTimestamp, replies)) <- danglingReplies} {
       if (earliestReplyTimestamp <= timestamp) {
         // the watermark has passed the earliest reply to this unknown parent. As the parent must have been before
-        // that earliest reply, we can assume that the parent no longer arrives (as wm incorporates the defined bounded delay)
+        // that earliest reply, we can assume that the parent no longer arrives (as wm incorporates the defined
+        // bounded delay)
         // --> recursively drop all replies to this parent
         val unresolved = BuildReplyTreeProcessFunction.getDanglingReplies(replies, getDanglingReplies)
 
@@ -244,8 +261,9 @@ object BuildReplyTreeProcessFunction {
   def getDanglingReplies(replies: Iterable[RawCommentEvent],
                          getChildren: RawCommentEvent => Iterable[RawCommentEvent]): Set[RawCommentEvent] = {
     @tailrec
-    def loop(acc: Set[RawCommentEvent])(replies: Iterable[RawCommentEvent],
-                                        getChildren: RawCommentEvent => Iterable[RawCommentEvent]): Set[RawCommentEvent] = {
+    def loop(acc: Set[RawCommentEvent])
+            (replies: Iterable[RawCommentEvent],
+             getChildren: RawCommentEvent => Iterable[RawCommentEvent]): Set[RawCommentEvent] = {
       if (replies.isEmpty) acc // base case
       else loop(acc ++ replies)(replies.flatMap(getChildren), getChildren)
     }
@@ -264,5 +282,4 @@ object BuildReplyTreeProcessFunction {
       postId,
       c.replyToCommentId,
       c.placeId)
-
 }
