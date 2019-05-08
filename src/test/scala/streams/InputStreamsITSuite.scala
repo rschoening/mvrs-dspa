@@ -15,6 +15,7 @@ import org.scalatest.Assertions._
 
 import scala.collection.JavaConverters._
 
+// TODO add small-enough (for git) subset of test data to resources
 
 class InputStreamsITSuite extends AbstractTestBase {
   @Ignore("depends on configured test data, counts apply for small dataset")

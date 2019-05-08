@@ -37,7 +37,7 @@ object ReadLikeEventsMeasurementJob extends FlinkStreamingJob {
     // - duration: 5 min 39 seconds (expected: ~5.5 minutes + overhead) --> OK
     // - ~10000 watermarks per second scheduled!
     // --> need to apply absolute minimum interval (how to do this in case of unscaled replay? can't schedule based on event time...)
-    //     - after change to minimum interval (1000ms): 332 (NOTE this will no longer be determinisitc)
+    //     - after change to minimum interval (1000ms): 332 (NOTE this will no longer be deterministic)
 
     // with speedup factor 200000, wm interval 10000 ms
     // - duration: 2 min 49 seconds (expected: ~2.75 minutes + overhead) --> OK

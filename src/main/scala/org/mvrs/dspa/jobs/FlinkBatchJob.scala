@@ -9,6 +9,7 @@ import org.mvrs.dspa.utils.FlinkUtils
   * @param parallelism the default parallelism for the job
   */
 abstract class FlinkBatchJob(parallelism: Int = 4) extends FlinkJob {
+  // localWithUI is set by base class based on program arguments
   implicit val env: ExecutionEnvironment = FlinkUtils.createBatchExecutionEnvironment(localWithUI)
 
   env.setParallelism(parallelism)
