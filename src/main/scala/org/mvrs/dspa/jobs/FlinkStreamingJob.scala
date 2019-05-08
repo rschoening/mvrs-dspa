@@ -22,13 +22,17 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
                                  enableGenericTypes: Boolean = false,
                                  autoWatermarkInterval: Int = 200) extends FlinkJob {
   // read settings
-  // - to make the class more general-purpose, read settings in project-specific subclass and
-  //   provide ctor args for all these here
+
+  // NOTE
+  // - read job-independent global preferences from settings (application.conf)
+  // - get job-dependent settings via constructor arguments
+  // To make the class more general-purpose, read settings in project-specific subclass and provide constructor args for all these here
   private val latencyTrackingInterval = Settings.config.getInt("jobs.latency-tracking-interval")
   private val stateBackendPath = Settings.config.getString("jobs.state-backend-path")
-  private val checkpointInterval = Settings.config.getLong("jobs.checkpoint-interval")
-  private val checkpointMinPause = Settings.config.getLong("jobs.checkpoint-min-pause")
+  private val checkpointInterval = Settings.duration("jobs.checkpoint-interval").toMilliseconds
+  private val checkpointMinPause = Settings.duration("jobs.checkpoint-min-pause").toMilliseconds
 
+  // localWithUI is set by base class based on program arguments
   implicit val env: StreamExecutionEnvironment = FlinkUtils.createStreamExecutionEnvironment(localWithUI)
 
   // see https://ci.apache.org/projects/flink/flink-docs-stable/monitoring/metrics.html#latency-tracking
@@ -44,7 +48,7 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
 
   if (checkpointInterval > 0) {
     env.enableCheckpointing(checkpointInterval, CheckpointingMode.EXACTLY_ONCE)
-    env.getCheckpointConfig.setMinPauseBetweenCheckpoints(1000)
+    env.getCheckpointConfig.setMinPauseBetweenCheckpoints(checkpointMinPause)
   }
 
   if (stateBackendPath.length > 0) {

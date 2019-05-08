@@ -29,10 +29,10 @@ import scala.util.Random
 abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
                                                extractEventTime: OUT => Long,
                                                speedupFactor: Double,
-                                               maximumDelayMillis: Int,
+                                               maximumDelayMillis: Long,
                                                delay: OUT => Long,
-                                               watermarkIntervalMillis: Int,
-                                               minimumWatermarkEmitIntervalMillis: Int) extends RichSourceFunction[OUT] {
+                                               watermarkIntervalMillis: Long,
+                                               minimumWatermarkEmitIntervalMillis: Long) extends RichSourceFunction[OUT] {
   @transient private lazy val scheduler = new EventScheduler[OUT](
     speedupFactor,
     Some(watermarkIntervalMillis),

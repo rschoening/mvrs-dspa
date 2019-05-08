@@ -25,7 +25,7 @@ class EventScheduler[E](val speedupFactor: Double,
                         delay: E => Long,
                         expectOrderedInput: Boolean = true,
                         allowLateEvents: Boolean = false,
-                        minimumWatermarkEmitIntervalMillis: Int = 0) {
+                        minimumWatermarkEmitIntervalMillis: Long = 0) {
   watermarkIntervalMillis.foreach(v => require(v > 0, "invalid watermark interval"))
   require(speedupFactor >= 0, s"invalid speedup factor: $speedupFactor")
 

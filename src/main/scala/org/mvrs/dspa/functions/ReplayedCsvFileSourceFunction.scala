@@ -34,9 +34,9 @@ class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
                                                         cellSeparator: Char,
                                                         extractEventTime: OUT => Long,
                                                         speedupFactor: Double,
-                                                        maximumDelayMillis: Int,
+                                                        maximumDelayMillis: Long,
                                                         delay: OUT => Long,
-                                                        watermarkIntervalMillis: Int,
+                                                        watermarkIntervalMillis: Long,
                                                         charsetName: Option[String])(implicit rowDecoder: RowDecoder[OUT])
   extends ReplayedSourceFunction[OUT, OUT](
     identity[OUT],
@@ -54,8 +54,8 @@ class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
            cellSeparator: Char,
            extractEventTime: OUT => Long,
            speedupFactor: Double = 0,
-           maximumDelayMilliseconds: Int = 0,
-           watermarkInterval: Int = 1000,
+           maximumDelayMilliseconds: Long = 0,
+           watermarkInterval: Long = 1000,
            charsetName: Option[String] = None)(implicit rowDecoder: RowDecoder[OUT]) =
     this(filePath, skipFirstLine, cellSeparator, extractEventTime, speedupFactor, maximumDelayMilliseconds,
       if (maximumDelayMilliseconds <= 0) (_: OUT) => 0L
