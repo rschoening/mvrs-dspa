@@ -108,13 +108,16 @@ package object streams {
                         (implicit env: StreamExecutionEnvironment): DataStream[RawCommentEvent] = {
     implicit val decoder: RowDecoder[RawCommentEvent] = RawCommentEvent.csvDecoder
 
-    env.addSource(new ReplayedCsvFileSourceFunction[RawCommentEvent](
-      filePath,
-      skipFirstLine = true, '|',
-      extractEventTime = _.timestamp,
-      speedupFactor, // 0 -> unchanged read speed
-      randomDelay,
-      watermarkInterval)).name(s"$filePath")
+    env.addSource(
+      new ReplayedCsvFileSourceFunction[RawCommentEvent](
+        filePath,
+        skipFirstLine = true, '|',
+        extractEventTime = _.timestamp,
+        speedupFactor, // 0 -> unchanged read speed
+        randomDelay,
+        watermarkInterval
+      )
+    ).name(s"$filePath")
   }
 
   def commentsFromCsv(filePath: String, speedupFactor: Double = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)
@@ -126,26 +129,32 @@ package object streams {
                   (implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
     implicit val decoder: RowDecoder[LikeEvent] = LikeEvent.csvDecoder
 
-    env.addSource(new ReplayedCsvFileSourceFunction[LikeEvent](
-      filePath,
-      skipFirstLine = true, '|',
-      extractEventTime = _.timestamp,
-      speedupFactor, // 0 -> unchanged read speed
-      randomDelay,
-      watermarkInterval)).name(s"$filePath")
+    env.addSource(
+      new ReplayedCsvFileSourceFunction[LikeEvent](
+        filePath,
+        skipFirstLine = true, '|',
+        extractEventTime = _.timestamp,
+        speedupFactor, // 0 -> unchanged read speed
+        randomDelay,
+        watermarkInterval
+      )
+    ).name(s"$filePath")
   }
 
   def postsFromCsv(filePath: String, speedupFactor: Double = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)
                   (implicit env: StreamExecutionEnvironment): DataStream[PostEvent] = {
     implicit val decoder: RowDecoder[PostEvent] = PostEvent.csvDecoder
 
-    env.addSource(new ReplayedCsvFileSourceFunction[PostEvent](
-      filePath,
-      skipFirstLine = true, '|',
-      extractEventTime = _.timestamp,
-      speedupFactor, // 0 -> unchanged read speed
-      randomDelay,
-      watermarkInterval)).name(s"$filePath")
+    env.addSource(
+      new ReplayedCsvFileSourceFunction[PostEvent](
+        filePath,
+        skipFirstLine = true, '|',
+        extractEventTime = _.timestamp,
+        speedupFactor, // 0 -> unchanged read speed
+        randomDelay,
+        watermarkInterval
+      )
+    ).name(s"$filePath")
   }
 
   def commentsFromKafka(consumerGroup: String, speedupFactor: Double = 0, randomDelay: Int = 0)
