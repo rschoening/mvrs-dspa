@@ -1,4 +1,4 @@
-package org.mvrs.dspa.jobs.preparation
+package org.mvrs.dspa.jobs.preparation.measure
 
 import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.streams
@@ -13,4 +13,3 @@ object LoadCommentEventsJob extends FlinkStreamingJob {
     env.execute("Import Comment events from csv file to Kafka")
   }
 }
-

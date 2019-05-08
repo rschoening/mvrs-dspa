@@ -1,10 +1,8 @@
-package org.mvrs.dspa.jobs.preparation
-
+package org.mvrs.dspa.jobs.preparation.measure
 
 import org.mvrs.dspa.model.RawCommentEvent
 
 import scala.collection.mutable
-import scala.language.reflectiveCalls
 
 object AnalyseComments extends App {
   require(args.length == 1, "full path to csv file expected")
