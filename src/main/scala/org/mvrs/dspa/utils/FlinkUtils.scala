@@ -60,7 +60,10 @@ object FlinkUtils {
     // TODO include metrics always? or rely on flink config file only when running in cluster?
     if (localWithUI) {
       val config = new Configuration
+
       config.setBoolean(ConfigConstants.LOCAL_START_WEBSERVER, true)
+      config.setString(WebOptions.LOG_PATH, "./data/flinkui.log")
+
       config.setString("metrics.reporters", "prometheus")
       config.setString("metrics.reporter.prometheus.class", "org.apache.flink.metrics.prometheus.PrometheusReporter")
 
