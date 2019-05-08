@@ -8,14 +8,15 @@ import org.apache.flink.api.common.state.ListState
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.scala._
-import org.apache.flink.configuration.{ConfigConstants, Configuration}
-import org.apache.flink.streaming.api.datastream.AsyncDataStream
+import org.apache.flink.configuration.{ConfigConstants, Configuration, WebOptions}
+import org.apache.flink.streaming.api.datastream.{AsyncDataStream, DataStreamSink}
 import org.apache.flink.streaming.api.functions.AssignerWithPeriodicWatermarks
 import org.apache.flink.streaming.api.functions.async.AsyncFunction
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer, FlinkKafkaProducer}
+import org.mvrs.dspa.utils.kafka.KafkaTopic
 
 import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
@@ -75,6 +76,15 @@ object FlinkUtils {
   def createBatchExecutionEnvironment(localWithUI: Boolean = false): ExecutionEnvironment =
     if (localWithUI) ExecutionEnvironment.createLocalEnvironmentWithWebUI()
     else ExecutionEnvironment.getExecutionEnvironment
+
+  def writeToNewKafkaTopic[E](stream: DataStream[E],
+                              topic: KafkaTopic[E],
+                              numPartitions: Int = 5,
+                              partitioner: Option[FlinkKafkaPartitioner[E]] = None,
+                              replicationFactor: Short = 1): DataStreamSink[E] = {
+    topic.create(numPartitions, replicationFactor, overwrite = true)
+    stream.addSink(topic.producer(partitioner)).name(s"Kafka: ${topic.name}")
+  }
 
   def createKafkaProducer[T: TypeInformation](topicId: String,
                                               bootstrapServers: String,

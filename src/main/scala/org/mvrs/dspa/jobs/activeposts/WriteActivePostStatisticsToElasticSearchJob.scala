@@ -18,7 +18,10 @@ object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob(ena
 
     val enrichedStream: DataStream[(PostStatistics, String, String)] = enrichPostStatistics(postStatisticsStream)
 
-    enrichedStream.addSink(ElasticSearchIndexes.activePostStatistics.createSink(100))
+    val esSink = ElasticSearchIndexes.activePostStatistics.createSink(
+      batchSize = Settings.config.getInt("post-statistics-elasticsearch-batch-size"))
+
+    enrichedStream.addSink(esSink)
 
     // execute program
     env.execute("Move enriched post statistics from Kafka to ElasticSearch")

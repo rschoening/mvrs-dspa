@@ -23,12 +23,10 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
     val windowSlide = Settings.duration("jobs.active-post-statistics.window-slide")
     val countPostAuthor = Settings.config.getBoolean("jobs.active-post-statistics.count-post-author")
     val stateTtl = FlinkUtils.getTtl(windowSize, Settings.config.getInt("data.speedup-factor"))
+    val postInfoIndex = ElasticSearchIndexes.postInfos
 
     // (re)create elasticsearch index for post infos
-    ElasticSearchIndexes.postInfos.create()
-
-    // (re)create kafka topic for post statistics
-    KafkaTopics.postStatistics.create(3, 1, overwrite = true)
+    postInfoIndex.create()
 
     // consume events from kafka
     val kafkaConsumerGroup = Some("active-post-statistics") // None for csv
@@ -39,20 +37,19 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
     val postInfoStream = streams.posts(Some("active-post-statistics-postinfos"))
 
     // write post infos to elasticsearch, for lookup when writing post stats to elasticsearch
+    val esSink = postInfoIndex.createSink(batchSize = Settings.config.getInt("post-info-elasticsearch-batch-size"))
+
     lookupForumFeatures(postInfoStream)
-      .addSink(ElasticSearchIndexes.postInfos.createSink(10))
-      .name(s"elasticsearch: ${ElasticSearchIndexes.postInfos.indexName}")
+      .addSink(esSink)
+      .name(s"elasticsearch: ${postInfoIndex.indexName}")
 
     // calculate post statistics
     val statsStream = statisticsStream(
       commentsStream, postsStream, likesStream,
       windowSize, windowSlide, stateTtl, countPostAuthor)
 
-    // write to kafka topic
-    statsStream
-      .keyBy(_.postId) // key by post id to preserve order
-      .addSink(KafkaTopics.postStatistics.producer())
-      .name(s"kafka: ${KafkaTopics.postStatistics.name}")
+    // write to kafka topic (key by post id to preserve order) TODO confirm that default kafka partitioner picks up key
+    FlinkUtils.writeToNewKafkaTopic(statsStream.keyBy(_.postId), KafkaTopics.postStatistics)
 
     env.execute("write post statistics to kafka (and post info to elasticsearch)")
   }
