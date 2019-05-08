@@ -10,266 +10,322 @@ import scala.collection.mutable
 
 //noinspection ZeroIndexToHead
 class EventSchedulerTestSuite extends FlatSpec with Matchers {
-  val timeTolerance = 100 // loose tolerance required when running on battery
+  val timeTolerance = 120 // loose tolerance required when running on battery/busy machine
 
   "the event scheduler" must "schedule correctly if no delay and no scaling" in {
-    val scheduler = new EventScheduler[String](
-      speedupFactor = 0,
-      watermarkIntervalMillis = Some(15000),
-      maximumDelayMillis = 0,
-      delay = _ => 0)
+    for (minimumWatermarkEmitIntervalMillis <- List(0, 10, 100)) {
+      println(s"\nMinimum watermark emit interval: $minimumWatermarkEmitIntervalMillis")
+      val scheduler = new EventScheduler[String](
+        speedupFactor = 0,
+        watermarkIntervalMillis = Some(15000),
+        maximumDelayMillis = 0,
+        delay = _ => 0,
+        minimumWatermarkEmitIntervalMillis = minimumWatermarkEmitIntervalMillis)
 
-    val schedule = scheduleEvents(
-      scheduler,
-      List(
-        ("e1", 10000),
-        ("e2", 20000),
-        ("e3", 30000))
-    )
+      val schedule = scheduleEvents(
+        scheduler,
+        List(
+          ("e1", 10000),
+          ("e2", 20000),
+          ("e3", 30000))
+      )
 
-    val events = schedule.collect { case s: ScheduledEvent => s }
-    val watermarks = schedule.collect { case s: ScheduledWatermark => s }
+      val events = schedule.collect { case s: ScheduledEvent => s }
+      val watermarks = schedule.collect { case s: ScheduledWatermark => s }
 
-    assertResult(List("e1", "e2", "e3"))(events.map(_.event))
-    assertResult(List(24999, 39999))(watermarks.map(_.watermark.getTimestamp))
+      assertResult(List("e1", "e2", "e3"))(events.map(_.event))
+      if (minimumWatermarkEmitIntervalMillis == 0) {
+        assertResult(List(24999, 39999))(watermarks.map(_.watermark.getTimestamp))
+      }
 
-    assert(math.abs(events(0).replayTimeOffset - 10) <= timeTolerance) // there is some startup delay (jit, ...)
-    assert(math.abs(events(1).replayTimeOffset - events(0).replayTimeOffset) <= timeTolerance)
-    assert(math.abs(events(2).replayTimeOffset - events(1).replayTimeOffset) <= timeTolerance)
+      assert(math.abs(events(0).replayTimeOffset - 10) <= timeTolerance) // there is some startup delay (jit, ...)
+      assert(math.abs(events(1).replayTimeOffset - events(0).replayTimeOffset) <= timeTolerance)
+      assert(math.abs(events(2).replayTimeOffset - events(1).replayTimeOffset) <= timeTolerance)
 
-    assertWatermarkCoversAllEvents(schedule)
-    assertNoLateEvents(schedule)
+      assertWatermarkCoversAllEvents(schedule)
+      assertNoLateEvents(schedule)
+      assertResult(4)(scheduler.maximumScheduleLength)
+    }
   }
 
   it must "schedule correctly if no delay" in {
-    val scheduler = new EventScheduler[String](
-      speedupFactor = 100,
-      watermarkIntervalMillis = Some(15000),
-      maximumDelayMillis = 0,
-      delay = _ => 0)
+    for (minimumWatermarkEmitIntervalMillis <- List(0, 10, 100)) {
+      println(s"\nMinimum watermark emit interval: $minimumWatermarkEmitIntervalMillis")
+      val scheduler = new EventScheduler[String](
+        speedupFactor = 100,
+        watermarkIntervalMillis = Some(15000),
+        maximumDelayMillis = 0,
+        delay = _ => 0,
+        minimumWatermarkEmitIntervalMillis = minimumWatermarkEmitIntervalMillis)
 
-    val schedule = scheduleEvents(
-      scheduler,
-      List(
-        ("e1", 10000),
-        ("e2", 20000),
-        ("e3", 30000))
-    )
+      val schedule = scheduleEvents(
+        scheduler,
+        List(
+          ("e1", 10000),
+          ("e2", 20000),
+          ("e3", 30000))
+      )
 
-    val events = schedule.collect { case s: ScheduledEvent => s }
-    val watermarks = schedule.collect { case s: ScheduledWatermark => s }
+      val events = schedule.collect { case s: ScheduledEvent => s }
+      val watermarks = schedule.collect { case s: ScheduledWatermark => s }
 
-    assertResult(List("e1", "e2", "e3"))(events.map(_.event))
-    assertResult(List(24999, 39999))(watermarks.map(_.watermark.getTimestamp)) // same as for unscaled
+      assertResult(List("e1", "e2", "e3"))(events.map(_.event))
+      assertResult(List(24999, 39999))(watermarks.map(_.watermark.getTimestamp)) // same as for unscaled
 
-    assert(math.abs(events(0).replayTimeOffset - 10) <= timeTolerance) // there is some startup delay (jit, ...)
-    assert(math.abs(events(1).replayTimeOffset - 100) <= timeTolerance)
-    assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
+      assert(math.abs(events(0).replayTimeOffset - 10) <= timeTolerance) // there is some startup delay (jit, ...)
+      assert(math.abs(events(1).replayTimeOffset - 100) <= timeTolerance)
+      assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
 
-    assertWatermarkCoversAllEvents(schedule)
-    assertNoLateEvents(schedule)
+      assertWatermarkCoversAllEvents(schedule)
+      assertNoLateEvents(schedule)
+      assertResult(4)(scheduler.maximumScheduleLength)
+    }
   }
+
   it must "schedule correctly with defined maximum delay" in {
-    val scheduler = new EventScheduler[String](
-      speedupFactor = 100,
-      watermarkIntervalMillis = Some(15000),
-      maximumDelayMillis = 10000,
-      delay = _ => 0)
+    for (minimumWatermarkEmitIntervalMillis <- List(0, 10, 100)) {
+      println(s"\nMinimum watermark emit interval: $minimumWatermarkEmitIntervalMillis")
+      val scheduler = new EventScheduler[String](
+        speedupFactor = 100,
+        watermarkIntervalMillis = Some(15000),
+        maximumDelayMillis = 10000,
+        delay = _ => 0,
+        minimumWatermarkEmitIntervalMillis = minimumWatermarkEmitIntervalMillis)
 
-    val schedule = scheduleEvents(
-      scheduler,
-      List(
-        ("e1", 10000),
-        ("e2", 20000),
-        ("e3", 30000))
-    )
+      val schedule = scheduleEvents(
+        scheduler,
+        List(
+          ("e1", 10000),
+          ("e2", 20000),
+          ("e3", 30000))
+      )
 
-    val events = schedule.collect { case s: ScheduledEvent => s }
-    val watermarks = schedule.collect { case s: ScheduledWatermark => s }
+      val events = schedule.collect { case s: ScheduledEvent => s }
+      val watermarks = schedule.collect { case s: ScheduledWatermark => s }
 
-    assertResult(List("e1", "e2", "e3"))(events.map(_.event))
-    assertResult(List(14999, 29999, 44999))(watermarks.map(_.watermark.getTimestamp))
+      assertResult(List("e1", "e2", "e3"))(events.map(_.event))
+      assertResult(List(14999, 29999, 44999))(watermarks.map(_.watermark.getTimestamp))
 
-    assert(math.abs(events(0).replayTimeOffset - 10) <= timeTolerance) // startup delay (jit, ...)
-    assert(math.abs(events(1).replayTimeOffset - 100) <= timeTolerance)
-    assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
+      assert(math.abs(events(0).replayTimeOffset - 10) <= timeTolerance) // startup delay (jit, ...)
+      assert(math.abs(events(1).replayTimeOffset - 100) <= timeTolerance)
+      assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
 
-    assertWatermarkCoversAllEvents(schedule)
-    assertNoLateEvents(schedule)
+      assertWatermarkCoversAllEvents(schedule)
+      assertNoLateEvents(schedule)
+      assertResult(4)(scheduler.maximumScheduleLength)
+    }
   }
 
   it must "schedule correctly with reordered event times" in {
-    val scheduler = new EventScheduler[String](
-      speedupFactor = 10,
-      watermarkIntervalMillis = Some(2000),
-      maximumDelayMillis = 1300,
-      {
-        case "e1" => 1300 // delay the first event so that it schedules after the second
-        case _ => 0
-      })
+    for (minimumWatermarkEmitIntervalMillis <- List(0, 10, 100)) {
+      println(s"\nMinimum watermark emit interval: $minimumWatermarkEmitIntervalMillis")
 
-    val schedule = scheduleEvents(
-      scheduler,
-      List(
-        ("e1", 1000),
-        ("e2", 2000),
-        ("e3", 3000))
-    )
+      val scheduler = new EventScheduler[String](
+        speedupFactor = 10,
+        watermarkIntervalMillis = Some(2000),
+        maximumDelayMillis = 1300,
+        {
+          case "e1" => 1300 // delay the first event so that it schedules after the second
+          case _ => 0
+        },
+        minimumWatermarkEmitIntervalMillis = minimumWatermarkEmitIntervalMillis)
 
-    val events = schedule.collect { case s: ScheduledEvent => s }
-    val watermarks = schedule.collect { case s: ScheduledWatermark => s }
+      val schedule = scheduleEvents(
+        scheduler,
+        List(
+          ("e1", 1000),
+          ("e2", 2000),
+          ("e3", 3000))
+      )
 
-    assertResult(List("e2", "e1", "e3"))(events.map(_.event))
-    assertResult(List(1699, 3699))(watermarks.map(_.watermark.getTimestamp))
+      val events = schedule.collect { case s: ScheduledEvent => s }
+      val watermarks = schedule.collect { case s: ScheduledWatermark => s }
 
-    assert(math.abs(events(0).replayTimeOffset - 100) <= timeTolerance)
-    assert(math.abs(events(1).replayTimeOffset - 130) <= timeTolerance)
-    assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
+      assertResult(List("e2", "e1", "e3"))(events.map(_.event))
+      assertResult(List(1699, 3699))(watermarks.map(_.watermark.getTimestamp))
 
-    assertWatermarkCoversAllEvents(schedule)
-    assertNoLateEvents(schedule)
+      assert(math.abs(events(0).replayTimeOffset - 100) <= timeTolerance)
+      assert(math.abs(events(1).replayTimeOffset - 130) <= timeTolerance)
+      assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
+
+      assertWatermarkCoversAllEvents(schedule)
+      assertNoLateEvents(schedule)
+      assertResult(4)(scheduler.maximumScheduleLength)
+    }
   }
 
   it must "schedule correctly with reordered/scaled event times and LATE events" in {
-    val scheduler = new EventScheduler[String](
-      speedupFactor = 10,
-      watermarkIntervalMillis = Some(2000),
-      maximumDelayMillis = 1300,
-      {
-        case "e2" => 12500 // delay the first event so that it schedules before the last (2000 + 12500 = 14500)
-        case _ => 0
-      },
-      allowLateEvents = true)
+    for (minimumWatermarkEmitIntervalMillis <- List(0, 10, 100)) {
+      println(s"\nMinimum watermark emit interval: $minimumWatermarkEmitIntervalMillis")
 
-    val schedule = scheduleEvents(
-      scheduler,
-      List(
-        ("e1", 1000),
-        ("e2", 2000),
-        ("e3", 3000),
-        ("e4", 14000),
-        ("e5", 15000),
+      val scheduler = new EventScheduler[String](
+        speedupFactor = 10,
+        watermarkIntervalMillis = Some(2000),
+        maximumDelayMillis = 1300,
+        {
+          case "e2" => 12500 // delay the first event so that it schedules before the last (2000 + 12500 = 14500)
+          case _ => 0
+        },
+        allowLateEvents = true,
+        minimumWatermarkEmitIntervalMillis = minimumWatermarkEmitIntervalMillis)
+
+      val schedule = scheduleEvents(
+        scheduler,
+        List(
+          ("e1", 1000),
+          ("e2", 2000),
+          ("e3", 3000),
+          ("e4", 14000),
+          ("e5", 15000),
+        )
       )
-    )
 
-    val events = schedule.collect { case s: ScheduledEvent => s }
-    val watermarks = schedule.collect { case s: ScheduledWatermark => s }
+      val events = schedule.collect { case s: ScheduledEvent => s }
+      val watermarks = schedule.collect { case s: ScheduledWatermark => s }
 
-    assertResult(List("e1", "e3", "e4", "e2", "e5"))(events.map(_.event))
-    assertResult(List(1699, 3699, 5699, 7699, 9699, 11699, 13699, 15699))(watermarks.map(_.watermark.getTimestamp))
+      assertResult(List("e1", "e3", "e4", "e2", "e5"))(events.map(_.event))
+      assertResult(List(1699, 3699, 5699, 7699, 9699, 11699, 13699, 15699))(watermarks.map(_.watermark.getTimestamp))
 
-    assert(math.abs(events(0).replayTimeOffset - 100) <= timeTolerance) // e1
-    assert(math.abs(events(1).replayTimeOffset - 130) <= timeTolerance) // e3
-    assert(math.abs(events(2).replayTimeOffset - 1300) <= timeTolerance) // e4
-    assert(math.abs(events(3).replayTimeOffset - 1350) <= timeTolerance) // e2
-    assert(math.abs(events(4).replayTimeOffset - 1400) <= timeTolerance) // e5
+      assert(math.abs(events(0).replayTimeOffset - 100) <= timeTolerance) // e1
+      assert(math.abs(events(1).replayTimeOffset - 130) <= timeTolerance) // e3
+      assert(math.abs(events(2).replayTimeOffset - 1300) <= timeTolerance) // e4
+      assert(math.abs(events(3).replayTimeOffset - 1350) <= timeTolerance) // e2
+      assert(math.abs(events(4).replayTimeOffset - 1400) <= timeTolerance) // e5
 
-    assertWatermarkCoversAllEvents(schedule)
-    assertResult(Set("e2"))(getLateEvents(schedule))
+      assertWatermarkCoversAllEvents(schedule)
+      if (minimumWatermarkEmitIntervalMillis == 0) {
+        // NOTE if > 0, the watermark that results in identifying this event as late may be skipped
+        assertResult(Set("e2"))(getLateEvents(schedule))
+      }
+      assertResult(6)(scheduler.maximumScheduleLength)
+    }
   }
 
   it must "schedule correctly with reordered/UNscaled event times and LATE events" in {
-    val scheduler = new EventScheduler[String](
-      speedupFactor = 0,
-      watermarkIntervalMillis = Some(2000),
-      maximumDelayMillis = 1300,
-      {
-        case "e2" => 12500 // delay the first event so that it schedules before the last (2000 + 12500 = 14500)
-        case _ => 0
-      },
-      allowLateEvents = true)
+    for (minimumWatermarkEmitIntervalMillis <- List(0, 10, 100)) {
+      println(s"\nMinimum watermark emit interval: $minimumWatermarkEmitIntervalMillis")
 
-    val schedule = scheduleEvents(
-      scheduler,
-      List(
-        ("e1", 1000),
-        ("e2", 2000),
-        ("e3", 3000),
-        ("e4", 14000),
-        ("e5", 15000),
+      val scheduler = new EventScheduler[String](
+        speedupFactor = 0,
+        watermarkIntervalMillis = Some(2000),
+        maximumDelayMillis = 1300,
+        {
+          case "e2" => 12500 // delay the first event so that it schedules before the last (2000 + 12500 = 14500)
+          case _ => 0
+        },
+        allowLateEvents = true,
+        minimumWatermarkEmitIntervalMillis = minimumWatermarkEmitIntervalMillis)
+
+      val schedule = scheduleEvents(
+        scheduler,
+        List(
+          ("e1", 1000),
+          ("e2", 2000),
+          ("e3", 3000),
+          ("e4", 14000),
+          ("e5", 15000),
+        )
       )
-    )
 
-    val events = schedule.collect { case s: ScheduledEvent => s }
-    val watermarks = schedule.collect { case s: ScheduledWatermark => s }
+      val events = schedule.collect { case s: ScheduledEvent => s }
+      val watermarks = schedule.collect { case s: ScheduledWatermark => s }
 
-    assertResult(List("e1", "e3", "e4", "e2", "e5"))(events.map(_.event))
-    assertResult(List(1699, 3699, 5699, 7699, 9699, 11699, 13699, 15699))(watermarks.map(_.watermark.getTimestamp))
+      assertResult(List("e1", "e3", "e4", "e2", "e5"))(events.map(_.event))
 
-    events.foreach(e => assert(e.replayTimeOffset <= timeTolerance, e))
+      events.foreach(e => assert(e.replayTimeOffset <= timeTolerance, e))
 
-    assertWatermarkCoversAllEvents(schedule)
-    assertResult(Set("e2"))(getLateEvents(schedule))
+      assertWatermarkCoversAllEvents(schedule)
+      if (minimumWatermarkEmitIntervalMillis == 0) {
+        // NOTE if > 0, the watermark that results in identifying this event as late may be skipped
+        assertResult(Set("e2"))(getLateEvents(schedule))
+        assertResult(List(1699, 3699, 5699, 7699, 9699, 11699, 13699, 15699))(watermarks.map(_.watermark.getTimestamp))
+      }
+      assertResult(6)(scheduler.maximumScheduleLength)
+    }
   }
 
   it must "schedule correctly with reordered event times, incrementally" in {
-    val scheduler = new EventScheduler[String](
-      speedupFactor = 10,
-      watermarkIntervalMillis = Some(2000),
-      maximumDelayMillis = 1300,
-      {
-        case "e1" => 1300 // delay the first event so that it schedules after the second
-        case _ => 0
-      })
+    for (minimumWatermarkEmitIntervalMillis <- List(0, 10, 100)) {
+      println(s"\nMinimum watermark emit interval: $minimumWatermarkEmitIntervalMillis")
 
-    val schedule = new mutable.ArrayBuffer[ScheduledItem]()
-    val startTime = System.currentTimeMillis()
+      val scheduler = new EventScheduler[String](
+        speedupFactor = 10,
+        watermarkIntervalMillis = Some(2000),
+        maximumDelayMillis = 1300,
+        {
+          case "e1" => 1300 // delay the first event so that it schedules after the second
+          case _ => 0
+        },
+        minimumWatermarkEmitIntervalMillis = minimumWatermarkEmitIntervalMillis)
 
-    scheduler.schedule("e1", 1000)
-    schedule ++= getSchedule(scheduler, flush = false, startTime)
+      val schedule = new mutable.ArrayBuffer[ScheduledItem]()
+      val startTime = System.currentTimeMillis()
 
-    scheduler.schedule("e2", 2000)
-    schedule ++= getSchedule(scheduler, flush = false, startTime)
+      scheduler.schedule("e1", 1000)
+      schedule ++= getSchedule(scheduler, flush = false, startTime)
 
-    scheduler.schedule("e3", 3000)
-    schedule ++= getSchedule(scheduler, flush = true, startTime)
+      scheduler.schedule("e2", 2000)
+      schedule ++= getSchedule(scheduler, flush = false, startTime)
 
-    println(schedule.mkString("\n"))
+      scheduler.schedule("e3", 3000)
+      schedule ++= getSchedule(scheduler, flush = true, startTime)
 
-    val events = schedule.collect { case s: ScheduledEvent => s }
-    val watermarks = schedule.collect { case s: ScheduledWatermark => s }
+      println(schedule.mkString("\n"))
 
-    assertResult(List("e2", "e1", "e3"))(events.map(_.event))
-    assertResult(List(1699, 3699))(watermarks.map(_.watermark.getTimestamp))
+      val events = schedule.collect { case s: ScheduledEvent => s }
+      val watermarks = schedule.collect { case s: ScheduledWatermark => s }
 
-    assert(math.abs(events(0).replayTimeOffset - 100) <= timeTolerance)
-    assert(math.abs(events(1).replayTimeOffset - 130) <= timeTolerance)
-    assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
+      assertResult(List("e2", "e1", "e3"))(events.map(_.event))
+      assertResult(List(1699, 3699))(watermarks.map(_.watermark.getTimestamp))
 
-    assertWatermarkCoversAllEvents(schedule)
-    assertNoLateEvents(schedule)
+      assert(math.abs(events(0).replayTimeOffset - 100) <= timeTolerance)
+      assert(math.abs(events(1).replayTimeOffset - 130) <= timeTolerance)
+      assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
+
+      assertWatermarkCoversAllEvents(schedule)
+      assertNoLateEvents(schedule)
+      assertResult(3)(scheduler.maximumScheduleLength)
+    }
   }
 
   it must "schedule correctly if with reordered event times and watermark interval shorter than delay" in {
-    val scheduler = new EventScheduler[String](
-      speedupFactor = 10,
-      watermarkIntervalMillis = Some(800),
-      maximumDelayMillis = 1300,
-      {
-        case "e1" => 1300 // delay the first event so that it schedules after the second
-        case _ => 0
-      })
+    for (minimumWatermarkEmitIntervalMillis <- List(0, 10, 100)) {
+      println(s"\nMinimum watermark emit interval: $minimumWatermarkEmitIntervalMillis")
 
-    val schedule = scheduleEvents(
-      scheduler,
-      List(
-        ("e1", 1000),
-        ("e2", 2000),
-        ("e3", 3000))
-    )
+      val scheduler = new EventScheduler[String](
+        speedupFactor = 10,
+        watermarkIntervalMillis = Some(800),
+        maximumDelayMillis = 1300,
+        {
+          case "e1" => 1300 // delay the first event so that it schedules after the second
+          case _ => 0
+        },
+        minimumWatermarkEmitIntervalMillis = minimumWatermarkEmitIntervalMillis)
 
-    val events = schedule.collect { case s: ScheduledEvent => s }
-    val watermarks = schedule.collect { case s: ScheduledWatermark => s }
+      val schedule = scheduleEvents(
+        scheduler,
+        List(
+          ("e1", 1000),
+          ("e2", 2000),
+          ("e3", 3000))
+      )
 
-    assertResult(List("e2", "e1", "e3"))(events.map(_.event))
-    assertResult(List(499, 1299, 2099, 2899, 3699))(watermarks.map(_.watermark.getTimestamp))
+      val events = schedule.collect { case s: ScheduledEvent => s }
+      val watermarks = schedule.collect { case s: ScheduledWatermark => s }
 
-    assert(math.abs(events(0).replayTimeOffset - 100) <= timeTolerance)
-    assert(math.abs(events(1).replayTimeOffset - 130) <= timeTolerance)
-    assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
+      assertResult(List("e2", "e1", "e3"))(events.map(_.event))
+      if (minimumWatermarkEmitIntervalMillis == 0) {
+        assertResult(List(499, 1299, 2099, 2899, 3699))(watermarks.map(_.watermark.getTimestamp))
+      }
 
-    assertWatermarkCoversAllEvents(schedule)
-    assertNoLateEvents(schedule)
+      assert(math.abs(events(0).replayTimeOffset - 100) <= timeTolerance)
+      assert(math.abs(events(1).replayTimeOffset - 130) <= timeTolerance)
+      assert(math.abs(events(2).replayTimeOffset - 200) <= timeTolerance)
+
+      assertWatermarkCoversAllEvents(schedule)
+      assertNoLateEvents(schedule)
+      assertResult(4)(scheduler.maximumScheduleLength)
+    }
   }
 
   it must "correctly calculate replay time" in {
