@@ -27,7 +27,11 @@ class EventScheduler[E](val speedupFactor: Double,
   watermarkIntervalMillis.foreach(v => require(v > 0, "invalid watermark interval"))
   require(speedupFactor >= 0, s"invalid speedup factor: $speedupFactor")
 
+  /**
+    * The start of the replay (lazy, determined on first access)
+    */
   private lazy val replayStartTime: Long = System.currentTimeMillis
+
   /**
     * Queue of (delayed-event-time, either (event, timestamp) or watermark)
     */
@@ -36,10 +40,22 @@ class EventScheduler[E](val speedupFactor: Double,
   private var firstEventTime = Long.MinValue
   private var maximumEventTime: Long = Long.MinValue
 
-  @transient private lazy val LOG = LoggerFactory.getLogger(classOf[EventScheduler[E]])
+  private lazy val LOG = LoggerFactory.getLogger(classOf[EventScheduler[E]])
 
-  def schedule(events: Iterable[(E, Long)]): Unit = events.foreach { case (event, eventTime) => schedule(event, eventTime) }
+  /**
+    * Schedule a collection of events based on their event times
+    *
+    * @param events collection tuples (event, event time)
+    */
+  def schedule(events: Iterable[(E, Long)]): Unit =
+    events.foreach { case (event, eventTime) => schedule(event, eventTime) }
 
+  /**
+    * Schedule an individual event based on a given event time
+    *
+    * @param event     the event to schedule
+    * @param eventTime the event time based on which to schedule the event
+    */
   def schedule(event: E, eventTime: Long): Unit = {
     if (expectOrderedInput) assert(eventTime >= maximumEventTime, s"event time $eventTime < maximum $maximumEventTime")
 
@@ -58,12 +74,37 @@ class EventScheduler[E](val speedupFactor: Double,
     queue += ((eventTime + delayMillis, Left((event, eventTime)))) // schedule the event
   }
 
+  /**
+    * The current length of the schedule queue (to be reported in metrics)
+    *
+    * @return length of queue
+    */
   def scheduleLength: Int = queue.size
 
+  /**
+    * The current number of scheduled events (to be reported in metrics)
+    *
+    * @return
+    */
   def scheduledEvents: Int = queue.count(_._2.isLeft)
 
+  /**
+    * The current number of scheduled watermarks (to be reported in metrics)
+    *
+    * @return
+    */
   def scheduledWatermarks: Int = queue.count(_._2.isRight)
 
+  /**
+    * Process the pending events/watermarks
+    *
+    * @param emitEvent     function to emit a scheduled event
+    * @param emitWatermark function to emit a scheduled watermark
+    * @param wait          function to wait a given number of milliseconds (can be passed in to facilitate unit testing)
+    * @param isCancelled   function returning a value indicating if the operation was cancelled
+    * @param flush         indicates if the queue should be fully flushed (e.g. when no further input is expected)
+    * @return delayed timestamp of upcoming event in queue (None if queue is empty or next scheduled item is a watermark)
+    */
   def processPending(emitEvent: (E, Long) => Unit,
                      emitWatermark: Watermark => Unit,
                      wait: Long => Unit,
@@ -111,6 +152,7 @@ class EventScheduler[E](val speedupFactor: Double,
 
   private def scheduleWatermark(delayedEventTime: Long, intervalMillis: Long): Unit = {
     require(intervalMillis > 0, "positive watermark interval expected")
+
     val nextEmitTime = delayedEventTime + intervalMillis
     val nextEventTime = nextEmitTime - maximumDelayMillis - 1
     val nextWatermark = new Watermark(nextEventTime)
