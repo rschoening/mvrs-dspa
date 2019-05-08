@@ -111,7 +111,7 @@ class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, coun
             activeUserSet.size, postCreatedInWindow))
       }
       else {
-        assert(futureBucketCount > 0)
+        assert(futureBucketCount > 0) // TODO revise, after switching to reading from Kafka with SimpleReplay function and in the context of checkpoints
       }
 
       LOG.debug(s"registering FOLLOWING timer for $timestamp + $slide (current watermark: ${ctx.timerService.currentWatermark()})")

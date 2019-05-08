@@ -253,7 +253,7 @@ object BuildReplyTreeProcessFunction {
     loop(Set())(replies, getChildren)
   }
 
-  private def resolve(c: RawCommentEvent, postId: Long): CommentEvent = {
+  private def resolve(c: RawCommentEvent, postId: Long): CommentEvent =
     CommentEvent(
       c.commentId,
       c.personId,
@@ -264,6 +264,5 @@ object BuildReplyTreeProcessFunction {
       postId,
       c.replyToCommentId,
       c.placeId)
-  }
 
 }
