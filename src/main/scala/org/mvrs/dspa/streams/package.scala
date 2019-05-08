@@ -4,8 +4,8 @@ import kantan.csv.RowDecoder
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.scala.{DataStream, OutputTag, StreamExecutionEnvironment, createTypeInformation}
 import org.mvrs.dspa.functions.{ReplayedCsvFileSourceFunction, SimpleScaledReplayFunction}
-import org.mvrs.dspa.jobs.preparation.BuildReplyTreeProcessFunction
 import org.mvrs.dspa.model.{CommentEvent, LikeEvent, PostEvent, RawCommentEvent}
+import org.mvrs.dspa.streams.BuildReplyTreeProcessFunction
 import org.mvrs.dspa.utils.FlinkUtils
 
 package object streams {

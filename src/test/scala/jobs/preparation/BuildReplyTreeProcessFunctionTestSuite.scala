@@ -1,7 +1,7 @@
 package jobs.preparation
 
-import org.mvrs.dspa.jobs.preparation.BuildReplyTreeProcessFunction
 import org.mvrs.dspa.model.RawCommentEvent
+import org.mvrs.dspa.streams.BuildReplyTreeProcessFunction
 import org.mvrs.dspa.utils.DateTimeUtils
 import org.scalatest.{FlatSpec, Matchers}
 

@@ -11,13 +11,14 @@ import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
 import org.mvrs.dspa.model.{CommentEvent, RawCommentEvent}
 import org.mvrs.dspa.streams
+import org.mvrs.dspa.streams.BuildReplyTreeProcessFunction
 import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
 import org.scalatest.Assertions.assertResult
 
 import scala.collection.JavaConverters._
 
 /**
-  * Integration test suite for [[org.mvrs.dspa.jobs.preparation.BuildReplyTreeProcessFunction]]
+  * Integration test suite for [[BuildReplyTreeProcessFunction]]
   *
   * since the execution is not deterministic with parallelism > 1, the tests are repeated
   */
