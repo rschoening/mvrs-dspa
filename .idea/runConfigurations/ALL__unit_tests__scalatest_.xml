@@ -1,0 +1,20 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="ALL: unit tests (scalatest)" type="ScalaTestRunConfiguration" factoryName="ScalaTest">
+    <module name="mvrs-dspa" />
+    <setting name="path" value="" />
+    <setting name="vmparams" value="" />
+    <setting name="params" value="" />
+    <setting name="workingDirectory" value="file://$PROJECT_DIR$" />
+    <setting name="searchForTest" value="Across module dependencies" />
+    <setting name="showProgressMessages" value="true" />
+    <setting name="useSbt" value="false" />
+    <setting name="useUiWithSbt" value="false" />
+    <setting name="jrePath" value="" />
+    <envs />
+    <setting name="testKind" value="All in package" />
+    <setting name="package" value="" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

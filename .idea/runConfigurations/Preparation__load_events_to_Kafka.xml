@@ -5,7 +5,7 @@
     <option name="PROGRAM_PARAMETERS" value="local-with-ui" />
     <extension name="coverage">
       <pattern>
-        <option name="PATTERN" value="org.mvrs.dspa.jobs.preparation.*" />
+        <option name="PATTERN" value="org.mvrs.dspa.streams.*" />
         <option name="ENABLED" value="true" />
       </pattern>
     </extension>

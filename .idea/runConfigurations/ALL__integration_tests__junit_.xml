@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="All integration tests" type="JUnit" factoryName="JUnit">
+  <configuration default="false" name="ALL: integration tests (junit)" type="JUnit" factoryName="JUnit">
     <module name="mvrs-dspa" />
     <option name="PACKAGE_NAME" value="" />
     <option name="MAIN_CLASS_NAME" value="" />
