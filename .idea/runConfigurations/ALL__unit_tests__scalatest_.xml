@@ -13,6 +13,24 @@
     <envs />
     <setting name="testKind" value="All in package" />
     <setting name="package" value="" />
+    <buffered bufClass="functions.EventSchedulerTestSuite" />
+    <buffered bufClass="functions.EventSchedulerTestSuite" />
+    <buffered bufClass="functions.PostStatisticsFunctionTestSuite" />
+    <buffered bufClass="functions.PostStatisticsFunctionTestSuite" />
+    <buffered bufClass="jobs.clustering.ClusterModelTestSuite" />
+    <buffered bufClass="jobs.clustering.ClusterModelTestSuite" />
+    <buffered bufClass="jobs.clustering.ClusteringParameterTestSuite" />
+    <buffered bufClass="jobs.clustering.ClusteringParameterTestSuite" />
+    <buffered bufClass="jobs.clustering.KMeansClusteringTestSuite" />
+    <buffered bufClass="jobs.clustering.KMeansClusteringTestSuite" />
+    <buffered bufClass="jobs.preparation.BuildReplyTreeProcessFunctionTestSuite" />
+    <buffered bufClass="jobs.preparation.BuildReplyTreeProcessFunctionTestSuite" />
+    <buffered bufClass="jobs.recommendations.RecommendationUtilsTestSuite" />
+    <buffered bufClass="jobs.recommendations.RecommendationUtilsTestSuite" />
+    <buffered bufClass="utils.Avro4sTrials" />
+    <buffered bufClass="utils.Avro4sTrials" />
+    <buffered bufClass="utils.ParseUtilsSuite" />
+    <buffered bufClass="utils.ParseUtilsSuite" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>
