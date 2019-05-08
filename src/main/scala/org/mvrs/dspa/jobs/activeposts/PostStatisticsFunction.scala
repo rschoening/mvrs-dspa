@@ -49,7 +49,7 @@ class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, coun
     LOG.debug(s"onTimer: $timestamp for key: ${ctx.getCurrentKey} (last activity: $lastActivity window size: ${windowSize.toMilliseconds}")
 
     if (lastActivity < timestamp - windowSize.toMilliseconds) {
-      // nothing to report, now new timer to register
+      // Last activity is before start of window. Nothing to report, now new timer to register
       LOG.debug(s"- last activity outside of window - go to sleep until next event arrives")
       bucketMapState.clear()
       windowEndState.clear()
@@ -76,7 +76,7 @@ class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, coun
         entry => {
           val bucketTimestamp = entry.getKey
 
-          if (bucketTimestamp > timestamp) {
+          if (bucketTimestamp > timestamp) { // TODO revise > (clearly define all timestamps and intervals)
             futureBucketCount += 1 // future bucket, ignore (count for later assertion)
           }
           else if (bucketTimestamp <= timestamp - windowSize.toMilliseconds) bucketsToDrop += bucketTimestamp // to be evicted
@@ -87,9 +87,8 @@ class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, coun
             commentCount += bucket.commentCount
             replyCount += bucket.replyCount
             likeCount += bucket.likeCount
-            if (bucket.originalPost) {
-              postCreatedInWindow = true
-            }
+
+            if (bucket.originalPost) postCreatedInWindow = true
 
             // alternative (originally considered in design document):
             // MapState personId -> last activity date
@@ -161,9 +160,9 @@ class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, coun
     else LOG.debug(s"Regular event, to current bucket: $value")
   }
 
-  private def updateBucket(bucketTimestamp: Long, f: Bucket => Unit): Unit = {
+  private def updateBucket(bucketTimestamp: Long, action: Bucket => Unit): Unit = {
     val bucket = getBucket(bucketTimestamp)
-    f(bucket)
+    action(bucket)
     bucketMapState.put(bucketTimestamp, bucket)
   }
 
@@ -176,8 +175,6 @@ class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, coun
       newBucket
     }
   }
-
-
 }
 
 object PostStatisticsFunction {
