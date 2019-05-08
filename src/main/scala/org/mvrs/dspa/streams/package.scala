@@ -1,7 +1,6 @@
 package org.mvrs.dspa
 
 import kantan.csv.RowDecoder
-import org.apache.flink.api.common.time
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.scala.{DataStream, OutputTag, StreamExecutionEnvironment, createTypeInformation}
 import org.mvrs.dspa.functions.{ReplayedCsvFileSourceFunction, SimpleScaledReplayFunction}
@@ -51,7 +50,8 @@ package object streams {
     (rootedComments, droppedReplies)
   }
 
-  def rawComments()(implicit env: StreamExecutionEnvironment): DataStream[RawCommentEvent] = {
+  def rawComments(speedupFactorOverride: Option[Double] = None)
+                 (implicit env: StreamExecutionEnvironment): DataStream[RawCommentEvent] = {
     implicit val decoder: RowDecoder[RawCommentEvent] = RawCommentEvent.csvDecoder
 
     env.addSource(
@@ -59,14 +59,14 @@ package object streams {
         Settings.config.getString("data.comments-csv-path"),
         skipFirstLine = true, '|',
         extractEventTime = _.timestamp,
-        Settings.config.getInt("data.speedup-factor"),
+        getSpeedupFactor(speedupFactorOverride),
         Settings.config.getInt("data.random-delay"),
         Settings.config.getInt("data.csv-watermark-interval")
       )
     )
   }
 
-  def rawCommentsFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)
+  def rawCommentsFromCsv(filePath: String, speedupFactor: Double = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)
                         (implicit env: StreamExecutionEnvironment): DataStream[RawCommentEvent] = {
     implicit val decoder: RowDecoder[RawCommentEvent] = RawCommentEvent.csvDecoder
 
@@ -79,57 +79,60 @@ package object streams {
       watermarkInterval))
   }
 
-  def comments(kafkaConsumerGroup: Option[String] = None)(implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] =
+  def comments(kafkaConsumerGroup: Option[String] = None, speedupFactorOverride: Option[Double] = None)
+              (implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] =
     kafkaConsumerGroup.map(
       commentsFromKafka(
         _,
-        Settings.config.getInt("data.speedup-factor")
+        getSpeedupFactor(speedupFactorOverride)
       )
     ).getOrElse(
       commentsFromCsv(
         Settings.config.getString("data.comments-csv-path"),
-        Settings.config.getInt("data.speedup-factor"),
+        getSpeedupFactor(speedupFactorOverride),
         Settings.config.getInt("data.random-delay"),
         Settings.config.getInt("data.csv-watermark-interval"),
       )
     )
 
-  def posts(kafkaConsumerGroup: Option[String] = None)(implicit env: StreamExecutionEnvironment): DataStream[PostEvent] =
+  def posts(kafkaConsumerGroup: Option[String] = None, speedupFactorOverride: Option[Double] = None)
+           (implicit env: StreamExecutionEnvironment): DataStream[PostEvent] =
     kafkaConsumerGroup.map(
       postsFromKafka(
         _,
-        Settings.config.getInt("data.speedup-factor")
+        getSpeedupFactor(speedupFactorOverride),
       )
     ).getOrElse(
       postsFromCsv(
         Settings.config.getString("data.posts-csv-path"),
-        Settings.config.getInt("data.speedup-factor"),
+        getSpeedupFactor(speedupFactorOverride),
         Settings.config.getInt("data.random-delay"),
         Settings.config.getInt("data.csv-watermark-interval"),
       )
     )
 
-  def likes(kafkaConsumerGroup: Option[String] = None)(implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] =
+  def likes(kafkaConsumerGroup: Option[String] = None, speedupFactorOverride: Option[Double] = None)
+           (implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] =
     kafkaConsumerGroup.map(
       likesFromKafka(
         _,
-        Settings.config.getInt("data.speedup-factor")
+        getSpeedupFactor(speedupFactorOverride),
       )
     ).getOrElse(
       likesFromCsv(
         Settings.config.getString("data.likes-csv-path"),
-        Settings.config.getInt("data.speedup-factor"),
+        getSpeedupFactor(speedupFactorOverride),
         Settings.config.getInt("data.random-delay"),
         Settings.config.getInt("data.csv-watermark-interval"),
       )
     )
 
-  def commentsFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)
+  def commentsFromCsv(filePath: String, speedupFactor: Double = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)
                      (implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] = {
     resolveReplyTree(rawCommentsFromCsv(filePath, speedupFactor, randomDelay, watermarkInterval))
   }
 
-  def likesFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)
+  def likesFromCsv(filePath: String, speedupFactor: Double = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)
                   (implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
     implicit val decoder: RowDecoder[LikeEvent] = LikeEvent.csvDecoder
 
@@ -142,7 +145,7 @@ package object streams {
       watermarkInterval))
   }
 
-  def postsFromCsv(filePath: String, speedupFactor: Int = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)
+  def postsFromCsv(filePath: String, speedupFactor: Double = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)
                   (implicit env: StreamExecutionEnvironment): DataStream[PostEvent] = {
     implicit val decoder: RowDecoder[PostEvent] = PostEvent.csvDecoder
 
@@ -155,7 +158,7 @@ package object streams {
       watermarkInterval))
   }
 
-  def commentsFromKafka(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)
+  def commentsFromKafka(consumerGroup: String, speedupFactor: Double = 0, randomDelay: Int = 0)
                        (implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] = {
     val commentsSource = KafkaTopics.comments.consumer(consumerGroup)
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
@@ -165,7 +168,7 @@ package object streams {
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[CommentEvent](maxOutOfOrderness, _.timestamp))
   }
 
-  def postsFromKafka(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)
+  def postsFromKafka(consumerGroup: String, speedupFactor: Double = 0, randomDelay: Int = 0)
                     (implicit env: StreamExecutionEnvironment): DataStream[PostEvent] = {
     val postsSource = KafkaTopics.posts.consumer(consumerGroup)
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
@@ -175,7 +178,7 @@ package object streams {
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[PostEvent](maxOutOfOrderness, _.timestamp))
   }
 
-  def likesFromKafka(consumerGroup: String, speedupFactor: Int = 0, randomDelay: Int = 0)
+  def likesFromKafka(consumerGroup: String, speedupFactor: Double = 0, randomDelay: Int = 0)
                     (implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
     val likesSource = KafkaTopics.likes.consumer(consumerGroup)
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
@@ -185,6 +188,10 @@ package object streams {
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[LikeEvent](maxOutOfOrderness, _.timestamp))
   }
 
-  private def getMaxOutOfOrderness(speedupFactor: Int, randomDelay: Int): time.Time =
-    org.apache.flink.api.common.time.Time.milliseconds(if (speedupFactor == 0) randomDelay else randomDelay / speedupFactor)
+  private def getSpeedupFactor(speedupFactorOverride: Option[Double]): Double =
+    speedupFactorOverride.getOrElse(Settings.config.getDouble("data.speedup-factor"))
+
+
+  private def getMaxOutOfOrderness(speedupFactor: Double, randomDelay: Int): Time =
+    Time.milliseconds(if (speedupFactor == 0.0) randomDelay else (randomDelay / speedupFactor).ceil.toLong)
 }
