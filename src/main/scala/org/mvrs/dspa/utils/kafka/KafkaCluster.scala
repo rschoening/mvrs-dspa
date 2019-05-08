@@ -47,7 +47,7 @@ class KafkaCluster(val servers: String) {
     waitForDeletion(topicName, options.timeoutMs())
   }
 
-  private def waitForDeletion(topicName: String, timeoutMillis: Int, wait: Int = 500): Unit = {
+  private def waitForDeletion(topicName: String, timeoutMillis: Int, wait: Int = 1000): Unit = {
     val timedOut = System.currentTimeMillis() + timeoutMillis
     do {
       Thread.sleep(wait)
