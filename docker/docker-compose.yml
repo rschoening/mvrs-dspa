@@ -100,19 +100,20 @@ services:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     command: "--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus"
     ports:
-      - 9090:9090
+      - 9091:9090
     depends_on:
       - exporter
+      
   exporter:
     image: prom/node-exporter:latest
     ports:
-      - "9100:9100"
+      - "9101:9100"
   #    network_mode: host
 
   grafana:
     image: grafana/grafana
     ports:
-      - "8080:3000"
+      - "8081:3000"
     depends_on:
       - prometheus
     volumes:
