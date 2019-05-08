@@ -3,8 +3,7 @@ package org.mvrs.dspa.streams
 import org.apache.flink.api.common.state.{ListState, ListStateDescriptor}
 import org.apache.flink.api.scala.metrics.ScalaGauge
 import org.apache.flink.configuration.Configuration
-import org.apache.flink.dropwizard.metrics.DropwizardMeterWrapper
-import org.apache.flink.metrics.{Counter, Gauge, Meter}
+import org.apache.flink.metrics.{Counter, Gauge}
 import org.apache.flink.runtime.state.{FunctionInitializationContext, FunctionSnapshotContext}
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction
 import org.apache.flink.streaming.api.functions.co.KeyedBroadcastProcessFunction
@@ -32,12 +31,8 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   @transient private var postForCommentListState: ListState[Map[Long, Long]] = _
 
   // metrics
-  // TODO remove redundant metrics (eg. throughput, row counts per input/output)
-  @transient private var firstLevelCommentCounter: Counter = _
-  @transient private var replyCounter: Counter = _
   @transient private var resolvedReplyCount: Counter = _
   @transient private var droppedReplyCounter: Counter = _
-  @transient private var throughputMeter: Meter = _
   @transient private var danglingRepliesCount: Gauge[Int] = _
 
   // TODO revise watermark-related logic
@@ -48,19 +43,14 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   override def open(parameters: Configuration): Unit = {
     val group = getRuntimeContext.getMetricGroup
 
-    firstLevelCommentCounter = group.counter("firstlevelcomment-counter")
-    replyCounter = group.counter("reply-counter")
     resolvedReplyCount = group.counter("rootedreply-counter")
     droppedReplyCounter = group.counter("droppedreply-counter")
-    throughputMeter = group.meter("throughput-meter", new DropwizardMeterWrapper(new com.codahale.metrics.Meter()))
     danglingRepliesCount = group.gauge[Int, ScalaGauge[Int]]("dangling-replies-gauge", ScalaGauge[Int](() => danglingReplies.size))
   }
 
   override def processElement(firstLevelComment: CommentEvent,
                               ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, RawCommentEvent, CommentEvent]#ReadOnlyContext,
                               out: Collector[CommentEvent]): Unit = {
-    firstLevelCommentCounter.inc()
-
     val postId = firstLevelComment.postId
     assert(ctx.getCurrentKey == postId) // must be keyed by post id
 
@@ -69,7 +59,6 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     postForComment.put(firstLevelComment.commentId, postId)
 
     out.collect(firstLevelComment)
-    throughputMeter.markEvent()
 
     // process all replies that were waiting for this comment (recursively)
     if (danglingReplies.contains(firstLevelComment.commentId)) {
@@ -118,15 +107,12 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   override def processBroadcastElement(reply: RawCommentEvent,
                                        ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, RawCommentEvent, CommentEvent]#Context,
                                        out: Collector[CommentEvent]): Unit = {
-    replyCounter.inc() // count per parallel worker
-
     val postId = postForComment.get(reply.replyToCommentId.get)
 
     if (postId.isDefined) {
       postForComment(reply.commentId) = postId.get // remember our new friend
 
       out.collect(resolve(reply, postId.get)) // ... and immediately emit the rooted reply
-      throughputMeter.markEvent()
     }
     else rememberDanglingReply(reply) // cache for later evaluation, globally in this operator/worker
 
@@ -229,7 +215,6 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
       })
 
     // metrics
-    throughputMeter.markEvent(count)
     resolvedReplyCount.inc(count)
   }
 
