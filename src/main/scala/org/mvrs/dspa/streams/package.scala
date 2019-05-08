@@ -10,47 +10,15 @@ import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.utils.kafka.KafkaTopic
 
 package object streams {
-  def resolveReplyTree(rawComments: DataStream[RawCommentEvent]): DataStream[CommentEvent] =
-    resolveReplyTree(rawComments, droppedRepliesStream = false)._1
 
-  def resolveReplyTree(rawComments: DataStream[RawCommentEvent],
-                       droppedRepliesStream: Boolean): (DataStream[CommentEvent], DataStream[RawCommentEvent]) = {
-    val firstLevelComments =
-      rawComments
-        .filter(_.replyToPostId.isDefined).name("filter: first-level comments")
-        .map(c =>
-          CommentEvent(
-            c.commentId,
-            c.personId,
-            c.creationDate,
-            c.locationIP,
-            c.browserUsed,
-            c.content,
-            c.replyToPostId.get,
-            None,
-            c.placeId
-          )
-        )
-        .keyBy(_.postId)
-
-    val repliesBroadcast =
-      rawComments
-        .filter(_.replyToPostId.isEmpty).name("filter: replies")
-        .broadcast()
-
-    val outputTagDroppedReplies = new OutputTag[RawCommentEvent]("dropped replies")
-
-    val outputTag = if (droppedRepliesStream) Some(outputTagDroppedReplies) else None
-
-    val rootedComments: DataStream[CommentEvent] = firstLevelComments
-      .connect(repliesBroadcast)
-      .process(new BuildReplyTreeProcessFunction(outputTag)).name("reconstruct reply tree")
-
-    val droppedReplies = rootedComments.getSideOutput(outputTagDroppedReplies)
-
-    (rootedComments, droppedReplies)
-  }
-
+  /**
+    * Gets the stream of comments (with assigned post ids), either from kafka or from csv file
+    *
+    * @param kafkaConsumerGroup    if specified, the stream is consumed from kafka. Otherwise (None), from csv file
+    * @param speedupFactorOverride optional override of the speedup factor defined in the settings
+    * @param env                   the implicit stream execution environment
+    * @return stream of comments with assigned post ids, i.e. after reply tree reconstruction
+    */
   def comments(kafkaConsumerGroup: Option[String] = None, speedupFactorOverride: Option[Double] = None)
               (implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] =
     kafkaConsumerGroup.map(
@@ -67,6 +35,14 @@ package object streams {
       )
     )
 
+  /**
+    * Gets the stream of post events, either from kafka or from csv file
+    *
+    * @param kafkaConsumerGroup    if specified, the stream is consumed from kafka. Otherwise (None), from csv file
+    * @param speedupFactorOverride optional override of the speedup factor defined in the settings
+    * @param env                   the implicit stream execution environment
+    * @return stream of post events
+    */
   def posts(kafkaConsumerGroup: Option[String] = None, speedupFactorOverride: Option[Double] = None)
            (implicit env: StreamExecutionEnvironment): DataStream[PostEvent] =
     kafkaConsumerGroup.map(
@@ -83,6 +59,14 @@ package object streams {
       )
     )
 
+  /**
+    * Gets the stream of like events, either from kafka or from csv file
+    *
+    * @param kafkaConsumerGroup    if specified, the stream is consumed from kafka. Otherwise (None), from csv file
+    * @param speedupFactorOverride optional override of the speedup factor defined in the settings
+    * @param env                   the implicit stream execution environment
+    * @return stream of like events
+    */
   def likes(kafkaConsumerGroup: Option[String] = None, speedupFactorOverride: Option[Double] = None)
            (implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] =
     kafkaConsumerGroup.map(
@@ -99,10 +83,17 @@ package object streams {
       )
     )
 
+  /**
+    * Gets the stream of post statistics from kafka
+    *
+    * @param kafkaConsumerGroup    kafka consumer group
+    * @param speedupFactorOverride optional override of the speedup factor defined in the settings
+    * @param env                   the implicit stream execution environment
+    * @return stream of post statistics produced per active post at end of window
+    */
   def postStatistics(kafkaConsumerGroup: String, speedupFactorOverride: Option[Double] = None)
                     (implicit env: StreamExecutionEnvironment): DataStream[PostStatistics] =
     postStatisticsFromKafka(kafkaConsumerGroup, getSpeedupFactor(speedupFactorOverride))
-
 
   def rawCommentsFromCsv(filePath: String, speedupFactor: Double = 0, randomDelay: Long = 0, watermarkInterval: Long = 10000)
                         (implicit env: StreamExecutionEnvironment): DataStream[RawCommentEvent] = {
@@ -172,6 +163,48 @@ package object streams {
   def likesFromKafka(consumerGroup: String, speedupFactor: Double = 0, randomDelay: Long = 0)
                     (implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] =
     fromKafka(KafkaTopics.likes, consumerGroup, _.timestamp, speedupFactor, randomDelay)
+
+  def resolveReplyTree(rawComments: DataStream[RawCommentEvent]): DataStream[CommentEvent] =
+    resolveReplyTree(rawComments, droppedRepliesStream = false)._1
+
+  def resolveReplyTree(rawComments: DataStream[RawCommentEvent],
+                       droppedRepliesStream: Boolean): (DataStream[CommentEvent], DataStream[RawCommentEvent]) = {
+    val firstLevelComments =
+      rawComments
+        .filter(_.replyToPostId.isDefined).name("filter: first-level comments")
+        .map(c =>
+          CommentEvent(
+            c.commentId,
+            c.personId,
+            c.creationDate,
+            c.locationIP,
+            c.browserUsed,
+            c.content,
+            c.replyToPostId.get,
+            None,
+            c.placeId
+          )
+        )
+        .keyBy(_.postId)
+
+    val repliesBroadcast =
+      rawComments
+        .filter(_.replyToPostId.isEmpty).name("filter: replies")
+        .broadcast()
+
+    val outputTagDroppedReplies = new OutputTag[RawCommentEvent]("dropped replies")
+
+    val outputTag = if (droppedRepliesStream) Some(outputTagDroppedReplies) else None
+
+    val rootedComments: DataStream[CommentEvent] = firstLevelComments
+      .connect(repliesBroadcast)
+      .process(new BuildReplyTreeProcessFunction(outputTag)).name("reconstruct reply tree")
+
+    val droppedReplies = rootedComments.getSideOutput(outputTagDroppedReplies)
+
+    (rootedComments, droppedReplies)
+  }
+
 
   private def fromKafka[T: TypeInformation](topic: KafkaTopic[T],
                                             consumerGroup: String,
