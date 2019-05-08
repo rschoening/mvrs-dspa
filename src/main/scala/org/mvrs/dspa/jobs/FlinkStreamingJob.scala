@@ -19,13 +19,15 @@ import org.mvrs.dspa.utils.FlinkUtils
   */
 abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCharacteristic.EventTime,
                                  parallelism: Int = 4,
-                                 enableGenericTypes: Boolean = false) extends FlinkJob {
+                                 enableGenericTypes: Boolean = false,
+                                 autoWatermarkInterval: Int = 200) extends FlinkJob {
   // read settings
   // - to make the class more general-purpose, read settings in project-specific subclass and
   //   provide ctor args for all these here
   private val latencyTrackingInterval = Settings.config.getInt("jobs.latency-tracking-interval")
   private val stateBackendPath = Settings.config.getString("jobs.state-backend-path")
   private val checkpointInterval = Settings.config.getLong("jobs.checkpoint-interval")
+  private val checkpointMinPause = Settings.config.getLong("jobs.checkpoint-min-pause")
 
   implicit val env: StreamExecutionEnvironment = FlinkUtils.createStreamExecutionEnvironment(localWithUI)
 
@@ -40,8 +42,10 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
     env.getConfig.disableGenericTypes() // to make sure the warning can't be overlooked
   }
 
-  if (checkpointInterval > 0)
+  if (checkpointInterval > 0) {
     env.enableCheckpointing(checkpointInterval, CheckpointingMode.EXACTLY_ONCE)
+    env.getCheckpointConfig.setMinPauseBetweenCheckpoints(1000)
+  }
 
   if (stateBackendPath.length > 0) {
 
@@ -52,6 +56,7 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
     env.setStateBackend(stateBackend)
   }
 
+  env.getConfig.setAutoWatermarkInterval(autoWatermarkInterval)
   env.setStreamTimeCharacteristic(timeCharacteristic)
   env.setParallelism(parallelism)
 
