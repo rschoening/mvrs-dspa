@@ -10,9 +10,9 @@ object LoadAllEventsJob extends FlinkStreamingJob {
     KafkaTopics.posts.create(3, 1, overwrite = true)
     KafkaTopics.likes.create(3, 1, overwrite = true)
 
-    streams.comments().addSink(KafkaTopics.comments.producer())
-    streams.posts().addSink(KafkaTopics.posts.producer())
-    streams.likes().addSink(KafkaTopics.likes.producer())
+    streams.comments(speedupFactorOverride = Some(0)).addSink(KafkaTopics.comments.producer())
+    streams.posts(speedupFactorOverride = Some(0)).addSink(KafkaTopics.posts.producer())
+    streams.likes(speedupFactorOverride = Some(0)).addSink(KafkaTopics.likes.producer())
 
     env.execute("Import all events from csv file to Kafka")
   }
