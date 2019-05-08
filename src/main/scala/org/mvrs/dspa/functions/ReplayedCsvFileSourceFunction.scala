@@ -56,8 +56,7 @@ class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
       watermarkInterval, charsetName)
 
   override def open(parameters: Configuration): Unit = {
-    val uri = new URI(filePath)
-    val file = new java.io.File(uri)
+    val file = new java.io.File(new URI(filePath))
     val config = (if (skipFirstLine) rfc.withHeader() else rfc).withCellSeparator(cellSeparator)
 
     implicit val coded: Codec = charsetName.map(name => Codec(Charset.forName(name))).getOrElse(Codec.UTF8)

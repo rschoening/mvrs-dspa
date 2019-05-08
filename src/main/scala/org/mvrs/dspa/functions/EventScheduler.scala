@@ -28,6 +28,9 @@ class EventScheduler[E](val speedupFactor: Double,
   require(speedupFactor >= 0, s"invalid speedup factor: $speedupFactor")
 
   private lazy val replayStartTime: Long = System.currentTimeMillis
+  /**
+    * Queue of (delayed-event-time, either (event, timestamp) or watermark)
+    */
   private lazy val queue = mutable.PriorityQueue.empty[(Long, Either[(E, Long), Watermark])](Ordering.by((_: (Long, Either[(E, Long), Watermark]))._1).reverse)
 
   private var firstEventTime = Long.MinValue

@@ -10,8 +10,6 @@ import org.mvrs.dspa.jobs.recommendations.{FeaturePrefix, RecommendationUtils}
 import org.mvrs.dspa.utils.FlinkUtils
 
 object LoadStaticDataJob extends FlinkBatchJob {
-  private def path(directory: String, fileName: String): String = s"$directory/$fileName"
-
   def execute(): Unit = {
 
     val directory = Settings.config.getString("data.tables-directory")
@@ -86,6 +84,8 @@ object LoadStaticDataJob extends FlinkBatchJob {
 
     env.execute("import static data for recommendations")
   }
+
+  private def path(directory: String, fileName: String): String = s"$directory/$fileName"
 
   private def sortedValues[V: Ordering](x: Iterator[(Long, V)]): (Long, List[V]) = {
     val t: (Long, List[V]) = x.foldLeft[(Long, List[V])]((0L, Nil))((z, t) => (t._1, t._2 :: z._2))
