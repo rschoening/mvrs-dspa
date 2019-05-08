@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Task: active post statistics" type="Application" factoryName="Application">
+  <configuration default="false" name="Task: active post statistics (kafka -&gt; kafka, post info: kafka -&gt; elasticsearch)" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="org.mvrs.dspa.jobs.activeposts.ActivePostStatisticsJob" />
     <module name="mvrs-dspa" />
     <option name="PROGRAM_PARAMETERS" value="local-with-ui" />
