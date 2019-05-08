@@ -48,11 +48,11 @@ class SimpleScaledReplayFunction[I](extractEventTime: I => Long,
       val scaledEventTimeDiff = eventTimeDiff / speedupFactor
       val replayTime = previousEmitTime + scaledEventTimeDiff
 
-      val waitTime = replayTime - now
+      val waitTime = (replayTime - now).ceil.toLong // round up
 
       log(s"replay time: $replayTime - scaled event time difference: $scaledEventTimeDiff - wait time: $waitTime - item: $value")
 
-      if (waitTime > 0) wait(waitTime.ceil.toLong) // round up
+      if (waitTime > 0) wait(waitTime)
     }
 
     previousEventTime = eventTime
@@ -61,5 +61,3 @@ class SimpleScaledReplayFunction[I](extractEventTime: I => Long,
     value
   }
 }
-
-

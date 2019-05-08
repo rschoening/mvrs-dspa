@@ -47,10 +47,10 @@ object FlinkUtils {
     *                          effect that even slightly late events miss the state that has been set up for them.
     * @return the time-to-live in processing time
     */
-  def getTtl(time: Time, speedupFactor: Int = 0, minimumTimeMillis: Long = 60000): Time =
+  def getTtl(time: Time, speedupFactor: Double = 0, minimumTimeMillis: Long = 60000): Time =
     Time.of(
       if (speedupFactor > 0)
-        math.max(time.toMilliseconds.toDouble / speedupFactor, minimumTimeMillis).toLong
+        math.max(time.toMilliseconds / speedupFactor, minimumTimeMillis).toLong
       else
         minimumTimeMillis,
       TimeUnit.MILLISECONDS

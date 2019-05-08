@@ -1,19 +1,26 @@
 package org.mvrs.dspa.jobs.preparation
 
+import org.apache.flink.streaming.api.scala.DataStream
 import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.streams
 import org.mvrs.dspa.streams.KafkaTopics
+import org.mvrs.dspa.utils.kafka.KafkaTopic
 
 object LoadAllEventsJob extends FlinkStreamingJob {
   def execute(): Unit = {
-    KafkaTopics.comments.create(3, 1, overwrite = true)
-    KafkaTopics.posts.create(3, 1, overwrite = true)
-    KafkaTopics.likes.create(3, 1, overwrite = true)
+    val speedup = Some(0.0) // don't use speedup for writing events to kafka
 
-    streams.comments(speedupFactorOverride = Some(0)).addSink(KafkaTopics.comments.producer())
-    streams.posts(speedupFactorOverride = Some(0)).addSink(KafkaTopics.posts.producer())
-    streams.likes(speedupFactorOverride = Some(0)).addSink(KafkaTopics.likes.producer())
+    writeToNewTopic(streams.comments(speedupFactorOverride = speedup), KafkaTopics.comments)
+
+    writeToNewTopic(streams.likes(speedupFactorOverride = speedup), KafkaTopics.likes)
+
+    writeToNewTopic(streams.posts(speedupFactorOverride = speedup), KafkaTopics.posts)
 
     env.execute("Import all events from csv file to Kafka")
+  }
+
+  private def writeToNewTopic[E](stream: DataStream[E], topic: KafkaTopic[E]) = {
+    topic.create(3, 1, overwrite = true)
+    stream.addSink(topic.producer()).name(s"kafka: ${topic.name}")
   }
 }

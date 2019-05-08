@@ -7,7 +7,7 @@ import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.jobs.recommendations.AsyncForumLookupFunction
 import org.mvrs.dspa.model._
 import org.mvrs.dspa.streams.KafkaTopics
-import org.mvrs.dspa.utils.FlinkUtils
+import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
 import org.mvrs.dspa.{Settings, streams}
 
 // TODO observe checkpoint size/time (growth?)
@@ -39,11 +39,9 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
     val postInfoStream = streams.posts(Some("active-post-statistics-postinfos"))
 
     // write post infos to elasticsearch, for lookup when writing post stats to elasticsearch
-    val postsWithForumFeatures: DataStream[(PostEvent, String)] = lookupForumFeatures(postInfoStream)
-
-    val postInfos = postsWithForumFeatures.map(createPostInfo _)
-
-    postInfos.addSink(ElasticSearchIndexes.postInfos.createSink(100))
+    lookupForumFeatures(postInfoStream)
+      .addSink(ElasticSearchIndexes.postInfos.createSink(10))
+      .name(s"elasticsearch: ${ElasticSearchIndexes.postInfos.indexName}")
 
     // calculate post statistics
     val statsStream = statisticsStream(
@@ -52,10 +50,11 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
 
     // write to kafka topic
     statsStream
-      .keyBy(_.postId)
+      .keyBy(_.postId) // key by post id to preserve order
       .addSink(KafkaTopics.postStatistics.producer())
+      .name(s"kafka: ${KafkaTopics.postStatistics.name}")
 
-    env.execute("write post statistics to elastic search")
+    env.execute("write post statistics to kafka (and post info to elasticsearch)")
   }
 
   //noinspection ConvertibleToMethodValue
@@ -65,36 +64,37 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
                        windowSize: Time, slide: Time, stateTtl: Time,
                        countPostAuthor: Boolean): DataStream[PostStatistics] = {
     val comments = commentsStream
-      .map(createEvent(_))
+      .map(createEvent(_)).name("map: event record")
       .keyBy(_.postId)
 
     val posts = postsStream
-      .map(createEvent(_))
+      .map(createEvent(_)).name("map: event record")
       .keyBy(_.postId)
 
     val likes = likesStream
-      .map(createEvent(_))
+      .map(createEvent(_)).name("map: event record")
       .keyBy(_.postId)
 
     posts
       .union(comments, likes)
       .keyBy(_.postId)
       .process(new PostStatisticsFunction(windowSize, slide, stateTtl, countPostAuthor))
+      .name(
+        s"calculate post statistics " +
+          s"(window: ${DateTimeUtils.formatDuration(windowSize.toMilliseconds)} / " +
+          s"slide ${DateTimeUtils.formatDuration(slide.toMilliseconds)})"
+      )
   }
 
-  private def lookupForumFeatures(postsStream: DataStream[PostEvent]): DataStream[(PostEvent, String)] = {
+  private def lookupForumFeatures(postsStream: DataStream[PostEvent]): DataStream[PostInfo] =
     FlinkUtils.asyncStream(
       postsStream,
       new AsyncForumLookupFunction(
         ElasticSearchIndexes.forumFeatures.indexName,
-        Settings.elasticSearchNodes: _*))
-      .map(t => (t._1, t._2))
-  }
+        Settings.elasticSearchNodes: _*)).name("DB: look up forum title for post")
+      .map(t => createPostInfo(t._1, t._2)).name("map: post info record")
 
-  private def createPostInfo(t: (PostEvent, String)): PostInfo = {
-    val postEvent = t._1
-    val forumTitle = t._2
-
+  private def createPostInfo(postEvent: PostEvent, forumTitle: String): PostInfo =
     PostInfo(
       postEvent.postId,
       postEvent.personId,
@@ -104,15 +104,18 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
       postEvent.content.getOrElse(""),
       postEvent.imageFile.getOrElse("")
     )
-  }
 
   private def createEvent(e: LikeEvent) = Event(EventType.Like, e.postId, e.personId, e.timestamp)
 
   private def createEvent(e: PostEvent) = Event(EventType.Post, e.postId, e.personId, e.timestamp)
 
-  private def createEvent(e: CommentEvent) = Event(
-    e.replyToCommentId.map(_ => EventType.Reply).getOrElse(EventType.Comment),
-    e.postId, e.personId, e.timestamp)
+  private def createEvent(e: CommentEvent) =
+    Event(
+      e.replyToCommentId.map(_ => EventType.Reply).getOrElse(EventType.Comment),
+      e.postId,
+      e.personId,
+      e.timestamp
+    )
 }
 
 
