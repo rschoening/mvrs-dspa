@@ -99,7 +99,6 @@ object FlinkUtils {
     )
 
     // TODO ensure transactional writes
-
     producer.setWriteTimestampToKafka(false) // TODO not sure if kafka timestamps will be of any use - deactivate for now
     producer
   }
@@ -116,17 +115,22 @@ object FlinkUtils {
     consumer
   }
 
-  def createKafkaConsumer[T: TypeInformation](topic: String, props: Properties)
+  def createKafkaConsumer[T: TypeInformation](topic: String, props: Properties, commitOffsetsOnCheckpoints: Boolean = false)
                                              (implicit env: StreamExecutionEnvironment): FlinkKafkaConsumer[T] = {
-    val consumer = new FlinkKafkaConsumer[T](
-      topic, new TypeInformationSerializationSchema[T](createTypeInformation[T], env.getConfig), props)
-    consumer.setStartFromEarliest()
-    consumer
+    createKafkaConsumer(
+      topic,
+      props,
+      new TypeInformationSerializationSchema[T](createTypeInformation[T], env.getConfig),
+      commitOffsetsOnCheckpoints)
   }
 
-  def createKafkaConsumer[T](topic: String, props: Properties, deserializationSchema: DeserializationSchema[T]): FlinkKafkaConsumer[T] = {
+  def createKafkaConsumer[T](topic: String,
+                             props: Properties,
+                             deserializationSchema: DeserializationSchema[T],
+                             commitOffsetsOnCheckpoints: Boolean): FlinkKafkaConsumer[T] = {
     val consumer = new FlinkKafkaConsumer[T](topic, deserializationSchema, props)
     consumer.setStartFromEarliest()
+    consumer.setCommitOffsetsOnCheckpoints(commitOffsetsOnCheckpoints)
     consumer
   }
 
