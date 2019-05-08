@@ -22,6 +22,7 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
     val windowSize = Settings.duration("jobs.active-post-statistics.window-size")
     val windowSlide = Settings.duration("jobs.active-post-statistics.window-slide")
     val countPostAuthor = Settings.config.getBoolean("jobs.active-post-statistics.count-post-author")
+    val batchSize = Settings.config.getInt("jobs.active-post-statistics.post-info-elasticsearch-batch-size")
     val stateTtl = FlinkUtils.getTtl(windowSize, Settings.config.getInt("data.speedup-factor"))
     val postInfoIndex = ElasticSearchIndexes.postInfos
 
@@ -37,11 +38,9 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
     val postInfoStream = streams.posts(Some("active-post-statistics-postinfos"))
 
     // write post infos to elasticsearch, for lookup when writing post stats to elasticsearch
-    val esSink = postInfoIndex.createSink(batchSize = Settings.config.getInt("post-info-elasticsearch-batch-size"))
-
     lookupForumFeatures(postInfoStream)
-      .addSink(esSink)
-      .name(s"elasticsearch: ${postInfoIndex.indexName}")
+      .addSink(postInfoIndex.createSink(batchSize))
+      .name(s"ElasticSearch: ${postInfoIndex.indexName}")
 
     // calculate post statistics
     val statsStream = statisticsStream(

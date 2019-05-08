@@ -10,18 +10,19 @@ import org.mvrs.dspa.{Settings, streams}
 
 object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob(enableGenericTypes = true) {
   def execute(): Unit = {
+    // read settings
     implicit val esNodes: Seq[ElasticSearchNode] = Settings.elasticSearchNodes
+    val batchSize = Settings.config.getInt("jobs.active-post-statistics.post-statistics-elasticsearch-batch-size")
 
-    ElasticSearchIndexes.activePostStatistics.create()
+    val esIndex = ElasticSearchIndexes.activePostStatistics;
+    esIndex.create()
 
     val postStatisticsStream: DataStream[PostStatistics] = streams.postStatistics("move-post-statistics")
 
-    val enrichedStream: DataStream[(PostStatistics, String, String)] = enrichPostStatistics(postStatisticsStream)
+    enrichPostStatistics(postStatisticsStream)
+      .addSink(esIndex.createSink(batchSize))
+      .name(s"ElasticSearch: ${esIndex.indexName}")
 
-    val esSink = ElasticSearchIndexes.activePostStatistics.createSink(
-      batchSize = Settings.config.getInt("post-statistics-elasticsearch-batch-size"))
-
-    enrichedStream.addSink(esSink)
 
     // execute program
     env.execute("Move enriched post statistics from Kafka to ElasticSearch")
