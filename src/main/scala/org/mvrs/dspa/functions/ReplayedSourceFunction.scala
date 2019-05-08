@@ -1,6 +1,10 @@
 package org.mvrs.dspa.functions
 
+import org.apache.flink.api.scala.metrics.ScalaGauge
+import org.apache.flink.dropwizard.metrics.DropwizardMeterWrapper
+import org.apache.flink.metrics.{Counter, Gauge, Meter}
 import org.apache.flink.streaming.api.functions.source.{RichSourceFunction, SourceFunction}
+import org.apache.flink.streaming.api.watermark.Watermark
 import org.mvrs.dspa.functions.ReplayedSourceFunction._
 import org.mvrs.dspa.utils.FlinkUtils
 import org.slf4j.LoggerFactory
@@ -36,6 +40,12 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
   @transient private var isCancelled = false
   @transient private var rowIndex: Int = _
 
+  @transient private var watermarkCounter: Counter = _
+  @transient private var watermarkMeter: Meter = _
+  @transient private var scheduleLength: Gauge[Int] = _
+  @transient private var scheduledEvents: Gauge[Int] = _
+  @transient private var scheduledWatermarks: Gauge[Int] = _
+
   protected def this(parse: IN => OUT,
                      extractEventTime: OUT => Long,
                      speedupFactor: Double = 0,
@@ -47,7 +57,14 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
       watermarkIntervalMillis)
 
   override def run(ctx: SourceFunction.SourceContext[OUT]): Unit = {
-    rowIndex = 0
+
+    val group = getRuntimeContext.getMetricGroup
+
+    watermarkCounter = group.counter("numWatermarks")
+    watermarkMeter = group.meter("numWatermarksPerSecond", new DropwizardMeterWrapper(new com.codahale.metrics.Meter()))
+    scheduleLength = group.gauge[Int, ScalaGauge[Int]]("scheduleLength", ScalaGauge[Int](() => scheduler.scheduleLength))
+    scheduledEvents = group.gauge[Int, ScalaGauge[Int]]("scheduledEvents", ScalaGauge[Int](() => scheduler.scheduledEvents))
+    scheduledWatermarks = group.gauge[Int, ScalaGauge[Int]]("scheduledWatermarks", ScalaGauge[Int](() => scheduler.scheduledWatermarks))
 
     for (input <- inputIterator.takeWhile(_ => !isCancelled)) {
       scheduleInput(input, rowIndex)
@@ -82,10 +99,17 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
   private def processPending(ctx: SourceFunction.SourceContext[OUT], flush: Boolean = false): Unit = {
     scheduler.processPending(
       (e, timestamp) => ctx.collectWithTimestamp(e, timestamp),
-      ctx.emitWatermark,
+      emitWatermark(_, ctx),
       sleep,
       () => isCancelled,
       flush)
+  }
+
+  private def emitWatermark(wm: Watermark, ctx: SourceFunction.SourceContext[OUT]): Unit = {
+    watermarkCounter.inc()
+    watermarkMeter.markEvent()
+
+    ctx.emitWatermark(wm)
   }
 
   private def sleep(waitTime: Long): Unit = if (waitTime > 0) Thread.sleep(waitTime)
