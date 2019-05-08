@@ -36,10 +36,17 @@ class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
                                                         speedupFactor: Double,
                                                         maximumDelayMillis: Int,
                                                         delay: OUT => Long,
-                                                        watermarkIntervalMillis: Long,
+                                                        watermarkIntervalMillis: Int,
                                                         charsetName: Option[String])(implicit rowDecoder: RowDecoder[OUT])
-  extends ReplayedSourceFunction[OUT, OUT](identity[OUT], extractEventTime, speedupFactor, maximumDelayMillis, delay, watermarkIntervalMillis) {
-
+  extends ReplayedSourceFunction[OUT, OUT](
+    identity[OUT],
+    extractEventTime,
+    speedupFactor,
+    maximumDelayMillis,
+    delay,
+    watermarkIntervalMillis,
+    1000
+  ) {
   @transient private var csvReader: Option[CsvReader[ReadResult[OUT]]] = None
 
   def this(filePath: String,
@@ -48,7 +55,7 @@ class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
            extractEventTime: OUT => Long,
            speedupFactor: Double = 0,
            maximumDelayMilliseconds: Int = 0,
-           watermarkInterval: Long = 1000,
+           watermarkInterval: Int = 1000,
            charsetName: Option[String] = None)(implicit rowDecoder: RowDecoder[OUT]) =
     this(filePath, skipFirstLine, cellSeparator, extractEventTime, speedupFactor, maximumDelayMilliseconds,
       if (maximumDelayMilliseconds <= 0) (_: OUT) => 0L

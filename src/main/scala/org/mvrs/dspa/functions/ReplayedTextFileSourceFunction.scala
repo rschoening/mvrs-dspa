@@ -15,8 +15,8 @@ class ReplayedTextFileSourceFunction[OUT](filePath: String,
                                           speedupFactor: Double,
                                           maximumDelayMillis: Int,
                                           delay: OUT => Long,
-                                          watermarkInterval: Long)
-  extends ReplayedSourceFunction[String, OUT](parse, extractEventTime, speedupFactor, maximumDelayMillis, delay, watermarkInterval) {
+                                          watermarkInterval: Int)
+  extends ReplayedSourceFunction[String, OUT](parse, extractEventTime, speedupFactor, maximumDelayMillis, delay, watermarkInterval, 1000) {
 
   @transient private var source: Option[BufferedSource] = None
 
@@ -26,7 +26,7 @@ class ReplayedTextFileSourceFunction[OUT](filePath: String,
            extractEventTime: OUT => Long,
            speedupFactor: Double = 0,
            maximumDelayMilliseconds: Int = 0,
-           watermarkInterval: Long = 1000) =
+           watermarkInterval: Int = 1000) =
     this(filePath, skipFirstLine, parse, extractEventTime, speedupFactor, maximumDelayMilliseconds,
       if (maximumDelayMilliseconds <= 0) (_: OUT) => 0L
       else (_: OUT) => FlinkUtils.getNormalDelayMillis(rand, maximumDelayMilliseconds),

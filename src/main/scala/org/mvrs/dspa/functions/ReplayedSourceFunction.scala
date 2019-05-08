@@ -31,11 +31,18 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
                                                speedupFactor: Double,
                                                maximumDelayMillis: Int,
                                                delay: OUT => Long,
-                                               watermarkIntervalMillis: Long) extends RichSourceFunction[OUT] {
-  // TODO there should be a lower bound to the watermark interval (in resulting processing time). This is straightforward
-  //      when there is a speedup factor, but needs more thought when there is no defined (i.e. infinite) speedup - in this
-  //      case the watermarks cannot be scheduled as they are now (scheduled based on scaled event time)
-  @transient private lazy val scheduler = new EventScheduler[OUT](speedupFactor, Some(watermarkIntervalMillis), maximumDelayMillis, delay)
+                                               watermarkIntervalMillis: Int,
+                                               minimumWatermarkEmitIntervalMillis: Int) extends RichSourceFunction[OUT] {
+  @transient private lazy val scheduler = new EventScheduler[OUT](
+    speedupFactor,
+    Some(watermarkIntervalMillis),
+    maximumDelayMillis,
+    delay,
+    expectOrderedInput = true,
+    allowLateEvents = true, // delay() return values are allowed to exceed maximumDelayMillis
+    minimumWatermarkEmitIntervalMillis = minimumWatermarkEmitIntervalMillis
+  )
+
   @transient private lazy val LOG = LoggerFactory.getLogger(classOf[ReplayedSourceFunction[IN, OUT]])
   @transient private var isCancelled = false
   @transient private var rowIndex: Int = _
@@ -50,11 +57,15 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
                      extractEventTime: OUT => Long,
                      speedupFactor: Double = 0,
                      maximumDelayMilliseconds: Int = 0,
-                     watermarkIntervalMillis: Long = 1000) =
-    this(parse, extractEventTime, speedupFactor, maximumDelayMilliseconds,
+                     watermarkIntervalMillis: Int = 10000,
+                     minimumWatermarkEmitIntervalMillis: Int = 1000) =
+    this(
+      parse, extractEventTime, speedupFactor, maximumDelayMilliseconds,
       if (maximumDelayMilliseconds <= 0) (_: OUT) => 0L
       else (_: OUT) => FlinkUtils.getNormalDelayMillis(rand, maximumDelayMilliseconds),
-      watermarkIntervalMillis)
+      watermarkIntervalMillis,
+      minimumWatermarkEmitIntervalMillis
+    )
 
   override def run(ctx: SourceFunction.SourceContext[OUT]): Unit = {
 
