@@ -74,6 +74,8 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
     }
 
     processPending(ctx, flush = true)
+
+    LOG.info(s"emitted watermarks: ${watermarkCounter.getCount}")
   }
 
   private def scheduleInput(input: IN, rowIndex: Int): Unit = {
