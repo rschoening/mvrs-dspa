@@ -5,7 +5,6 @@ import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.scala.{DataStream, OutputTag, StreamExecutionEnvironment, createTypeInformation}
 import org.mvrs.dspa.functions.{ReplayedCsvFileSourceFunction, SimpleScaledReplayFunction}
 import org.mvrs.dspa.model.{CommentEvent, LikeEvent, PostEvent, RawCommentEvent}
-import org.mvrs.dspa.streams.BuildReplyTreeProcessFunction
 import org.mvrs.dspa.utils.FlinkUtils
 
 package object streams {
@@ -48,19 +47,6 @@ package object streams {
     val droppedReplies = rootedComments.getSideOutput(outputTagDroppedReplies)
 
     (rootedComments, droppedReplies)
-  }
-
-  def rawCommentsFromCsv(filePath: String, speedupFactor: Double = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)
-                        (implicit env: StreamExecutionEnvironment): DataStream[RawCommentEvent] = {
-    implicit val decoder: RowDecoder[RawCommentEvent] = RawCommentEvent.csvDecoder
-
-    env.addSource(new ReplayedCsvFileSourceFunction[RawCommentEvent](
-      filePath,
-      skipFirstLine = true, '|',
-      extractEventTime = _.timestamp,
-      speedupFactor, // 0 -> unchanged read speed
-      randomDelay,
-      watermarkInterval)).name(s"$filePath")
   }
 
   def comments(kafkaConsumerGroup: Option[String] = None, speedupFactorOverride: Option[Double] = None)
@@ -110,6 +96,19 @@ package object streams {
         Settings.config.getInt("data.csv-watermark-interval"),
       )
     )
+
+  def rawCommentsFromCsv(filePath: String, speedupFactor: Double = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)
+                        (implicit env: StreamExecutionEnvironment): DataStream[RawCommentEvent] = {
+    implicit val decoder: RowDecoder[RawCommentEvent] = RawCommentEvent.csvDecoder
+
+    env.addSource(new ReplayedCsvFileSourceFunction[RawCommentEvent](
+      filePath,
+      skipFirstLine = true, '|',
+      extractEventTime = _.timestamp,
+      speedupFactor, // 0 -> unchanged read speed
+      randomDelay,
+      watermarkInterval)).name(s"$filePath")
+  }
 
   def commentsFromCsv(filePath: String, speedupFactor: Double = 0, randomDelay: Int = 0, watermarkInterval: Int = 10000)
                      (implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] = {
