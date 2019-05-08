@@ -58,6 +58,12 @@ class EventScheduler[E](val speedupFactor: Double,
     queue += ((eventTime + delayMillis, Left((event, eventTime)))) // schedule the event
   }
 
+  def scheduleLength: Int = queue.size
+
+  def scheduledEvents: Int = queue.count(_._2.isLeft)
+
+  def scheduledWatermarks: Int = queue.count(_._2.isRight)
+
   def processPending(emitEvent: (E, Long) => Unit,
                      emitWatermark: Watermark => Unit,
                      wait: Long => Unit,
