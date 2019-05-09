@@ -27,7 +27,8 @@ class EventSchedulerTestSuite extends FlatSpec with Matchers {
         List(
           ("e1", 10000),
           ("e2", 20000),
-          ("e3", 30000))
+          ("e3", 30000)
+        )
       )
 
       val events = schedule.collect { case s: ScheduledEvent => s }

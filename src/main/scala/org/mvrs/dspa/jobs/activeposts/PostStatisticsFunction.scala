@@ -9,54 +9,73 @@ import org.apache.flink.streaming.api.functions.KeyedProcessFunction
 import org.apache.flink.util.Collector
 import org.mvrs.dspa.jobs.activeposts.PostStatisticsFunction._
 import org.mvrs.dspa.model.{Event, EventType, PostStatistics}
+import org.mvrs.dspa.utils.DateTimeUtils
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
+/**
+  * Keyed process function to calculate post statistics within a sliding window
+  *
+  * @param windowSize      the window size
+  * @param slide           the window slide
+  * @param stateTtl        the time-to-live for buckets (in processing time, i.e. taking into account any
+  * @param countPostAuthor indicates if the original post author should be counted as one of the involved users
+  */
 class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, countPostAuthor: Boolean = true)
   extends KeyedProcessFunction[Long, Event, PostStatistics] {
 
-  private lazy val lastActivityState = getRuntimeContext.getState(lastActivityDescriptor)
-  private lazy val windowEndState = getRuntimeContext.getState(windowEndDescriptor)
-  private lazy val bucketMapState = getRuntimeContext.getMapState(bucketMapDescriptor)
+  // state
+  @transient private lazy val lastActivityState = getRuntimeContext.getState(lastActivityDescriptor)
+  @transient private lazy val windowEndState = getRuntimeContext.getState(windowEndDescriptor)
+  @transient private lazy val bucketMapState = getRuntimeContext.getMapState(bucketMapDescriptor)
 
-  private val bucketMapDescriptor = new MapStateDescriptor[Long, Bucket]("buckets", createTypeInformation[Long], createTypeInformation[Bucket])
-  private val lastActivityDescriptor = new ValueStateDescriptor("lastActivity", classOf[Long])
-  private val windowEndDescriptor = new ValueStateDescriptor("windowEnd", classOf[Long])
+  // state descriptors
+  @transient private lazy val bucketMapDescriptor = new MapStateDescriptor[Long, Bucket]("buckets", createTypeInformation[Long], createTypeInformation[Bucket])
+  @transient private lazy val lastActivityDescriptor = new ValueStateDescriptor("lastActivity", classOf[Long])
+  @transient private lazy val windowEndDescriptor = new ValueStateDescriptor("windowEnd", classOf[Long])
 
-  private val ttlConfig = StateTtlConfig
-    .newBuilder(stateTtl)
-    .setUpdateType(StateTtlConfig.UpdateType.OnReadAndWrite)
-    .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
-    .build
-
-  private val LOG = LoggerFactory.getLogger(classOf[PostStatisticsFunction])
+  @transient private lazy val LOG = LoggerFactory.getLogger(classOf[PostStatisticsFunction])
 
   override def open(parameters: Configuration): Unit = {
+    debug(s"Time-to-live: ${DateTimeUtils.formatDuration(stateTtl.toMilliseconds)}")
+
+    val ttlConfig = StateTtlConfig
+      .newBuilder(stateTtl)
+      .setUpdateType(StateTtlConfig.UpdateType.OnReadAndWrite)
+      .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
+      .build
+
     bucketMapDescriptor.enableTimeToLive(ttlConfig)
     lastActivityDescriptor.enableTimeToLive(ttlConfig)
     windowEndDescriptor.enableTimeToLive(ttlConfig)
   }
 
-  override def onTimer(timestamp: Long,
+  override def onTimer(windowExclusiveUpperBound: Long,
                        ctx: KeyedProcessFunction[Long, Event, PostStatistics]#OnTimerContext,
                        out: Collector[PostStatistics]): Unit = {
+
     // NOTE: window start is inclusive, end is exclusive (=> start of next window)
+    // NOTE: bucket timestamp is exclusive upper bound of bucket window (window size equals slide of full window)
 
     val lastActivity = lastActivityState.value()
 
-    LOG.debug(s"onTimer: $timestamp for key: ${ctx.getCurrentKey} (last activity: $lastActivity window size: ${windowSize.toMilliseconds}")
+    debug(s"onTimer: $windowExclusiveUpperBound for key: ${ctx.getCurrentKey} " +
+      s"(last activity: $lastActivity window size: ${windowSize.toMilliseconds}")
 
-    if (lastActivity < timestamp - windowSize.toMilliseconds) {
+    val windowInclusiveStartTime = windowExclusiveUpperBound - windowSize.toMilliseconds
+
+    if (lastActivity < windowInclusiveStartTime) {
       // Last activity is before start of window. Nothing to report, now new timer to register
-      LOG.debug(s"- last activity outside of window - go to sleep until next event arrives")
+      debug("- last activity outside of window - go to sleep until next event arrives")
+
       bucketMapState.clear()
       windowEndState.clear()
       lastActivityState.clear()
     }
     else {
-      LOG.debug(s"- last activity inside of window")
+      debug("- last activity inside of window")
 
       // event counts
       val bucketsToDrop = mutable.MutableList[Long]()
@@ -65,21 +84,19 @@ class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, coun
       var likeCount = 0
       var postCreatedInWindow = false
 
-      val buckets = bucketMapState.iterator().asScala
-      val bucketList = buckets.toList
-
-      var futureBucketCount = 0
-
       val activeUserSet = mutable.Set[Long]()
 
-      bucketList.foreach(
+      bucketMapState.iterator().asScala.foreach(
         entry => {
-          val bucketTimestamp = entry.getKey
+          val bucketExclusiveUpperBound = entry.getKey
 
-          if (bucketTimestamp > timestamp) { // TODO revise > (clearly define all timestamps and intervals)
-            futureBucketCount += 1 // future bucket, ignore (count for later assertion)
+          if (bucketExclusiveUpperBound > windowExclusiveUpperBound) {
+            // future bucket, ignore (count for later assertion)
           }
-          else if (bucketTimestamp <= timestamp - windowSize.toMilliseconds) bucketsToDrop += bucketTimestamp // to be evicted
+          else if (bucketExclusiveUpperBound <= windowInclusiveStartTime) {
+            // bucket end timestamp is before window start time, to be evicted
+            bucketsToDrop += bucketExclusiveUpperBound
+          }
           else {
             // bucket within window
             val bucket = entry.getValue
@@ -90,12 +107,7 @@ class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, coun
 
             if (bucket.originalPost) postCreatedInWindow = true
 
-            // alternative (originally considered in design document):
-            // MapState personId -> last activity date
-            // however: events within watermark must be distinguished
-            // -> more complex than id set per bucket
-            // -> sets cost a bit more in terms of size and time (union)
-            //    but: separate flink MapState (with unclear cost) can be avoided
+            // add bucket persons to unioned set for entire window
             activeUserSet ++= bucket.persons
           }
         })
@@ -105,24 +117,23 @@ class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, coun
 
         out.collect(
           PostStatistics(
-            ctx.getCurrentKey, timestamp,
+            ctx.getCurrentKey, windowExclusiveUpperBound,
             commentCount, replyCount, likeCount,
             activeUserSet.size, postCreatedInWindow))
       }
-      else {
-        assert(futureBucketCount > 0) // TODO revise, after switching to reading from Kafka with SimpleReplay function and in the context of checkpoints
-      }
 
-      LOG.debug(s"registering FOLLOWING timer for $timestamp + $slide (current watermark: ${ctx.timerService.currentWatermark()})")
+      debug(s"registering FOLLOWING timer for $windowExclusiveUpperBound + $slide " +
+        s"(current watermark: ${ctx.timerService.currentWatermark()})")
 
-      registerWindowEndTimer(ctx.timerService, timestamp + slide.toMilliseconds)
+      registerWindowEndTimer(ctx.timerService, windowExclusiveUpperBound + slide.toMilliseconds)
 
       // evict state
       bucketsToDrop.foreach(bucketMapState.remove)
     }
   }
 
-  private def registerWindowEndTimer(timerService: TimerService, endTime: Long): Unit = {
+  private def registerWindowEndTimer(timerService: TimerService,
+                                     endTime: Long): Unit = {
     windowEndState.update(endTime)
     timerService.registerEventTimeTimer(endTime)
   }
@@ -132,7 +143,9 @@ class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, coun
                               out: Collector[PostStatistics]): Unit = {
     if (windowEndState.value == 0) {
       // no window yet: register timer at event timestamp + slide
-      LOG.debug(s"registering NEW timer for ${value.timestamp} + ${slide.toMilliseconds} (current watermark: ${ctx.timerService.currentWatermark()})")
+      debug(s"registering NEW timer for ${value.timestamp} + ${slide.toMilliseconds} " +
+        s"(current watermark: ${ctx.timerService.currentWatermark()})")
+
       registerWindowEndTimer(ctx.timerService, value.timestamp + slide.toMilliseconds)
     }
 
@@ -140,25 +153,25 @@ class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, coun
     lastActivityState.update(value.timestamp)
 
     val windowEnd = windowEndState.value
-    val bucketTimestamp = PostStatisticsFunction.getBucketForTimestamp(value.timestamp, windowEnd, slide.toMilliseconds)
+    val bucketTimestamp = getBucketForTimestamp(value.timestamp, windowEnd, slide.toMilliseconds)
 
     value.eventType match {
       case EventType.Comment => updateBucket(bucketTimestamp, _.addComment(value.personId))
       case EventType.Reply => updateBucket(bucketTimestamp, _.addReply(value.personId))
       case EventType.Like => updateBucket(bucketTimestamp, _.addLike(value.personId))
       case EventType.Post => updateBucket(bucketTimestamp, _.registerPost(value.personId))
-
-      case _ => // do nothing with posts and likes
     }
 
     if (value.timestamp > windowEnd) {
-      LOG.debug(s"Early event, to future bucket: $value (current window: $windowEnd)")
+      debug(s"Event to future bucket: $value (current window: $windowEnd)")
     }
     else if (value.timestamp < windowEnd - windowSize.toMilliseconds) {
-      LOG.debug(s"Late event, to past bucket: $value (current window: $windowEnd)")
+      debug(s"Event to past bucket: $value (current window: $windowEnd)")
     }
-    else LOG.debug(s"Regular event, to current bucket: $value")
+    else debug(s"Event to current bucket: $value")
   }
+
+  private def debug(msg: => String): Unit = if (LOG.isDebugEnabled) LOG.debug(msg)
 
   private def updateBucket(bucketTimestamp: Long, action: Bucket => Unit): Unit = {
     val bucket = getBucket(bucketTimestamp)
@@ -183,10 +196,11 @@ object PostStatisticsFunction {
 
     val offset = exclusiveUpperBound % bucketSize
     val index = math.floor((timestamp - offset).toDouble / bucketSize).toLong
+
     offset + (index + 1) * bucketSize
   }
 
-  // NOTE: to ensure seriazability, case classes should be in companion object.
+  // NOTE: to ensure serializability, case classes should be in companion object.
   // This ensures that there are no references to containing class
   case class Bucket(countPostAuthor: Boolean) {
     val persons: mutable.Set[Long] = mutable.Set()
