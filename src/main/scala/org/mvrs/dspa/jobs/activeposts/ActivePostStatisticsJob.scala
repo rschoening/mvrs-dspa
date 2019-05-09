@@ -4,7 +4,6 @@ import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.scala.{DataStream, createTypeInformation}
 import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.jobs.FlinkStreamingJob
-import org.mvrs.dspa.jobs.recommendations.AsyncForumLookupFunction
 import org.mvrs.dspa.model._
 import org.mvrs.dspa.streams.KafkaTopics
 import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
@@ -85,7 +84,7 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
   private def lookupForumFeatures(postsStream: DataStream[PostEvent]): DataStream[PostInfo] =
     FlinkUtils.asyncStream(
       postsStream,
-      new AsyncForumLookupFunction(
+      new AsyncForumTitleLookupFunction(
         ElasticSearchIndexes.forumFeatures.indexName,
         Settings.elasticSearchNodes: _*)).name("DB: look up forum title for post")
       .map(t => createPostInfo(t._1, t._2)).name("map: post info record")
