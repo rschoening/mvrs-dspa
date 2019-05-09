@@ -15,19 +15,24 @@ abstract class AsyncElasticSearchFunction[IN, OUT: TypeInformation](nodes: Elast
   extends RichAsyncFunction[IN, OUT] with ResultTypeQueryable[OUT] {
   require(nodes.nonEmpty, "at least one node must be provided")
 
-  implicit lazy val executor: ExecutionContext = ExecutionContext.fromExecutor(Executors.directExecutor())
+  @transient implicit lazy val executor: ExecutionContext = ExecutionContext.fromExecutor(Executors.directExecutor())
+  @transient private var client: ElasticClient = _
 
-  private var client: Option[ElasticClient] = None
+  final override def open(parameters: Configuration): Unit = {
+    client = elastic.createClient(nodes: _*)
 
-  override def open(parameters: Configuration): Unit = client = Some(elastic.createClient(nodes: _*))
-
-  override def close(): Unit = {
-    client.foreach(_.close())
-    client = None
+    openCore(parameters)
   }
 
-  override def asyncInvoke(input: IN, resultFuture: ResultFuture[OUT]): Unit = {
-    asyncInvoke(client.get, input, resultFuture)
+  protected def openCore(parameters: Configuration): Unit = {}
+
+  final override def close(): Unit = {
+    if (client != null) client.close()
+    client = null
+  }
+
+  final override def asyncInvoke(input: IN, resultFuture: ResultFuture[OUT]): Unit = {
+    asyncInvoke(client, input, resultFuture)
   }
 
   def asyncInvoke(client: ElasticClient, input: IN, resultFuture: ResultFuture[OUT]): Unit
