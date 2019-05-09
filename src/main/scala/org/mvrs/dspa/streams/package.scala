@@ -145,7 +145,7 @@ package object streams {
         randomDelay,
         watermarkInterval
       )
-    ).name(s"$filePath")
+    ).name(s"$filePath (speedup: x $speedupFactor; randomDelay: $randomDelay)")
   }
 
   def commentsFromKafka(consumerGroup: String, speedupFactor: Double = 0, randomDelay: Long = 0)
@@ -217,9 +217,9 @@ package object streams {
     val consumer = topic.consumer(consumerGroup)
 
     env.addSource(consumer)
-      .name(s"kafka: ${topic.name}")
+      .name(s"Kafka: ${topic.name}")
       .map(new SimpleScaledReplayFunction[T](extractTime, speedupFactor))
-      .name("replay speedup")
+      .name(s"replay speedup (x $speedupFactor)")
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[T](maxOutOfOrderness, extractTime))
   }
 
