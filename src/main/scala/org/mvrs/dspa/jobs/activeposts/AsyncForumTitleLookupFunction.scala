@@ -10,7 +10,7 @@ import org.mvrs.dspa.utils.elastic.{AsyncCachingElasticSearchFunction, ElasticSe
 import scala.concurrent.Future
 
 class AsyncForumTitleLookupFunction(forumFeaturesIndex: String, nodes: ElasticSearchNode*)
-  extends AsyncCachingElasticSearchFunction[PostEvent, (PostEvent, String), String](_.forumId.toString, nodes) {
+  extends AsyncCachingElasticSearchFunction[PostEvent, (PostEvent, String), String, SearchResponse](_.forumId.toString, nodes) {
 
   override protected def getCacheValue(input: PostEvent, output: (PostEvent, String)): String = output._2
 

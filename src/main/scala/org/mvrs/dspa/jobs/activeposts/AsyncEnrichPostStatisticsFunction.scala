@@ -11,7 +11,7 @@ import org.mvrs.dspa.utils.elastic.{AsyncCachingElasticSearchFunction, ElasticSe
 import scala.concurrent.Future
 
 class AsyncEnrichPostStatisticsFunction(postInfosIndexName: String, nodes: ElasticSearchNode*)
-  extends AsyncCachingElasticSearchFunction[PostStatistics, (PostStatistics, String, String), PostInfos](_.postId.toString, nodes) {
+  extends AsyncCachingElasticSearchFunction[PostStatistics, (PostStatistics, String, String), PostInfos, SearchResponse](_.postId.toString, nodes) {
 
   // TODO investigate slower-than-expected ingress rate in elasticsearch
   // - backpressure from elasticsearch?

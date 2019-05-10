@@ -15,7 +15,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: TypeInformation](getCacheKey: IN => String,
+abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: TypeInformation, R](getCacheKey: IN => String,
                                                                                                nodes: Seq[ElasticSearchNode],
                                                                                                maximumCacheSize: Long = 10000)
   extends AsyncElasticSearchFunction[IN, OUT](nodes)
@@ -28,9 +28,9 @@ abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: Ty
 
   protected def toOutput(input: IN, cachedValue: V): OUT
 
-  protected def executeQuery(client: ElasticClient, input: IN): Future[Response[SearchResponse]]
+  protected def executeQuery(client: ElasticClient, input: IN): Future[Response[R]]
 
-  protected def unpackResponse(response: Response[SearchResponse], input: IN): OUT
+  protected def unpackResponse(response: Response[R], input: IN): OUT
 
   final override def asyncInvoke(client: ElasticClient,
                                  input: IN,
@@ -60,7 +60,7 @@ abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: Ty
     }
   }
 
-  private def unpack(response: Response[SearchResponse], input: IN) = {
+  private def unpack(response: Response[R], input: IN) = {
     val output = unpackResponse(response, input)
 
     val value = getCacheValue(input, output)
