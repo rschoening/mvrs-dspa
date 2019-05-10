@@ -11,7 +11,7 @@ import org.mvrs.dspa.utils.elastic
 
 import scala.concurrent.ExecutionContext
 
-abstract class AsyncElasticSearchFunction[IN, OUT: TypeInformation](nodes: ElasticSearchNode*)
+abstract class AsyncElasticSearchFunction[IN, OUT: TypeInformation](nodes: Seq[ElasticSearchNode])
   extends RichAsyncFunction[IN, OUT] with ResultTypeQueryable[OUT] {
   require(nodes.nonEmpty, "at least one node must be provided")
 

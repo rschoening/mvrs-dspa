@@ -12,7 +12,7 @@ import scala.util.{Failure, Success}
 class AsyncRecommendUsersFunction(personMinHashIndex: String, minHasher: MinHasher32,
                                   maximumRecommendationCount: Int, minimumRecommendationSimilarity: Double,
                                   nodes: ElasticSearchNode*)
-  extends AsyncElasticSearchFunction[(Long, MinHashSignature, Set[Long]), (Long, Seq[(Long, Double)])](nodes: _*) {
+  extends AsyncElasticSearchFunction[(Long, MinHashSignature, Set[Long]), (Long, Seq[(Long, Double)])](nodes) {
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
 

@@ -15,12 +15,14 @@ import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: TypeInformation](getCacheKey: IN => String, nodes: ElasticSearchNode*)
-  extends AsyncElasticSearchFunction[IN, OUT](nodes: _*)
+abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: TypeInformation](getCacheKey: IN => String,
+                                                                                               nodes: Seq[ElasticSearchNode],
+                                                                                               maximumCacheSize: Long = 10000)
+  extends AsyncElasticSearchFunction[IN, OUT](nodes)
     with CheckpointedFunction {
 
   @transient private var listState: ListState[Map[String, V]] = _
-  @transient private lazy val cache = new Cache[String, V]()
+  @transient private lazy val cache = new Cache[String, V](maximumCacheSize)
 
   protected def getCacheValue(input: IN, output: OUT): V
 

@@ -12,7 +12,7 @@ import scala.collection.JavaConverters._
 import scala.util.{Failure, Success}
 
 class AsyncPersonMinHashLookupFunction(personFeaturesIndex: String, personFeaturesType: String, minHasher: MinHasher32, nodes: ElasticSearchNode*)
-  extends AsyncElasticSearchFunction[ForumEvent, (Long, MinHashSignature)](nodes: _*) {
+  extends AsyncElasticSearchFunction[ForumEvent, (Long, MinHashSignature)](nodes) {
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
 

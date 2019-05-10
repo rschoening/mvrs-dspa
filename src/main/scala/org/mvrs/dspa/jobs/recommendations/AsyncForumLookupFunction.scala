@@ -11,7 +11,7 @@ import org.mvrs.dspa.utils.elastic.{AsyncElasticSearchFunction, ElasticSearchNod
 import scala.util.{Failure, Success}
 
 class AsyncForumLookupFunction(forumFeaturesIndex: String, nodes: ElasticSearchNode*)
-  extends AsyncElasticSearchFunction[PostEvent, (PostEvent, String, Set[String])](nodes: _*) {
+  extends AsyncElasticSearchFunction[PostEvent, (PostEvent, String, Set[String])](nodes) {
 
   override def asyncInvoke(client: ElasticClient,
                            input: PostEvent,

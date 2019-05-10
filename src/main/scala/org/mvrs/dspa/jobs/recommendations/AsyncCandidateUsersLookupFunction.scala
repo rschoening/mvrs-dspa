@@ -10,7 +10,7 @@ import org.mvrs.dspa.utils.elastic.{AsyncElasticSearchFunction, ElasticSearchNod
 import scala.util.{Failure, Success}
 
 class AsyncCandidateUsersLookupFunction(lshBucketsIndex: String, minHasher: MinHasher32, nodes: ElasticSearchNode*)
-  extends AsyncElasticSearchFunction[(Long, MinHashSignature), (Long, MinHashSignature, Set[Long])](nodes: _*) {
+  extends AsyncElasticSearchFunction[(Long, MinHashSignature), (Long, MinHashSignature, Set[Long])](nodes) {
 
   import com.sksamuel.elastic4s.http.ElasticDsl._
 
