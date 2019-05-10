@@ -210,6 +210,27 @@ under the License.
             <version>27.1-jre</version>
         </dependency>
 
+        <!-- https://mvnrepository.com/artifact/com.github.cb372/scalacache-core -->
+        <dependency>
+            <groupId>com.github.cb372</groupId>
+            <artifactId>scalacache-core_2.12</artifactId>
+            <version>0.27.0</version>
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/io.chrisdavenport/read -->
+        <dependency>
+            <groupId>io.chrisdavenport</groupId>
+            <artifactId>read_2.12</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/com.github.cb372/scalacache-caffeine -->
+        <dependency>
+            <groupId>com.github.cb372</groupId>
+            <artifactId>scalacache-caffeine_2.12</artifactId>
+            <version>0.27.0</version>
+        </dependency>
+
         <!-- https://mvnrepository.com/artifact/com.nrinaudo/kantan.csv -->
         <dependency>
             <groupId>com.nrinaudo</groupId>
