@@ -23,7 +23,6 @@ object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob(ena
       .addSink(esIndex.createSink(batchSize))
       .name(s"ElasticSearch: ${esIndex.indexName}")
 
-
     // execute program
     env.execute("Move enriched post statistics from Kafka to ElasticSearch")
   }
@@ -36,7 +35,7 @@ object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob(ena
         ElasticSearchIndexes.postInfos.indexName,
         elasticSearchNodes: _*
       )
-    )
+    ).name("enrich post statistics")
 }
 
 
