@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Preparation: load static data to elasticsearch" type="Application" factoryName="Application">
-    <option name="MAIN_CLASS_NAME" value="org.mvrs.dspa.jobs.recommendations.staticdata.LoadStaticDataJob" />
+    <option name="MAIN_CLASS_NAME" value="org.mvrs.dspa.jobs.preparation.LoadStaticDataJob" />
     <module name="mvrs-dspa" />
     <option name="PROGRAM_PARAMETERS" value="local-with-ui" />
     <extension name="coverage">

@@ -1,8 +1,7 @@
-package org.mvrs.dspa.jobs.recommendations.staticdata
+package org.mvrs.dspa.jobs.preparation
 
 import com.twitter.algebird.MinHashSignature
-import org.apache.flink.api.scala.DataSet
-import org.apache.flink.streaming.api.scala._
+import org.apache.flink.api.scala.{DataSet, _}
 import org.mvrs.dspa.Settings
 import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.jobs.FlinkBatchJob
@@ -95,6 +94,3 @@ object LoadStaticDataJob extends FlinkBatchJob {
   private def toFeature(input: (Long, Long), prefix: String): (Long, String) =
     (input._1, RecommendationUtils.toFeature(input._2, prefix))
 }
-
-
-
