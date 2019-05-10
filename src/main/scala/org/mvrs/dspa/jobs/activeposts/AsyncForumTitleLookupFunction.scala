@@ -25,9 +25,7 @@ class AsyncForumTitleLookupFunction(forumFeaturesIndex: String, nodes: ElasticSe
 
   override def asyncInvoke(client: ElasticClient,
                            input: PostEvent,
-                           resultFuture: ResultFuture[(PostEvent, String)]): Unit = {
-    import scala.collection.JavaConverters._
-
+                           resultFuture: ResultFuture[(PostEvent, String)]): Unit =
     cache.get(input.forumId) match {
       case Some(title) => resultFuture.complete(List((input, title)).asJava)
 
@@ -40,7 +38,6 @@ class AsyncForumTitleLookupFunction(forumFeaturesIndex: String, nodes: ElasticSe
         case Failure(exception) => resultFuture.completeExceptionally(exception)
       }
     }
-  }
 
   private def unpackResponse(input: PostEvent, response: Response[SearchResponse]): Seq[(PostEvent, String)] = {
     val hits = response.result.hits.hits

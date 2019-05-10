@@ -91,7 +91,7 @@ class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, coun
           val bucketExclusiveUpperBound = entry.getKey
 
           if (bucketExclusiveUpperBound > windowExclusiveUpperBound) {
-            // future bucket, ignore (count for later assertion)
+            // future bucket, ignore
           }
           else if (bucketExclusiveUpperBound <= windowInclusiveStartTime) {
             // bucket end timestamp is before window start time, to be evicted

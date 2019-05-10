@@ -52,7 +52,7 @@ object LoadStaticDataJob extends FlinkBatchJob {
           t => (
             t._1._1, // forum id
             t._2._2, // forum title
-            t._1._2 // features
+            t._1._2, // features
           )
         )
 

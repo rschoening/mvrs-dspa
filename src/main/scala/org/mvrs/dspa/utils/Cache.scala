@@ -9,9 +9,15 @@ import scalacache.{Entry, sync}
 
 import scala.collection.JavaConverters._
 
-class Cache[K: Read, V](@Nonnegative maximumSize: Long = 10000L)(implicit read: Read[K]) {
-  private val underlyingCaffeineCache = Caffeine.newBuilder().maximumSize(maximumSize).build[String, Entry[V]]
-  implicit val scalaCache: scalacache.Cache[V] = CaffeineCache(underlyingCaffeineCache)
+class Cache[K: Read, V](@Nonnegative maximumSize: Long = 10000L)
+                       (implicit read: Read[K]) {
+  private val underlyingCaffeineCache =
+    Caffeine
+      .newBuilder()
+      .maximumSize(maximumSize)
+      .build[String, Entry[V]]
+
+  private implicit val scalaCache: scalacache.Cache[V] = CaffeineCache(underlyingCaffeineCache)
 
   def get(key: K): Option[V] = sync.get(key)
 

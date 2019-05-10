@@ -29,12 +29,12 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
     postInfoIndex.create()
 
     // consume events from kafka
-    val kafkaConsumerGroup = Some("active-post-statistics") // None for csv
+    val kafkaConsumerGroup = Some("active-post-statistics")
     val commentsStream = streams.comments(kafkaConsumerGroup)
     val postsStream = streams.posts(kafkaConsumerGroup)
     val likesStream = streams.likes(kafkaConsumerGroup)
 
-    val postInfoStream = streams.posts(Some("active-post-statistics-postinfos"))
+    val postInfoStream = streams.posts(Some("active-post-statistics-postinfos")) // read using separate consumer group
 
     // write post infos to elasticsearch, for lookup when writing post stats to elasticsearch
     lookupForumFeatures(postInfoStream)

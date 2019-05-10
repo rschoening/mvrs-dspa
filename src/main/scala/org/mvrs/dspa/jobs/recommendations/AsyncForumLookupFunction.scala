@@ -13,7 +13,6 @@ import scala.util.{Failure, Success}
 class AsyncForumLookupFunction(forumFeaturesIndex: String, nodes: ElasticSearchNode*)
   extends AsyncElasticSearchFunction[PostEvent, (PostEvent, String, Set[String])](nodes: _*) {
 
-
   override def asyncInvoke(client: ElasticClient,
                            input: PostEvent,
                            resultFuture: ResultFuture[(PostEvent, String, Set[String])]): Unit = {
