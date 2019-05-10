@@ -43,7 +43,7 @@ class AsyncForumTitleLookupFunction(forumFeaturesIndex: String, nodes: ElasticSe
     val hits = response.result.hits.hits
 
     if (hits.length == 0) {
-      Nil
+      List((input, "<unknown forum>"))
     }
     else {
       assert(hits.length == 1)
