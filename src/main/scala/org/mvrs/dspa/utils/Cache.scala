@@ -21,5 +21,8 @@ class Cache[K: Read, V](@Nonnegative maximumSize: Long = 10000L)(implicit read: 
 
   def toMap: Map[K, V] = underlyingCaffeineCache.asMap().asScala.map(e => (read.unsafeRead(e._1), e._2.value)).toMap
 
-  def putAll(map: Map[K, V]): Unit = underlyingCaffeineCache.putAll(map.map(t => (t._1.toString, Entry(t._2, None))).asJava)
+  def putAll(pairs: Map[K, V]): Unit = underlyingCaffeineCache.putAll(
+    pairs.map {
+      case (key, value) => (key.toString, Entry(value, None))
+    }.asJava)
 }
