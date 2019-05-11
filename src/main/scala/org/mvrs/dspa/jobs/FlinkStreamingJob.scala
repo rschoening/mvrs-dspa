@@ -20,7 +20,8 @@ import org.mvrs.dspa.utils.FlinkUtils
 abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCharacteristic.EventTime,
                                  parallelism: Int = 4,
                                  enableGenericTypes: Boolean = false,
-                                 autoWatermarkInterval: Int = 200) extends FlinkJob {
+                                 autoWatermarkInterval: Int = 200,
+                                 checkpointIntervalOverride: Option[Long] = None) extends FlinkJob {
   // read settings
 
   // NOTE
@@ -29,7 +30,7 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
   // To make the class more general-purpose, read settings in project-specific subclass and provide constructor args for all these here
   private val latencyTrackingInterval = Settings.config.getInt("jobs.latency-tracking-interval")
   private val stateBackendPath = Settings.config.getString("jobs.state-backend-path")
-  private val checkpointInterval = Settings.duration("jobs.checkpoint-interval").toMilliseconds
+  private val checkpointInterval = checkpointIntervalOverride.getOrElse(Settings.duration("jobs.checkpoint-interval").toMilliseconds)
   private val checkpointMinPause = Settings.duration("jobs.checkpoint-min-pause").toMilliseconds
 
   // localWithUI is set by base class based on program arguments
