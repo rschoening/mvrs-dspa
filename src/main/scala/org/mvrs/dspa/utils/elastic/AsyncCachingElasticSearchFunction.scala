@@ -21,9 +21,11 @@ import scala.util.{Failure, Success}
 /**
   * Function base class for asynchronous requests to ElasticSearch that use an LRU cache
   *
-  * @param getCacheKey      function to get the cache key (string) from an input element
-  * @param nodes            the elastic search nodes
-  * @param maximumCacheSize the maximum cache size for the LRU cache
+  * @param getCacheKey        function to get the cache key (string) from an input element
+  * @param nodes              the elastic search nodes
+  * @param maximumCacheSize   the maximum cache size for the LRU cache
+  * @param cacheEmptyResponse indicates if an empty database response is cached, i.e. the query is not retried if it
+  *                           once returned empty for a given cache key.
   * @tparam IN  type of input elements
   * @tparam OUT type of output elements
   * @tparam V   type of cached value. This value can be different from the output element, which often also included
@@ -33,7 +35,8 @@ import scala.util.{Failure, Success}
   */
 abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: TypeInformation, R](getCacheKey: IN => String,
                                                                                                   nodes: Seq[ElasticSearchNode],
-                                                                                                  maximumCacheSize: Long = 10000)
+                                                                                                  maximumCacheSize: Long = 10000,
+                                                                                                  cacheEmptyResponse: Boolean = false)
   extends AsyncElasticSearchFunction[IN, OUT](nodes)
     with CheckpointedFunction {
 
@@ -42,15 +45,15 @@ abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: Ty
   @transient private var cacheMissesPerSecond: Meter = _
   @transient private var cacheHits: Counter = _
   @transient private var cacheHitsPerSecond: Meter = _
-  @transient private var esimatedCacheSize: Gauge[Long] = _
+  @transient private var estimatedCacheSize: Gauge[Long] = _
 
   // operator state
-  @transient private var listState: ListState[Map[String, V]] = _
+  @transient private var listState: ListState[Map[String, Option[V]]] = _
 
   // the LRU cache
-  @transient private lazy val cache = new Cache[String, V](maximumCacheSize)
+  @transient private lazy val cache = new Cache[String, Option[V]](maximumCacheSize)
 
-  override protected def openCore(parameters: Configuration): Unit = {
+  override protected def open(parameters: Configuration): Unit = {
     val group = getRuntimeContext.getMetricGroup
 
     cacheMisses = group.counter("cacheMisses")
@@ -61,17 +64,45 @@ abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: Ty
     cacheHitsPerSecond = group.meter("cacheHitsPerSeconds",
       new DropwizardMeterWrapper(new com.codahale.metrics.Meter()))
 
-    esimatedCacheSize = group.gauge[Long, ScalaGauge[Long]]("estimatedCacheSize",
+    estimatedCacheSize = group.gauge[Long, ScalaGauge[Long]]("estimatedCacheSize",
       ScalaGauge[Long](() => cache.estimatedSize))
   }
 
+  /**
+    * Derives the value to cache based on the input element and retrieved output element, in case of a cache miss.
+    *
+    * @param input  the input element
+    * @param output the output element
+    * @return the value to cache, which must be serializable
+    */
   protected def getCacheValue(input: IN, output: OUT): V
 
+  /**
+    * Derives the output element based on the input element and the corresponding cached value, in case of a cache hit.
+    *
+    * @param input       the input element
+    * @param cachedValue the cached value
+    * @return the output element to emit
+    */
   protected def toOutput(input: IN, cachedValue: V): OUT
 
+  /**
+    * Initiates the query to ElasticSearch and returns the future response
+    *
+    * @param client the ElasticSearch client
+    * @param input  the input element
+    * @return the future response
+    */
   protected def executeQuery(client: ElasticClient, input: IN): Future[Response[R]]
 
-  protected def unpackResponse(response: Response[R], input: IN): OUT
+  /**
+    * Unpacks the output element from the response from ElasticSearch
+    *
+    * @param response the response from ElasticSearch
+    * @param input    the input element
+    * @return the output element, or None for empty response
+    */
+  protected def unpackResponse(response: Response[R], input: IN): Option[OUT]
 
   final override def asyncInvoke(client: ElasticClient,
                                  input: IN,
@@ -80,13 +111,23 @@ abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: Ty
       case Some(value) =>
         cacheHits.inc()
         cacheHitsPerSecond.markEvent()
-        resultFuture.complete(List(toOutput(input, value)).asJava)
+
+        resultFuture.complete(
+          value.map(v => List(toOutput(input, v)))
+            .getOrElse(Nil)
+            .asJava)
 
       case None =>
         cacheMisses.inc()
         cacheMissesPerSecond.markEvent()
+
         executeQuery(client, input).onComplete {
-          case Success(response) => resultFuture.complete(List(unpack(response, input)).asJava)
+          case Success(response) => resultFuture.complete(
+            unpack(response, input)
+              .map(List(_))
+              .getOrElse(Nil)
+              .asJava)
+
           case Failure(exception) => resultFuture.completeExceptionally(exception)
         }
     }
@@ -97,7 +138,7 @@ abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: Ty
   }
 
   override def initializeState(context: FunctionInitializationContext): Unit = {
-    val stateDescriptor = new ListStateDescriptor("cache-content", createTypeInformation[Map[String, V]])
+    val stateDescriptor = new ListStateDescriptor("cache-content", createTypeInformation[Map[String, Option[V]]])
 
     listState = context.getOperatorStateStore.getListState(stateDescriptor)
 
@@ -107,13 +148,15 @@ abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: Ty
     }
   }
 
-  private def unpack(response: Response[R], input: IN) = {
-    val output = unpackResponse(response, input)
+  private def unpack(response: Response[R], input: IN): Option[OUT] = {
+    unpackResponse(response, input) match {
+      case result@Some(output) =>
+        cache.put(getCacheKey(input), Some(getCacheValue(input, output)))
+        result
 
-    val value = getCacheValue(input, output)
-
-    cache.put(getCacheKey(input), value)
-
-    output
+      case result@None =>
+        if (cacheEmptyResponse) cache.put(getCacheKey(input), None)
+        result
+    }
   }
 }

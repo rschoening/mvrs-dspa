@@ -16,18 +16,23 @@ class AsyncForumTitleLookupFunction(forumFeaturesIndex: String, nodes: ElasticSe
 
   override protected def toOutput(input: PostEvent, cachedValue: String): (PostEvent, String) = (input, cachedValue)
 
-  override protected def executeQuery(client: ElasticClient, input: PostEvent): Future[Response[SearchResponse]] =
+  override protected def executeQuery(client: ElasticClient, input: PostEvent): Future[Response[SearchResponse]] = {
+    // NOTE NOT ENCOUNTERED HERE:
+    if (input.postId == 761190) println("************* QUERY FOR POST SENT ****************")
     client.execute {
       search(forumFeaturesIndex).query {
         idsQuery(input.forumId.toString)
       }
     }
+  }
 
-  override def unpackResponse(response: Response[SearchResponse], input: PostEvent): (PostEvent, String) = {
+  override def unpackResponse(response: Response[SearchResponse], input: PostEvent): Option[(PostEvent, String)] = {
+    if (input.postId == 761190) println("************* RESPONSE FOR POST RECEIVED ****************")
+
     val hits = response.result.hits.hits
 
     if (hits.length == 0) {
-      (input, "<unknown forum>")
+      Some((input, "<unknown forum>"))
     }
     else {
       assert(hits.length == 1)
@@ -35,7 +40,7 @@ class AsyncForumTitleLookupFunction(forumFeaturesIndex: String, nodes: ElasticSe
       val source = hits(0).sourceAsMap
       val title = source("title").asInstanceOf[String]
 
-      (input, title)
+      Some((input, title))
     }
   }
 }

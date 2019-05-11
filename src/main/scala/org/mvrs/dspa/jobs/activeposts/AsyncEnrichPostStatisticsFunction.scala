@@ -34,10 +34,10 @@ class AsyncEnrichPostStatisticsFunction(postInfosIndexName: String, nodes: Elast
       }
     }
 
-  override protected def unpackResponse(response: Response[SearchResponse], input: PostStatistics): (PostStatistics, String, String) = {
+  override protected def unpackResponse(response: Response[SearchResponse], input: PostStatistics): Option[(PostStatistics, String, String)] = {
     val hits = response.result.hits.hits
     if (hits.length == 0) {
-      (input, "<unknown content>", "<unknown forum>")
+      Some((input, "<unknown content>", "<unknown forum>"))
     }
     else {
       assert(hits.length == 1, s"unexpected number of hits for post ${input.postId}")
@@ -49,10 +49,12 @@ class AsyncEnrichPostStatisticsFunction(postInfosIndexName: String, nodes: Elast
       val forumTitle = source("forumTitle").asInstanceOf[String]
 
       // return tuple
-      (
-        input,
-        if (content.isEmpty) imageFile else content,
-        forumTitle
+      Some(
+        (
+          input,
+          if (content.isEmpty) imageFile else content,
+          forumTitle
+        )
       )
     }
   }
