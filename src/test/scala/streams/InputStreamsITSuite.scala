@@ -9,16 +9,14 @@ import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.{Ignore, Test}
+import org.mvrs.dspa.streams
 import org.mvrs.dspa.utils.DateTimeUtils
-import org.mvrs.dspa.{Settings, streams}
 import org.scalatest.Assertions._
+import utils.TestUtils
 
 import scala.collection.JavaConverters._
 
-// TODO add small-enough (for git) subset of test data to resources
-
 class InputStreamsITSuite extends AbstractTestBase {
-  @Ignore("depends on configured test data, counts apply for small dataset")
   @Test
   def testReadingLikes(): Unit = {
     implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
@@ -28,7 +26,7 @@ class InputStreamsITSuite extends AbstractTestBase {
     env.setParallelism(4)
 
     streams
-      .likesFromCsv(Settings.config.getString("data.likes-csv-path"))
+      .likesFromCsv(TestUtils.getResourceURIPath("/streams/likes.csv"))
       .map(e => (e.postId, 1))
       .keyBy(_._1)
       .timeWindow(Time.days(30))
@@ -41,12 +39,13 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     val results = CounterSink.values.asScala.toList
 
-    assertResult(662890)(results.map(_._2).sum) // like event count
-    assertResult(150538)(results.map(_._1).distinct.size) // distinct posts
-    assertResult(167229)(results.size) // count of per-post windows
+    print(results)
+
+    assertResult(117151)(results.map(_._2).sum) // like event count
+    assertResult(26623)(results.map(_._1).distinct.size) // distinct posts
+    assertResult(29741)(results.size) // count of per-post windows
   }
 
-  @Ignore("depends on configured test data, counts apply for small dataset")
   @Test
   def testReadingPosts(): Unit = {
 
@@ -59,7 +58,7 @@ class InputStreamsITSuite extends AbstractTestBase {
     val startTime = System.currentTimeMillis()
 
     streams
-      .postsFromCsv(Settings.config.getString("data.posts-csv-path"))
+      .postsFromCsv(TestUtils.getResourceURIPath("/streams/posts.csv"))
       .map(e => (e.personId, 1))
       .keyBy(_._1)
       .timeWindow(Time.days(30))
@@ -72,16 +71,17 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     val results = CounterSink.values.asScala.toList
 
-    assertResult(173401)(results.map(_._2).sum) // post event count
-    assertResult(984)(results.map(_._1).distinct.size) // distinct persons
-    assertResult(6381)(results.size) // count of per-person windows
+    print(results)
+
+    assertResult(30956)(results.map(_._2).sum) // post event count
+    assertResult(382)(results.map(_._1).distinct.size) // distinct persons
+    assertResult(1266)(results.size) // count of per-person windows
 
     val duration = System.currentTimeMillis() - startTime
 
     println(s"duration: ${DateTimeUtils.formatDuration(duration)}")
   }
 
-  @Ignore("depends on configured test data, counts apply for small dataset")
   @Test
   def testReadingRawComments(): Unit = {
     implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
@@ -93,7 +93,7 @@ class InputStreamsITSuite extends AbstractTestBase {
     val startTime = System.currentTimeMillis()
 
     streams
-      .rawCommentsFromCsv(Settings.config.getString("data.comments-csv-path"))
+      .rawCommentsFromCsv(TestUtils.getResourceURIPath("/streams/comments.csv"))
       .map(e => (e.personId, 1))
       .keyBy(_._1)
       .timeWindow(Time.days(30))
@@ -106,16 +106,17 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     val results = CounterSink.values.asScala.toList
 
-    assertResult(632042)(results.map(_._2).sum) // post event count
-    assertResult(912)(results.map(_._1).distinct.size) // distinct persons
-    assertResult(8966)(results.size) // count of per-person windows
+    print(results)
+
+    assertResult(113422)(results.map(_._2).sum) // post event count
+    assertResult(822)(results.map(_._1).distinct.size) // distinct persons
+    assertResult(3880)(results.size) // count of per-person windows
 
     val duration = System.currentTimeMillis() - startTime
 
     println(s"duration: ${DateTimeUtils.formatDuration(duration)}")
   }
 
-  @Ignore("depends on configured test data, counts apply for small dataset")
   @Test
   def testReadingComments(): Unit = {
     implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
@@ -126,8 +127,8 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     val startTime = System.currentTimeMillis()
 
-    streams.commentsFromCsv(
-      Settings.config.getString("data.comments-csv-path"))
+    streams
+      .commentsFromCsv(TestUtils.getResourceURIPath("/streams/comments.csv"))
       .map(e => (e.postId, 1))
       .keyBy(_._1)
       .timeWindow(Time.days(30))
@@ -140,26 +141,27 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     val results = CounterSink.values.asScala.toList
 
-    val eventCount = results.map(_._2).sum
-    val distinctPostCount = results.map(_._1).distinct.size
-    val windowCount = results.size
-
-    println(s"event count: $eventCount") // 597785, 597796, 597788 for parallelism = 1
-    println(s"distinct posts: $distinctPostCount")
-    println(s"per-post windows: $windowCount") // 68492  - reproduced with parallelism = 1
+    print(results)
 
     // possible causes for non-determinism
     // - parallelism > 1 (no, at least event count is different also for p=1)
     // - some processing time-dependency
 
-//    assertResult(604529)(eventCount) // post event count NOTE currently not deterministic
-    assertResult(63177)(distinctPostCount) // distinct posts
-    // assertResult(68499)(windowCount) // count of per-post windows NOTE currently not deterministic
+    // assertResult(xxx)(results.map(_._2).sum) // post event count NOTE currently not deterministic
+    assertResult(11575)(results.map(_._1).distinct.size) // distinct posts
+    // assertResult(xxx)(results.size) // count of per-post windows NOTE currently not deterministic
 
     val duration = System.currentTimeMillis() - startTime
 
     println(s"duration: ${DateTimeUtils.formatDuration(duration)}")
   }
+
+  private def print(results: List[(Long, Int)]): Unit = {
+    println(results.map(_._2).sum) // like event count
+    println(results.map(_._1).distinct.size) // distinct posts
+    println(results.size) // count of per-post windows
+  }
+
 }
 
 class CounterSink extends SinkFunction[(Long, Int)] {
