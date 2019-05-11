@@ -8,7 +8,7 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.test.util.AbstractTestBase
-import org.junit.{Ignore, Test}
+import org.junit.Test
 import org.mvrs.dspa.streams
 import org.mvrs.dspa.utils.DateTimeUtils
 import org.scalatest.Assertions._
@@ -24,6 +24,8 @@ class InputStreamsITSuite extends AbstractTestBase {
     env.getConfig.setTaskCancellationTimeout(0)
     env.getConfig.setAutoWatermarkInterval(1000L)
     env.setParallelism(4)
+
+    val startTime = System.currentTimeMillis()
 
     streams
       .likesFromCsv(TestUtils.getResourceURIPath("/streams/likes.csv"))
@@ -44,6 +46,15 @@ class InputStreamsITSuite extends AbstractTestBase {
     assertResult(117151)(results.map(_._2).sum) // like event count
     assertResult(26623)(results.map(_._1).distinct.size) // distinct posts
     assertResult(29741)(results.size) // count of per-post windows
+
+
+    val duration = System.currentTimeMillis() - startTime
+
+    println(s"duration: ${DateTimeUtils.formatDuration(duration)}")
+    // durations:
+    // - parallelism = 4: 3.3 sec (note: source is non-parallel)
+    // - parallelism = 1: 3.3 sec
+    // -> dominated by init/teardown overhead, data volume too small to benefit from parallelism
   }
 
   @Test
@@ -53,7 +64,7 @@ class InputStreamsITSuite extends AbstractTestBase {
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.getConfig.setTaskCancellationTimeout(0)
     env.getConfig.setAutoWatermarkInterval(1000L)
-    env.setParallelism(4)
+    env.setParallelism(1)
 
     val startTime = System.currentTimeMillis()
 
@@ -80,6 +91,11 @@ class InputStreamsITSuite extends AbstractTestBase {
     val duration = System.currentTimeMillis() - startTime
 
     println(s"duration: ${DateTimeUtils.formatDuration(duration)}")
+
+    // durations:
+    // - parallelism = 4: 3.3 sec (note: source is non-parallel)
+    // - parallelism = 1: 3.2 sec
+    // -> dominated by init/teardown overhead, data volume too small to benefit from parallelism
   }
 
   @Test
@@ -88,7 +104,7 @@ class InputStreamsITSuite extends AbstractTestBase {
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.getConfig.setTaskCancellationTimeout(0)
     env.getConfig.setAutoWatermarkInterval(1000L)
-    env.setParallelism(4)
+    env.setParallelism(1)
 
     val startTime = System.currentTimeMillis()
 
@@ -115,6 +131,11 @@ class InputStreamsITSuite extends AbstractTestBase {
     val duration = System.currentTimeMillis() - startTime
 
     println(s"duration: ${DateTimeUtils.formatDuration(duration)}")
+
+    // durations:
+    // - parallelism = 4: 3.3 sec (note: source is non-parallel)
+    // - parallelism = 1: 3.2 sec
+    // -> dominated by init/teardown overhead, data volume too small to benefit from parallelism
   }
 
   @Test
@@ -123,7 +144,7 @@ class InputStreamsITSuite extends AbstractTestBase {
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.getConfig.setTaskCancellationTimeout(0)
     env.getConfig.setAutoWatermarkInterval(1000L)
-    env.setParallelism(1)
+    env.setParallelism(4)
 
     val startTime = System.currentTimeMillis()
 
@@ -151,6 +172,13 @@ class InputStreamsITSuite extends AbstractTestBase {
     assertResult(11575)(results.map(_._1).distinct.size) // distinct posts
     // assertResult(xxx)(results.size) // count of per-post windows NOTE currently not deterministic
 
+    // Before changes to ensure deterministic outputs:
+    // - parallelism=1: 3.5 seconds
+    // - parallelism=4: 15 seconds !!! due to broadcasting in reply tree reconstruction
+
+    // After changes:
+    // - parallelism=1: XX seconds
+    // - parallelism=4: XX seconds
     val duration = System.currentTimeMillis() - startTime
 
     println(s"duration: ${DateTimeUtils.formatDuration(duration)}")
@@ -161,7 +189,6 @@ class InputStreamsITSuite extends AbstractTestBase {
     println(results.map(_._1).distinct.size) // distinct posts
     println(results.size) // count of per-post windows
   }
-
 }
 
 class CounterSink extends SinkFunction[(Long, Int)] {
@@ -171,6 +198,6 @@ class CounterSink extends SinkFunction[(Long, Int)] {
 object CounterSink {
   // NOTE using
   // synchronized { /* access to non-threadsafe collection */ }
-  // does not work, collection still corrupt
+  // does not work, collection still corrupt --> Flink documentation should be changed
   val values: util.Collection[(Long, Int)] = Collections.synchronizedCollection(new util.ArrayList[(Long, Int)])
 }
