@@ -5,7 +5,9 @@ import org.mvrs.dspa.streams
 import org.mvrs.dspa.streams.KafkaTopics
 import org.mvrs.dspa.utils.FlinkUtils
 
-object LoadAllEventsJob extends FlinkStreamingJob {
+object LoadAllEventsJob extends FlinkStreamingJob(
+  checkpointIntervalOverride = Some(0) // disable checkpointing for the load job - not fault-tolerant due to reordering step
+) {
   def execute(): Unit = {
     val speedup = Some(0.0) // don't use speedup for writing events to kafka
 
