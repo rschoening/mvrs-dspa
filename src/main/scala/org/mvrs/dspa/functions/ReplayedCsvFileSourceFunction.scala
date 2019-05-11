@@ -47,7 +47,7 @@ class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
     watermarkIntervalMillis,
     1000
   ) {
-  @transient private var csvReader: Option[CsvReader[ReadResult[OUT]]] = None
+  @transient private var csvReader: CsvReader[ReadResult[OUT]] = _
 
   def this(filePath: String,
            skipFirstLine: Boolean,
@@ -68,7 +68,7 @@ class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
 
     implicit val coded: Codec = charsetName.map(name => Codec(Charset.forName(name))).getOrElse(Codec.UTF8)
 
-    csvReader = Some(file.asCsvReader[OUT](config))
+    csvReader = file.asCsvReader[OUT](config)
   }
 
   override def run(ctx: SourceFunction.SourceContext[OUT]): Unit = {
@@ -84,19 +84,16 @@ class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
   override def close(): Unit = closeSource()
 
   override protected def inputIterator: Iterator[OUT] =
-    csvReader.map(_.map {
+    if (csvReader == null) Iterator[OUT]()
+    else csvReader.map {
       case row@Left(error) => reportRowError(error); row // to be dropped in collect
       case row => row
-    }
-      .collect {
-        case Right(out) => out
-      })
-      .getOrElse(List[OUT]())
-      .toIterator
+    }.collect {
+      case Right(out) => out
+    }.toIterator
 
   private def closeSource(): Unit = {
-    csvReader.foreach(_.close())
-    csvReader = None
+    if (csvReader != null) csvReader.close()
   }
 }
 
