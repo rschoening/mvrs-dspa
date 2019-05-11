@@ -2,6 +2,7 @@ package streams
 
 import java.util
 import java.util.Collections
+import java.util.concurrent.atomic.AtomicLong
 
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.functions.sink.SinkFunction
@@ -33,13 +34,13 @@ class InputStreamsITSuite extends AbstractTestBase {
       .keyBy(_._1)
       .timeWindow(Time.days(30))
       .reduce((t1, t2) => (t1._1, t1._2 + t2._2))
-      .addSink(new CounterSink)
+      .addSink(new CollectionSink)
 
-    CounterSink.values.clear()
+    CollectionSink.values.clear()
 
     env.execute()
 
-    val results = CounterSink.values.asScala.toList
+    val results = CollectionSink.values.asScala.toList
 
     print(results)
 
@@ -74,13 +75,13 @@ class InputStreamsITSuite extends AbstractTestBase {
       .keyBy(_._1)
       .timeWindow(Time.days(30))
       .reduce((t1, t2) => (t1._1, t1._2 + t2._2))
-      .addSink(new CounterSink)
+      .addSink(new CollectionSink)
 
-    CounterSink.values.clear()
+    CollectionSink.values.clear()
 
     env.execute()
 
-    val results = CounterSink.values.asScala.toList
+    val results = CollectionSink.values.asScala.toList
 
     print(results)
 
@@ -114,13 +115,13 @@ class InputStreamsITSuite extends AbstractTestBase {
       .keyBy(_._1)
       .timeWindow(Time.days(30))
       .reduce((t1, t2) => (t1._1, t1._2 + t2._2))
-      .addSink(new CounterSink)
+      .addSink(new CollectionSink)
 
-    CounterSink.values.clear()
+    CollectionSink.values.clear()
 
     env.execute()
 
-    val results = CounterSink.values.asScala.toList
+    val results = CollectionSink.values.asScala.toList
 
     print(results)
 
@@ -144,41 +145,58 @@ class InputStreamsITSuite extends AbstractTestBase {
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.getConfig.setTaskCancellationTimeout(0)
     env.getConfig.setAutoWatermarkInterval(1000L)
-    env.setParallelism(4)
+    env.setParallelism(1)
 
     val startTime = System.currentTimeMillis()
 
     streams
-      .commentsFromCsv(TestUtils.getResourceURIPath("/streams/comments.csv"))
+      .commentsFromCsv(TestUtils.getResourceURIPath("/streams/comments.csv"), 10000000)
       .map(e => (e.postId, 1))
       .keyBy(_._1)
       .timeWindow(Time.days(30))
       .reduce((t1, t2) => (t1._1, t1._2 + t2._2))
-      .addSink(new CounterSink)
+      .addSink(new CollectionSink)
 
-    CounterSink.values.clear()
+    CollectionSink.values.clear()
 
     env.execute()
 
-    val results = CounterSink.values.asScala.toList
+    val results = CollectionSink.values.asScala.toList
 
     print(results)
 
-    // possible causes for non-determinism
-    // - parallelism > 1 (no, at least event count is different also for p=1)
-    // - some processing time-dependency
-
-    // assertResult(xxx)(results.map(_._2).sum) // post event count NOTE currently not deterministic
     assertResult(11575)(results.map(_._1).distinct.size) // distinct posts
-    // assertResult(xxx)(results.size) // count of per-post windows NOTE currently not deterministic
 
-    // Before changes to ensure deterministic outputs:
-    // - parallelism=1: 3.5 seconds
-    // - parallelism=4: 15 seconds !!! due to broadcasting in reply tree reconstruction
+    val duration = System.currentTimeMillis() - startTime
 
-    // After changes:
-    // - parallelism=1: XX seconds
-    // - parallelism=4: XX seconds
+    println(s"duration: ${DateTimeUtils.formatDuration(duration)}")
+  }
+
+  @Test
+  def testReadingCommentsNonWindowed(): Unit = {
+    implicit val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
+    env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
+    env.getConfig.setTaskCancellationTimeout(0)
+    env.getConfig.setAutoWatermarkInterval(100)
+    env.setParallelism(1)
+
+    val startTime = System.currentTimeMillis()
+
+    streams
+      .commentsFromCsv(TestUtils.getResourceURIPath("/streams/comments.csv"), 10000000)
+      .map(e => (e.postId, 1))
+      .addSink(new CounterSink[(Long, Int)])
+
+    CounterSink.counter.set(0)
+
+    env.execute()
+
+    val result = CounterSink.counter.get()
+
+    println(result)
+
+    // NOTE result is NOT deterministic
+
     val duration = System.currentTimeMillis() - startTime
 
     println(s"duration: ${DateTimeUtils.formatDuration(duration)}")
@@ -191,11 +209,19 @@ class InputStreamsITSuite extends AbstractTestBase {
   }
 }
 
-class CounterSink extends SinkFunction[(Long, Int)] {
-  override def invoke(value: (Long, Int)): Unit = CounterSink.values.add(value)
+class CounterSink[T] extends SinkFunction[T] {
+  override def invoke(value: T): Unit = CounterSink.counter.incrementAndGet()
 }
 
 object CounterSink {
+  val counter: AtomicLong = new AtomicLong(0)
+}
+
+class CollectionSink extends SinkFunction[(Long, Int)] {
+  override def invoke(value: (Long, Int)): Unit = CollectionSink.values.add(value)
+}
+
+object CollectionSink {
   // NOTE using
   // synchronized { /* access to non-threadsafe collection */ }
   // does not work, collection still corrupt --> Flink documentation should be changed
