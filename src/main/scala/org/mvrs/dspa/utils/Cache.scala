@@ -31,4 +31,6 @@ class Cache[K: Read, V](@Nonnegative maximumSize: Long = 10000L)
     pairs.map {
       case (key, value) => (key.toString, Entry(value, None))
     }.asJava)
+
+  def estimatedSize: Long = underlyingCaffeineCache.estimatedSize()
 }
