@@ -85,7 +85,8 @@ services:
         source: esdata1
         target: /usr/share/elasticsearch/data
     ports:
-      - "9201:9200"
+      - "9201:9200" # rest api
+      - "9301:9300" # transport client api
 
   kibana:
     image: docker.elastic.co/kibana/kibana:6.7.2
