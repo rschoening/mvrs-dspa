@@ -3,10 +3,19 @@ package org.mvrs.dspa.utils.elastic
 import com.sksamuel.elastic4s.http.ElasticClient
 import org.apache.flink.api.common.io.OutputFormat
 import org.apache.flink.configuration.Configuration
+import org.mvrs.dspa.utils.elastic
 
-abstract class ElasticSearchOutputFormat[T](nodes: ElasticSearchNode*) extends OutputFormat[T] {
+/**
+  * Base class for elastic4s based output formats
+  *
+  * @param nodes the elasticsearch nodes to connect to
+  * @tparam T the record type
+  */
+abstract class ElasticSearchOutputFormat[T](nodes: Seq[ElasticSearchNode]) extends OutputFormat[T] {
 
-  private var client: Option[ElasticClient] = None
+  @transient private lazy val client: ElasticClient = elastic.createClient(nodes: _*)
+
+  override def open(taskNumber: Int, numTasks: Int): Unit = {}
 
   protected def process(record: T, client: ElasticClient): Unit
 
@@ -14,15 +23,12 @@ abstract class ElasticSearchOutputFormat[T](nodes: ElasticSearchNode*) extends O
 
   override def configure(parameters: Configuration): Unit = {}
 
-  override def open(taskNumber: Int, numTasks: Int): Unit = client = Some(createClient(nodes: _*))
-
-  override def writeRecord(record: T): Unit = process(record, client.get) // exception if None
+  override def writeRecord(record: T): Unit = process(record, client)
 
   override def close(): Unit = {
-    client.foreach(c => {
-      closing(c)
-      c.close()
-    })
-    client = None
+    closing(client)
+    client.close()
   }
+
 }
+

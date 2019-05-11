@@ -19,6 +19,7 @@ abstract class ElasticSearchIndexSink[T](indexName: String, nodes: ElasticSearch
       new ElasticsearchSinkFunction[T] {
         private def createUpsertRequest(record: T): UpdateRequest = {
 
+          // val b : BulkRequest = new BulkRequest()
           // NOTE this closes over the containing class, which therefore must be serializable
           val document = createDocument(record).asJava
           val id = getDocumentId(record)

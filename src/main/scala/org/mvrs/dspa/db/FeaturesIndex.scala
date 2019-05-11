@@ -5,7 +5,7 @@ import com.sksamuel.elastic4s.mappings.FieldDefinition
 import org.mvrs.dspa.utils.elastic.{ElasticSearchIndexWithUpsertOutputFormat, ElasticSearchNode}
 
 class FeaturesIndex(indexName: String, nodes: ElasticSearchNode*)
-  extends ElasticSearchIndexWithUpsertOutputFormat[(Long, List[String])](indexName, nodes: _*) {
+  extends ElasticSearchIndexWithUpsertOutputFormat[(Long, List[String])](indexName, nodes) {
   override protected def getDocumentId(record: (Long, List[String])): String = record._1.toString
 
   override protected def createDocument(record: (Long, List[String])): Map[String, Any] =

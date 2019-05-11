@@ -1,20 +1,23 @@
 package org.mvrs.dspa.utils.elastic
 
-import com.sksamuel.elastic4s.http.ElasticClient
+import com.sksamuel.elastic4s.bulk.BulkCompatibleRequest
+import com.sksamuel.elastic4s.http.ElasticDsl._
 
-abstract class ElasticSearchIndexWithUpsertOutputFormat[T](indexName: String, nodes: ElasticSearchNode*)
+abstract class ElasticSearchIndexWithUpsertOutputFormat[T](indexName: String,
+                                                           nodes: Seq[ElasticSearchNode],
+                                                           batchSize: Int = 1000)
   extends ElasticSearchIndex(indexName, nodes: _*) {
 
+  /**
+    * Creates the output format performing upserts (based on the document id)
+    *
+    * @return the output format to be used with the Dataset API
+    */
   def createUpsertFormat(): ElasticSearchOutputFormat[T] = {
-    new ElasticSearchOutputFormat[T](nodes: _*) {
+    new ElasticSearchBulkOutputFormat[T](indexName, typeName, nodes, batchSize) {
 
-      import com.sksamuel.elastic4s.http.ElasticDsl._
-
-      override def process(record: T, client: ElasticClient): Unit = {
-        client.execute {
-          update(getDocumentId(record)) in indexName / typeName docAsUpsert createDocument(record)
-        }.await
-      }
+      override protected def createRequest(record: T): BulkCompatibleRequest =
+        update(getDocumentId(record)) in indexName / typeName docAsUpsert createDocument(record)
     }
   }
 

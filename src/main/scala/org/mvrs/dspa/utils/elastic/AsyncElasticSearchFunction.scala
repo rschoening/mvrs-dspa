@@ -17,13 +17,9 @@ abstract class AsyncElasticSearchFunction[IN, OUT: TypeInformation](nodes: Seq[E
   @transient implicit lazy val executor: ExecutionContext = ExecutionContext.fromExecutor(Executors.directExecutor())
   @transient private lazy val client: ElasticClient = elastic.createClient(nodes: _*)
 
-  final override def close(): Unit = {
-    if (client != null) client.close()
-  }
+  final override def close(): Unit = client.close()
 
-  final override def asyncInvoke(input: IN, resultFuture: ResultFuture[OUT]): Unit = {
-    asyncInvoke(client, input, resultFuture)
-  }
+  final override def asyncInvoke(input: IN, resultFuture: ResultFuture[OUT]): Unit = asyncInvoke(client, input, resultFuture)
 
   def asyncInvoke(client: ElasticClient, input: IN, resultFuture: ResultFuture[OUT]): Unit
 

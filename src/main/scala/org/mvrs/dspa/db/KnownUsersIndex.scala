@@ -5,7 +5,7 @@ import com.sksamuel.elastic4s.mappings.FieldDefinition
 import org.mvrs.dspa.utils.elastic.{ElasticSearchIndexWithUpsertOutputFormat, ElasticSearchNode}
 
 class KnownUsersIndex(indexName: String, nodes: ElasticSearchNode*)
-  extends ElasticSearchIndexWithUpsertOutputFormat[(Long, List[Long])](indexName, nodes: _*) {
+  extends ElasticSearchIndexWithUpsertOutputFormat[(Long, List[Long])](indexName, nodes) {
 
   override def getDocumentId(record: (Long, List[Long])): String = record._1.toString
 

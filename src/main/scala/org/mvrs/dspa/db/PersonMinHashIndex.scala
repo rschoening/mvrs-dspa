@@ -8,7 +8,7 @@ import com.twitter.algebird.MinHashSignature
 import org.mvrs.dspa.utils.elastic.{ElasticSearchIndexWithUpsertOutputFormat, ElasticSearchNode}
 
 class PersonMinHashIndex(indexName: String, nodes: ElasticSearchNode*)
-  extends ElasticSearchIndexWithUpsertOutputFormat[(Long, MinHashSignature)](indexName, nodes: _*) {
+  extends ElasticSearchIndexWithUpsertOutputFormat[(Long, MinHashSignature)](indexName, nodes) {
 
   override def getDocumentId(record: (Long, MinHashSignature)): String = record._1.toString
 
