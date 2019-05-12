@@ -25,8 +25,13 @@ class SimpleScaledReplayFunction[I](extractEventTime: I => Long,
       waitTime => if (waitTime > 0) Thread.sleep(waitTime)
     )
 
-  @transient private var previousEventTime = 0L
-  @transient private var previousEmitTime = 0L
+  /**
+    * The start of the replay (lazy, determined on first access)
+    */
+  @transient private var replayStartTime = 0L
+
+  @transient private var firstEventTime = 0L
+
   @transient private lazy val LOG = LoggerFactory.getLogger(classOf[SimpleScaledReplayFunction[I]])
 
   private def log(msg: => String): Unit = if (LOG.isDebugEnabled()) LOG.debug(msg)
@@ -43,20 +48,19 @@ class SimpleScaledReplayFunction[I](extractEventTime: I => Long,
 
     val now = System.currentTimeMillis()
 
-    if (previousEventTime > 0) {
-      val eventTimeDiff = eventTime - previousEventTime // may be negative
-      val scaledEventTimeDiff = eventTimeDiff / speedupFactor
-      val replayTime = previousEmitTime + scaledEventTimeDiff
+    if (replayStartTime == 0L) {
+      firstEventTime = eventTime
+      replayStartTime = now
+    }
+    else {
+      val replayTime = EventScheduler.toReplayTime(replayStartTime, firstEventTime, eventTime, speedupFactor)
 
-      val waitTime = (replayTime - now).ceil.toLong // round up
+      val waitTime = replayTime - now
 
-      log(s"replay time: $replayTime - scaled event time difference: $scaledEventTimeDiff - wait time: $waitTime - item: $value")
+      log(s"replay time: $replayTime - event time: $eventTime - wait time: $waitTime - item: $value")
 
       if (waitTime > 0) wait(waitTime)
     }
-
-    previousEventTime = eventTime
-    previousEmitTime = System.currentTimeMillis()
 
     value
   }

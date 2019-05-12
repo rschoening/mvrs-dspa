@@ -39,7 +39,7 @@ class SimpleScaledReplayFunctionITSuite extends AbstractTestBase {
     val stream: DataStream[(Long, Long)] = env.fromCollection(eventTimes)
       .keyBy(_ => 0L)
       .map(new SimpleScaledReplayFunction[Long](identity, speedupFactor))
-      .map((_, System.currentTimeMillis))
+      .map((_, System.currentTimeMillis)) // output: tuples (event time, emit processing time)
 
     val replayTimes = DataStreamUtils.collect(stream.javaStream).asScala.toList
     val listWithTimeSinceStart = replayTimes.map(t => (t._1, t._2 - startTime))
@@ -52,6 +52,7 @@ class SimpleScaledReplayFunctionITSuite extends AbstractTestBase {
 
     println(s"Speedup factor: $speedupFactor")
     println(s"Duration: $duration")
+    println(s"Time differences: ${getDifferenceToPrevious(listWithTimeSinceStart)}")
 
     // job overhead is ~ 500 ms
 
@@ -61,27 +62,50 @@ class SimpleScaledReplayFunctionITSuite extends AbstractTestBase {
     assertProcessingTimeWithinTolerance(listWithTimeSinceStart, speedupFactor)
   }
 
+  private def getDifferenceToPrevious(eventAndProcessingTimes: List[(Long, Long)]): List[(Long, Long)] =
+    eventAndProcessingTimes
+      .drop(1) // start from second element
+      .zip(eventAndProcessingTimes) // zip with predecessor
+      .map {
+      case ((eventTime, procTime), (prevEventTime, prevProcTime)) =>
+        (
+          eventTime - prevEventTime, // event time difference
+          procTime - prevProcTime // processing time difference
+        )
+    }
+
   private def assertProcessingTimeWithinTolerance(eventAndProcessingTimes: Seq[(Long, Long)], speedupFactor: Double): Unit = {
-    val timeDiffs =
-      eventAndProcessingTimes
-        .drop(1) // start from second element
-        .zip(eventAndProcessingTimes) // zip with predecessor
-        .map {
-        case ((eventTime, procTime), (prevEventTime, prevProcTime)) =>
-          (
-            eventTime - prevEventTime, // event time difference
-            procTime - prevProcTime // processing time difference
-          )
+    if (eventAndProcessingTimes.nonEmpty) {
+      val (firstEventTime, processingStartTime) = eventAndProcessingTimes.head
+
+      var runningMaxEventTime = 0L
+      val sinceStart =
+        eventAndProcessingTimes
+          .drop(1) // start from second element
+          .map {
+          case (eventTime, procTime) =>
+            runningMaxEventTime = math.max(eventTime, runningMaxEventTime)
+            (
+              runningMaxEventTime, // maximum event time so far
+              runningMaxEventTime - firstEventTime,
+              eventTime - firstEventTime, // event time difference
+              procTime - processingStartTime // processing time difference
+            )
+        }
+
+      println(s"Time since start: $sinceStart")
+
+      if (speedupFactor > 0) {
+        val tolerance = 10L
+        sinceStart.foreach {
+          case (maxEventTime, maxEventTimeDiff, eventTimeDiff, procTimeDiff) =>
+            assert(math.abs(maxEventTimeDiff / speedupFactor - procTimeDiff) <= tolerance,
+              s"maxEventTime: $maxEventTime; " +
+                s"maxEventTimeDiff: $maxEventTimeDiff; " +
+                s"eventTimeDiff: $eventTimeDiff; " +
+                s"procTimeDiff: $procTimeDiff")
+        }
       }
-
-    println(s"Time differences: $timeDiffs")
-
-    val tolerance = 10L
-    timeDiffs.foreach {
-      case (eventTimeDiff, procTimeDiff) => assert(
-        math.abs(
-          if (speedupFactor <= 0) 0
-          else math.max(eventTimeDiff, 0) / speedupFactor - procTimeDiff) <= tolerance)
     }
   }
 }
