@@ -27,10 +27,10 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   @transient private lazy val danglingReplies: mutable.Map[Long, mutable.Set[RawCommentEvent]] = mutable.Map[Long, mutable.Set[RawCommentEvent]]()
 
   // TODO persist to ElasticSearch, use as cache (then no longer in operator state)
-  @transient private lazy val postForComment: mutable.Map[Long, Long] = mutable.Map()
+  @transient private lazy val postForComment: mutable.Map[Long, PostReference] = mutable.Map()
 
   @transient private var danglingRepliesListState: ListState[Map[Long, Set[RawCommentEvent]]] = _
-  @transient private var postForCommentListState: ListState[Map[Long, Long]] = _
+  @transient private var postForCommentListState: ListState[Map[Long, PostReference]] = _
 
   // metrics
   @transient private var resolvedReplyCount: Counter = _
@@ -41,11 +41,16 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
 
   @transient private var lastCacheProcessingTime = 0L
 
-  @transient private var currentCommentWatermark: Long = Long.MinValue
-  @transient private var currentBroadcastWatermark: Long = Long.MinValue
-  @transient private var currentMinimumWatermark: Long = Long.MinValue
+  @transient private var currentCommentWatermark: Long = _
+  @transient private var currentBroadcastWatermark: Long = _
+  @transient private var currentMinimumWatermark: Long = _
 
   override def open(parameters: Configuration): Unit = {
+    // initialize transient variables
+    currentCommentWatermark = Long.MinValue
+    currentBroadcastWatermark = Long.MinValue
+    currentMinimumWatermark = Long.MinValue
+
     // prepare metrics
     val group = getRuntimeContext.getMetricGroup
 
@@ -59,9 +64,12 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   override def processElement(firstLevelComment: CommentEvent,
                               ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, RawCommentEvent, CommentEvent]#ReadOnlyContext,
                               out: Collector[CommentEvent]): Unit = {
+    // println(s"processElement(${firstLevelComment.commentId})")
+
     // there should be no events with timestamps older or equal to the watermark
     assert(firstLevelComment.timestamp > ctx.currentWatermark())
     assert(ctx.timerService().currentWatermark() == ctx.currentWatermark())
+    assert(ctx.currentWatermark() >= currentCommentWatermark)
 
     val postId = firstLevelComment.postId
 
@@ -70,96 +78,93 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     // this state is unbounded, replies may refer to arbitrarily old comments
     // consider storing it in ElasticSearch, with a LRU cache maintained in the operator
     // NOTE how to deal with cache misses? Must be in this operator, however access to ElasticSearch should be non-blocking
-    postForComment.put(firstLevelComment.commentId, postId)
+    postForComment.put(firstLevelComment.commentId, PostReference(postId, firstLevelComment.timestamp))
 
     out.collect(firstLevelComment)
 
     // process all replies that were waiting for this comment (recursively)
-    emitWaitingChildren(firstLevelComment.commentId, out, postId)
+    processWaitingChildren(
+      firstLevelComment.commentId, firstLevelComment.timestamp, postId,
+      out, reportDropped(_, ctx.output(_, _)))
 
+    // advance the stored watermarks. If the minimum watermarks have advanced, then check for
+    // dangling replies that can now be evicted
     currentCommentWatermark = ctx.currentWatermark()
     val minimumWatermark = math.min(currentCommentWatermark, currentBroadcastWatermark)
     if (minimumWatermark > currentMinimumWatermark) {
+      // the minimum watermark has advanced, store it and process dangling replies
       currentMinimumWatermark = minimumWatermark
-      processDanglingReplies(currentMinimumWatermark, out, reportDropped(_, (t, r) => ctx.output(t, r)))
+
+      evictDanglingReplies(currentMinimumWatermark, out, reportDropped(_, ctx.output(_, _)))
     }
 
     // register a timer (will call back at watermark for the timestamp)
-    // NOTE actually the timer should be based on arriving unresolved replies, however the timer can only be registered
-    //      in the keyed context of the first-level comments.
+    // NOTE actually the timer should be based on arriving unresolved replies, to evict them also if no first-level
+    // comment arrives for a while. However the timer can only be registered in the keyed context of the
+    // first-level comments.
     ctx.timerService().registerEventTimeTimer(firstLevelComment.timestamp)
   }
-
-  private def emitWaitingChildren(commentId: Long, out: Collector[CommentEvent], postId: Long) = {
-    if (danglingReplies.contains(commentId)) {
-
-      val directChildren = danglingReplies(commentId)
-
-      val resolved = resolveDanglingReplies(directChildren, postId, getWaitingReplies)
-
-      emitResolvedReplies(resolved, out)
-
-      danglingReplies.remove(commentId)
-    }
-  }
-
-  //  private def processWatermark(newWatermark: Long,
-  //                               currentWatermark: Long,
-  //                               collector: Collector[CommentEvent],
-  //                               sideOutput: (OutputTag[RawCommentEvent], RawCommentEvent) => Unit): Long = {
-  //    if (newWatermark > currentWatermark) {
-  //      val newMinimum = math.min(newWatermark, currentWatermark)
-  //
-  //      if (newMinimum > currentMinimumWatermark) {
-  //        currentMinimumWatermark = newMinimum
-  //        processDanglingReplies(currentMinimumWatermark, collector, reportDropped(_, sideOutput))
-  //      }
-  //    }
-  //
-  //    newWatermark
-  //  }
-
-  override def onTimer(firstLevelCommentWatermark: Long,
-                       ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, RawCommentEvent, CommentEvent]#OnTimerContext,
-                       out: Collector[CommentEvent]): Unit = {
-    currentCommentWatermark = firstLevelCommentWatermark
-    processDanglingReplies(
-      firstLevelCommentWatermark,
-      out,
-      reportDropped(_, (t, r) => ctx.output(t, r)))
-  }
-
 
   override def processBroadcastElement(reply: RawCommentEvent,
                                        ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, RawCommentEvent, CommentEvent]#Context,
                                        out: Collector[CommentEvent]): Unit = {
+    // println(s"processBroadcastElement(${reply.commentId})")
 
     // there should be no events with timestamps older or equal to the watermark
     assert(reply.timestamp > ctx.currentWatermark())
+    assert(ctx.currentWatermark() >= currentBroadcastWatermark)
+    assert(reply.replyToPostId.isEmpty)
+    assert(reply.replyToCommentId.isDefined)
 
-    val postId = reply.replyToCommentId.flatMap(postForComment.get)
+    // look up post reference from map
+    reply.replyToCommentId.flatMap(id => postForComment.get(id)) match {
+      case Some(postReference) =>
+        // the parent comment was found in the map -> post id is known
+        postForComment(reply.commentId) =
+          PostReference(
+            postReference.postId,
+            if (postReference.commentTimestamp > reply.timestamp) Long.MaxValue
+            else reply.timestamp
+          )
 
-    if (postId.isDefined) {
-      postForComment(reply.commentId) = postId.get // remember our new friend
+        // If the parent comment has a later timestamp, the child reply (and all of its descendants) will be dropped,
+        // to ensure deterministic results in spite of
+        //  1) the non-deterministic arrival order of broadcast elements vs. primary elements, and
+        //  2) the advancement of watermarks (which do so in a non-deterministic, proc-time dependent way)
 
-      out.collect(resolve(reply, postId.get)) // ... and immediately emit the rooted reply
+        processWaitingChildren(reply.commentId, reply.timestamp, postReference.postId, out, reportDropped(_, ctx.output(_, _)))
 
-      emitWaitingChildren(reply.commentId, out, postId.get)
+        if (postReference.commentTimestamp > reply.timestamp)
+          drop(reply, reportDropped(_, ctx.output(_, _)))
+        else
+          out.collect(createComment(reply, postReference.postId)) // emit the rooted reply
+
+      case None => rememberDanglingReply(reply) // cache for later evaluation, globally in this operator/worker
     }
-    else rememberDanglingReply(reply) // cache for later evaluation, globally in this operator/worker
 
     // process dangling replies whenever watermark progressed
-
     currentBroadcastWatermark = ctx.currentWatermark()
     val minimumWatermark = math.min(currentCommentWatermark, currentBroadcastWatermark)
 
     if (minimumWatermark > currentMinimumWatermark) {
       currentMinimumWatermark = minimumWatermark
-      processDanglingReplies(currentMinimumWatermark, out, reportDropped(_, (t, r) => ctx.output(t, r)))
+      evictDanglingReplies(currentMinimumWatermark, out, reportDropped(_, ctx.output(_, _)))
     }
-    //    currentBroadcastWatermark = processWatermark(
-    //      ctx.currentWatermark(), currentBroadcastWatermark,
-    //      out, (t, r) => ctx.output(t, r))
+  }
+
+  override def onTimer(timestamp: Long,
+                       ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, RawCommentEvent, CommentEvent]#OnTimerContext,
+                       out: Collector[CommentEvent]): Unit = {
+    // check if the minimum watermark has advanced. If so then check if any dangling replies can be evicted
+    currentCommentWatermark = ctx.currentWatermark()
+
+    val minimumWatermark = math.min(currentCommentWatermark, currentBroadcastWatermark)
+
+    if (minimumWatermark > currentMinimumWatermark) {
+      currentMinimumWatermark = minimumWatermark
+
+      evictDanglingReplies(currentMinimumWatermark, out, reportDropped(_, ctx.output(_, _)))
+    }
   }
 
   override def snapshotState(context: FunctionSnapshotContext): Unit = {
@@ -176,9 +181,9 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
       createTypeInformation[Map[Long, Set[RawCommentEvent]]]
     )
 
-    val postForCommentDescriptor = new ListStateDescriptor[Map[Long, Long]](
+    val postForCommentDescriptor = new ListStateDescriptor[Map[Long, PostReference]](
       "post-for-comment",
-      createTypeInformation[Map[Long, Long]])
+      createTypeInformation[Map[Long, PostReference]])
 
     danglingRepliesListState = context.getOperatorStateStore.getListState(childRepliesDescriptor)
     postForCommentListState = context.getOperatorStateStore.getListState(postForCommentDescriptor)
@@ -206,46 +211,65 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     }
   }
 
+  private def createdBeforeParent(child: RawCommentEvent, parentTimestamp: Long): Boolean = child.timestamp < parentTimestamp
+
+  private def emit(resolvedReply: CommentEvent, out: Collector[CommentEvent]): Unit = {
+    postForComment(resolvedReply.commentId) = PostReference(resolvedReply.postId, resolvedReply.timestamp) // remember comment -> post mapping
+
+    danglingReplies.remove(resolvedReply.commentId) // remove resolved replies from operator state
+
+    out.collect(resolvedReply) // emit the resolved replies
+
+    resolvedReplyCount.inc()
+  }
+
+  private def drop(reply: RawCommentEvent, report: RawCommentEvent => Unit): Unit = {
+    // NOTE all replies waiting for this must have been processed FIRST
+    danglingReplies.remove(reply.commentId)
+    report(reply)
+    droppedReplyCount.inc()
+  }
+
+  private def processWaitingChildren(commentId: Long, timestamp: Long, postId: Long,
+                                     collector: Collector[CommentEvent],
+                                     reportDropped: RawCommentEvent => Unit) = {
+    danglingReplies.get(commentId) match {
+      case Some(replies) =>
+        // there are replies waiting for this comment.
+        getWithChildren(replies, getWaitingReplies)
+          .groupBy(createdBeforeParent(_, timestamp))
+          .foreach {
+            case (true, earlyChildren) => earlyChildren.foreach(drop(_, reportDropped))
+            case (false, normalChildren) => normalChildren.map(createComment(_, postId)).foreach(emit(_, collector))
+          }
+
+        danglingReplies.remove(commentId)
+
+      case None => // no waiting children found
+    }
+  }
+
   private def reportDropped(reply: RawCommentEvent,
                             output: (OutputTag[RawCommentEvent], RawCommentEvent) => Unit): Unit =
     outputTagDroppedReplies.foreach(output(_, reply))
 
-  private def processDanglingReplies(minimumWatermark: Long,
-                                     out: Collector[CommentEvent],
-                                     reportDroppedReply: RawCommentEvent => Unit): Unit = {
+
+  private def evictDanglingReplies(minimumWatermark: Long,
+                                   out: Collector[CommentEvent],
+                                   reportDropped: RawCommentEvent => Unit): Unit = {
     val startTime = System.currentTimeMillis()
-
-    // first, let all known parents resolve their children
-    for {(parentCommentId, replies) <- danglingReplies} {
-      // check if the post id for the parent comment id is now known
-      val postId = postForComment.get(parentCommentId)
-
-      postId.foreach(id => {
-        // the post id was found -> point all dangling children to it
-        val resolved = resolveDanglingReplies(replies, id, getWaitingReplies)
-
-        emitResolvedReplies(resolved, out)
-
-        danglingReplies.remove(parentCommentId)
-      })
-    }
 
     for {(parentCommentId, replies) <- danglingReplies} {
       // The parent of a dangling reply can be either a first-level comment or another reply.
       // Only when the watermark of BOTH replies (broadcast) and first-level comments have passed
-      // can we be sure that the reply won't ever find it's parent so that it can be dropped
+      // can we be sure that the reply won't ever find it's parent and that it can be dropped
       // -> use the minimum of the watermarks of both input streams
 
       val lostReplies = replies.filter(_.timestamp <= minimumWatermark)
       if (lostReplies.nonEmpty) {
-        val lostRepliesWithChildren = getDanglingReplies(lostReplies, getWaitingReplies)
+        val lostRepliesWithChildren = getWithChildren(lostReplies, getWaitingReplies)
 
-        lostRepliesWithChildren.foreach(lostReply => {
-          danglingReplies.remove(lostReply.commentId) // remove resolved replies from operator state
-
-          reportDroppedReply(lostReply)
-          droppedReplyCount.inc()
-        })
+        lostRepliesWithChildren.foreach(drop(_, reportDropped))
 
         replies --= lostReplies // replies is *mutable* set
 
@@ -253,25 +277,9 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
       }
     }
 
-    val duration = System.currentTimeMillis() - startTime
-
     // metrics
-    lastCacheProcessingTime = duration
+    lastCacheProcessingTime = System.currentTimeMillis() - startTime
     cacheProcessingCount.inc()
-  }
-
-  private def emitResolvedReplies(resolved: Iterable[CommentEvent], out: Collector[CommentEvent]): Unit = {
-    val count = resolved.size
-    require(count > 0, "empty replies iterable")
-
-    resolved.foreach(resolvedReply => {
-      postForComment(resolvedReply.commentId) = resolvedReply.postId // remember comment -> post mapping
-      danglingReplies.remove(resolvedReply.commentId) // remove resolved replies from operator state
-      out.collect(resolvedReply) // emit the resolved replies
-    })
-
-    // metrics
-    resolvedReplyCount.inc(count)
   }
 
   private def getWaitingReplies(event: RawCommentEvent): mutable.Set[RawCommentEvent] =
@@ -291,22 +299,22 @@ object BuildReplyTreeProcessFunction {
   def resolveDanglingReplies(replies: Iterable[RawCommentEvent],
                              postId: Long,
                              getChildren: RawCommentEvent => Iterable[RawCommentEvent]): Set[CommentEvent] =
-    getDanglingReplies(replies, getChildren).map(r => resolve(r, postId))
+    getWithChildren(replies, getChildren).map(createComment(_, postId))
 
-  def getDanglingReplies(replies: Iterable[RawCommentEvent],
-                         getChildren: RawCommentEvent => Iterable[RawCommentEvent]): Set[RawCommentEvent] = {
+  def getWithChildren(replies: Iterable[RawCommentEvent],
+                      getChildren: RawCommentEvent => Iterable[RawCommentEvent]): Set[RawCommentEvent] = {
     @tailrec
     def loop(acc: Set[RawCommentEvent])
             (replies: Iterable[RawCommentEvent],
              getChildren: RawCommentEvent => Iterable[RawCommentEvent]): Set[RawCommentEvent] = {
       if (replies.isEmpty) acc // base case
-      else loop(acc ++ replies)(replies.flatMap(getChildren), getChildren)
+      else loop(acc ++ replies)(replies.flatMap(getChildren), getChildren) // recurse, accumulate set
     }
 
     loop(Set())(replies, getChildren)
   }
 
-  private def resolve(c: RawCommentEvent, postId: Long): CommentEvent =
+  private def createComment(c: RawCommentEvent, postId: Long): CommentEvent =
     CommentEvent(
       c.commentId,
       c.personId,
@@ -317,4 +325,7 @@ object BuildReplyTreeProcessFunction {
       postId,
       c.replyToCommentId,
       c.placeId)
+
+  case class PostReference(postId: Long, commentTimestamp: Long)
+
 }
