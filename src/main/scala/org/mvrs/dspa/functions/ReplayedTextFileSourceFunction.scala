@@ -59,6 +59,11 @@ class ReplayedTextFileSourceFunction[OUT](filePath: String,
     source = None
   }
 
-  override protected def inputIterator: Iterator[String] = source.map(s => if (skipFirstLine) s.getLines().drop(1) else s.getLines()).get
+  override protected def inputIterator: Iterator[String] =
+    source.map(
+      s =>
+        if (skipFirstLine) s.getLines().drop(1)
+        else s.getLines()
+    ).get
 }
 
