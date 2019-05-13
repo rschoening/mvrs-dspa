@@ -1,6 +1,6 @@
 package org.mvrs.dspa.functions
 
-import org.apache.flink.api.common.functions.MapFunction
+import org.apache.flink.api.common.functions.RichMapFunction
 import org.slf4j.LoggerFactory
 
 /**
@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory
   */
 class SimpleScaledReplayFunction[I](extractEventTime: I => Long,
                                     speedupFactor: Double,
-                                    wait: Long => Unit) extends MapFunction[I, I] {
+                                    wait: Long => Unit) extends RichMapFunction[I, I] {
   require(speedupFactor >= 0, s"invalid speedup factor: $speedupFactor")
 
   def this(extractEventTime: I => Long, speedupFactor: Double) =
@@ -26,10 +26,17 @@ class SimpleScaledReplayFunction[I](extractEventTime: I => Long,
     )
 
   /**
-    * The start of the replay (lazy, determined on first access)
+    * The start of the replay
+    *
+    * @note not checkpointed; re-initialized when restarting from checkpoint
     */
   @transient private var replayStartTime = 0L
 
+  /**
+    * The event time of the first event in the stream
+    *
+    * @note not checkpointed; re-initialized when restarting from checkpoint
+    */
   @transient private var firstEventTime = 0L
 
   @transient private lazy val LOG = LoggerFactory.getLogger(classOf[SimpleScaledReplayFunction[I]])
