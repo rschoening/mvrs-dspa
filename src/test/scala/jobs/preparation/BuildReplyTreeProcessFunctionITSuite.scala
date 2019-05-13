@@ -26,6 +26,32 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
   private val repetitions = 20
   private val postId = 999
 
+  /*
+   -> | 236570 | 825 | 2012-03-18T04:11:43Z | 54520 |    -    | (1)  parent -> post   (line 9385)
+   -> | 236620 | 109 | 2012-03-18T04:56:00Z |   -   | 236590  | (2)  grandchild       (line 9412)
+   -> | 236590 | 642 | 2012-03-18T07:38:42Z |   -   | 236570  | (3)  child            (line 9494, + 2h 42 minutes)
+   -> | 236640 | 956 | 2012-03-18T10:30:44Z |   -   | 236590  | (4)  grandchild       (line 9622)
+   ** | 236650 | 102 | 2012-03-19T02:14:21Z |   -   | 236620  | (5)  great-grandchild (line 9749)
+
+   children of 236590: 236640, 236620
+   */
+  @Test
+  def test_Parent_Grandchild_Child_Greatgrandchild(): Unit = for (_ <- 0 until repetitions) {
+    val (rooted, dropped) = buildReplyTree(
+      Seq(
+        createComment(commentId = 236570, 1000, postId), // parent
+        createReplyTo(commentId = 236620, 2000, 236590), // grandchild
+        createReplyTo(commentId = 236590, 3000, 236570), // child
+        createReplyTo(commentId = 236640, 4000, 236590), // grandchild
+        createReplyTo(commentId = 236650, 5000, 236620), // great-grandchild (dropped but not reported)
+      )
+    )
+
+    assert(rooted.forall(_.postId == postId))
+    assertResult(Set(236590, 236570, 236640))(rooted.map(_.commentId).toSet)
+    assertResult(Set(236620, 236650))(dropped.map(_.commentId).toSet) // got Set(236620) -> great-grandchild not reported
+  }
+
   @Test
   def test_Grandchild_Child_Parent(): Unit = for (_ <- 0 until repetitions) {
     val (rooted, dropped) = buildReplyTree(
