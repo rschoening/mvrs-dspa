@@ -20,24 +20,24 @@ object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob(ena
     val postStatisticsStream: DataStream[PostStatistics] = streams.postStatistics("move-post-statistics")
 
     enrichPostStatistics(postStatisticsStream)
-      .disableChaining()
+      .disableChaining() // disable chaining to be able to observe back-pressure on preceding operators NOTE revise, see observations for recommendation job
       .addSink(esIndex.createSink(batchSize))
       .name(s"ElasticSearch: ${esIndex.indexName}")
-      .disableChaining() // to be able to observe back-pressure on preceding operators
+      .disableChaining()
 
     // execute program
     env.execute("Move enriched post statistics from Kafka to ElasticSearch")
   }
 
   private def enrichPostStatistics(postStatisticsStream: DataStream[PostStatistics])
-                                  (implicit elasticSearchNodes: Seq[ElasticSearchNode]): DataStream[(PostStatistics, String, String)] =
+                                  (implicit esNodes: Seq[ElasticSearchNode]): DataStream[(PostStatistics, String, String)] =
     FlinkUtils.asyncStream(
       postStatisticsStream,
       new AsyncEnrichPostStatisticsFunction(
         ElasticSearchIndexes.postInfos.indexName,
-        elasticSearchNodes: _*
+        esNodes: _*
       )
-    ).name("enrich post statistics")
+    ).name("Async I/O: enrich post statistics")
 }
 
 
