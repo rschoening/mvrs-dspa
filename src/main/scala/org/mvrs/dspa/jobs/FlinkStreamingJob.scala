@@ -1,9 +1,11 @@
 package org.mvrs.dspa.jobs
 
+import org.apache.flink.contrib.streaming.state.RocksDBStateBackend
 import org.apache.flink.runtime.state.StateBackend
 import org.apache.flink.runtime.state.filesystem.FsStateBackend
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 import org.apache.flink.streaming.api.{CheckpointingMode, TimeCharacteristic}
+import org.apache.flink.util.TernaryBoolean
 import org.mvrs.dspa.Settings
 import org.mvrs.dspa.utils.FlinkUtils
 
@@ -29,9 +31,13 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
   // - get job-dependent settings via constructor arguments
   // To make the class more general-purpose, read settings in project-specific subclass and provide constructor args for all these here
   private val latencyTrackingInterval = Settings.config.getInt("jobs.latency-tracking-interval")
+  private val stateBackendRocksDb = Settings.config.getBoolean("jobs.state-backend-rocksdb")
   private val stateBackendPath = Settings.config.getString("jobs.state-backend-path")
+  private val rocksDbPath = Settings.config.getString("jobs.rocksdb-path")
   private val checkpointInterval = checkpointIntervalOverride.getOrElse(Settings.duration("jobs.checkpoint-interval").toMilliseconds)
   private val checkpointMinPause = Settings.duration("jobs.checkpoint-min-pause").toMilliseconds
+  private val checkpointIncrementally = Settings.config.getBoolean("jobs.checkpoint-incrementally")
+  private val asynchronousSnapshots = Settings.config.getBoolean("jobs.asynchronous-snapshots")
 
   // localWithUI is set by base class based on program arguments
   implicit val env: StreamExecutionEnvironment = FlinkUtils.createStreamExecutionEnvironment(localWithUI)
@@ -54,11 +60,16 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
 
   if (stateBackendPath.length > 0) {
 
-    // NOTE rocksdb checkpoints fail at org.rocksdb.Checkpoint.createCheckpoint(Native Method)
-    // see https://issues.apache.org/jira/browse/FLINK-10918
-    // val stateBackend: StateBackend = new RocksDBStateBackend(stateBackendPath, true)
-    val stateBackend: StateBackend = new FsStateBackend(stateBackendPath, false)
-    env.setStateBackend(stateBackend)
+    val stateBackend: StateBackend = new FsStateBackend(stateBackendPath, asynchronousSnapshots)
+
+    if (stateBackendRocksDb) {
+      val rocksDbStateBackend: StateBackend = new RocksDBStateBackend(stateBackend, TernaryBoolean.fromBoolean(checkpointIncrementally))
+
+      env.setStateBackend(rocksDbStateBackend)
+    }
+    else {
+      env.setStateBackend(stateBackend)
+    }
   }
 
   env.getConfig.setAutoWatermarkInterval(autoWatermarkInterval)
