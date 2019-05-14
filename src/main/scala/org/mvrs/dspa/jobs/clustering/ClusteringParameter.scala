@@ -15,7 +15,8 @@ object ClusteringParameter {
   private val labelPattern: Regex = "(\\s*label\\s*:\\s*)(\\d*)".r
 
   def parse(line: String): List[Either[Throwable, ClusteringParameter]] =
-    line.split('=').map(_.trim.toLowerCase).toList match {
+    if (line.trim.startsWith("#")) Nil // comment line
+    else line.split('=').map(_.trim.toLowerCase).toList match {
       case "k" :: v :: Nil => List(Try(ClusteringParameterK(v.toInt)).toEither)
       case "decay" :: v :: Nil => List(Try(ClusteringParameterDecay(v.toDouble)).toEither)
       case labelPattern(_, index) :: v :: Nil => List(Try(ClusteringParameterLabel(index.toInt, v)).toEither)
