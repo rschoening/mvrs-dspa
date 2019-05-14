@@ -1,4 +1,4 @@
-package functions
+package jobs.activeposts
 
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.TimeCharacteristic
