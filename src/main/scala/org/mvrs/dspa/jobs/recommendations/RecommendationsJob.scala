@@ -38,7 +38,7 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
     val postFeaturesStream: DataStream[PostEvent] = streams.posts(Some("recommendations-post-features"))
 
     // look up forum features for posts
-    val postsWithForumFeatures: DataStream[(PostEvent, String, Set[String])] = lookupForumFeatures(postFeaturesStream)
+    val postsWithForumFeatures: DataStream[(PostEvent, Set[String])] = lookupForumFeatures(postFeaturesStream)
 
     val postFeatures =
       postsWithForumFeatures
@@ -148,29 +148,25 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
     }
   }
 
-  def lookupForumFeatures(postsStream: DataStream[PostEvent]): DataStream[(PostEvent, String, Set[String])] = {
+  def lookupForumFeatures(postsStream: DataStream[PostEvent]): DataStream[(PostEvent, Set[String])] = {
     FlinkUtils.asyncStream(
       postsStream,
-      new AsyncForumLookupFunction(
+      new AsyncForumFeaturesLookupFunction(
         ElasticSearchIndexes.forumFeatures.indexName,
         Settings.elasticSearchNodes: _*))
       .name("Async I/O: look up forum features")
       .startNewChain()
   }
 
-  def createPostRecord(t: (PostEvent, String, Set[String])): PostFeatures = {
+  def createPostRecord(t: (PostEvent, Set[String])): PostFeatures = {
     val postEvent = t._1
-    val forumTitle = t._2
-    val forumFeatures = t._3
+    //  val forumTitle = t._2
+    val forumFeatures = t._2
 
     PostFeatures(
       postEvent.postId,
       postEvent.personId,
-      postEvent.forumId,
-      forumTitle,
       postEvent.timestamp,
-      postEvent.content.getOrElse(""),
-      postEvent.imageFile.getOrElse(""),
       forumFeatures ++ postEvent.tags.map(RecommendationUtils.toFeature(_, FeaturePrefix.Tag))
     )
   }

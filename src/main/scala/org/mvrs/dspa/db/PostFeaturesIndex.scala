@@ -14,10 +14,6 @@ class PostFeaturesIndex(indexName: String, nodes: ElasticSearchNode*)
   override protected def createDocument(record: PostFeatures): Map[String, Any] =
     Map[String, Any](
       "personId" -> record.personId,
-      "forumId" -> record.forumId,
-      "forumTitle" -> record.forumTitle,
-      "content" -> record.content,
-      "imageFile" -> record.imageFile,
       "features" -> record.features.asJava,
       "timestamp" -> record.timestamp,
     )
@@ -25,10 +21,6 @@ class PostFeaturesIndex(indexName: String, nodes: ElasticSearchNode*)
   override protected def createFields(): Iterable[FieldDefinition] =
     Iterable(
       longField("personId"),
-      longField("forumId"),
-      keywordField("forumTitle"),
-      textField("content"),
-      textField("imageFile"),
       textField("features").index(false),
       dateField("timestamp"),
     )
