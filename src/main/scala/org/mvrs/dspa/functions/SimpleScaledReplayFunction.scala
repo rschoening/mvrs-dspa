@@ -1,6 +1,10 @@
 package org.mvrs.dspa.functions
 
 import org.apache.flink.api.common.functions.RichMapFunction
+import org.apache.flink.api.scala.metrics.ScalaGauge
+import org.apache.flink.configuration.Configuration
+import org.apache.flink.dropwizard.metrics.DropwizardMeterWrapper
+import org.apache.flink.metrics.{Counter, Gauge, Meter}
 import org.slf4j.LoggerFactory
 
 /**
@@ -25,6 +29,11 @@ class SimpleScaledReplayFunction[I](extractEventTime: I => Long,
       waitTime => if (waitTime > 0) Thread.sleep(waitTime)
     )
 
+  // metrics
+  @transient private var totalWaitTime: Counter = _
+  @transient private var waitTimePerSecond: Meter = _
+  @transient private var lastTimeDifferenceGauge: Gauge[Long] = _
+
   /**
     * The start of the replay
     *
@@ -39,9 +48,26 @@ class SimpleScaledReplayFunction[I](extractEventTime: I => Long,
     */
   @transient private var firstEventTime = 0L
 
+  /**
+    * The time difference of the last processed element (relative to scaled replay time). If the time difference is
+    * positive, the operator waited for that time to emit the element. If the difference is negative, then the source
+    * is slower than the scaled replay time and elements are emitted immediately.
+    */
+  @transient private var lastTimeDifference = 0L
+
   @transient private lazy val LOG = LoggerFactory.getLogger(classOf[SimpleScaledReplayFunction[I]])
 
   private def log(msg: => String): Unit = if (LOG.isDebugEnabled()) LOG.debug(msg)
+
+  override def open(parameters: Configuration): Unit = {
+    val group = getRuntimeContext.getMetricGroup
+
+    totalWaitTime = group.counter("totalWaitTime")
+    waitTimePerSecond = group.meter("waitTimePerSecond",
+      new DropwizardMeterWrapper(new com.codahale.metrics.Meter()))
+    lastTimeDifferenceGauge = group.gauge[Long, ScalaGauge[Long]]("lastTimeDifference",
+      ScalaGauge[Long](() => lastTimeDifference))
+  }
 
   override def map(value: I): I = {
     if (speedupFactor == 0) value
@@ -62,11 +88,18 @@ class SimpleScaledReplayFunction[I](extractEventTime: I => Long,
     else {
       val replayTime = EventScheduler.toReplayTime(replayStartTime, firstEventTime, eventTime, speedupFactor)
 
-      val waitTime = replayTime - now
+      val timeDifference = replayTime - now
 
-      log(s"replay time: $replayTime - event time: $eventTime - wait time: $waitTime - item: $value")
+      log(s"replay time: $replayTime - event time: $eventTime - time difference: $timeDifference - item: $value")
 
-      if (waitTime > 0) wait(waitTime)
+      lastTimeDifference = timeDifference
+
+      if (timeDifference > 0) {
+        wait(timeDifference)
+
+        waitTimePerSecond.markEvent(timeDifference)
+        totalWaitTime.inc(timeDifference)
+      }
     }
 
     value
