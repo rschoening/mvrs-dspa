@@ -14,7 +14,7 @@ import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.model._
-import org.mvrs.dspa.utils.FlinkUtils
+import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
 import org.mvrs.dspa.{Settings, streams}
 
 import scala.collection.JavaConverters._
@@ -59,8 +59,8 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     val eventFeaturesStream: DataStream[FeaturizedEvent] = getEventFeatures(comments, posts)
 
     // get frequency of posts/comments in time window, per person
-    val frequencyStream: DataStream[(Long, Int)] =
-      getEventFrequencyPerPerson(eventFeaturesStream, frequencyWindowSize, frequencyWindowSlide)
+    val frequencyStream: DataStream[(Long, Int)] = getEventFrequencyPerPerson(
+      comments, posts, frequencyWindowSize, frequencyWindowSlide)
 
     // get aggregated features (text and frequency-based)
     val aggregatedFeaturesStream: DataStream[FeaturizedEvent] =
@@ -97,24 +97,24 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     outputErrors(controlParameterParseErrors, clusterParameterParseErrorsOutputPath)
 
     env.execute()
-
   }
 
-  def readControlParameters(controlFilePath: String, updateInterval: Long = 2000L)
+  def readControlParameters(controlFilePath: String, updateInterval: Long = 1000L)
                            (implicit env: StreamExecutionEnvironment): DataStream[String] = {
-    val format = new TextInputFormat(new Path(controlFilePath))
-    format.setNumSplits(1)
+    val inputFormat = new TextInputFormat(new Path(controlFilePath))
+    inputFormat.setNumSplits(1)
 
     env
       .readFile(
-        format,
+        inputFormat,
         controlFilePath,
         FileProcessingMode.PROCESS_CONTINUOUSLY,
-        updateInterval).name("Read clustering parameters")
-      .name("control stream source")
+        updateInterval)
+      .name(s"Control parameters: $controlFilePath")
       .setParallelism(1) // otherwise the empty splits never emit watermarks, timers never fire etc.
-      .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[String](Time.seconds(0), _ => Long.MaxValue)) // required for downstream timers
-
+      .assignTimestampsAndWatermarks(
+      FlinkUtils.timeStampExtractor[String](Time.seconds(0),
+        _ => Long.MaxValue)) // required for downstream timers
   }
 
   def parseControlParameters(controlParameterLines: DataStream[String]): (DataStream[ClusteringParameter], DataStream[String]) = {
@@ -186,15 +186,26 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     commentFeaturesStream.union(postFeaturesStream)
   }
 
-  def getEventFrequencyPerPerson(eventFeaturesStream: DataStream[FeaturizedEvent],
+  def getEventFrequencyPerPerson(comments: DataStream[CommentEvent],
+                                 posts: DataStream[PostEvent],
                                  windowSize: Time,
-                                 windowSlide: Time): DataStream[(Long, Int)] =
-    eventFeaturesStream
-      .map(c => (c.personId, 1))
-      .keyBy(_._1)
+                                 windowSlide: Time): DataStream[(Long, Int)] = {
+    val frequencyInputStream =
+      comments
+        .map(c => (c.personId, 1))
+        .name("Map: comment -> (person Id, counter)")
+        .union(posts
+          .map(p => (p.personId, 1))
+          .name("Map: post -> (person Id, counter)"))
+        .keyBy(_._1) // person id
+
+    frequencyInputStream
       .timeWindow(FlinkUtils.convert(windowSize), FlinkUtils.convert(windowSlide))
       .sum(1)
-      .name("calculate post/comment frequency per person")
+      .name("calculate post/comment frequency per person" +
+        s"(window: ${DateTimeUtils.formatDuration(windowSize.toMilliseconds)}" +
+        s"slide ${DateTimeUtils.formatDuration(windowSlide.toMilliseconds)})")
+  }
 
   def aggregateFeatures(eventFeaturesStream: DataStream[FeaturizedEvent],
                         frequencyStream: DataStream[(Long, Int)],
@@ -223,13 +234,15 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     val clusters: DataStream[(Long, Int, ClusterModel)] =
       aggregatedFeaturesStream
         .map(_.features.toVector) // feature vector
+        .name("Map: --> feature vector")
         .keyBy(_ => 0) // all to same worker
         .connect(controlParameterBroadcast)
         .process(
           new KMeansClusterFunction(
             k, decay, windowSize, minElementCount, maxElementCount,
             clusterParametersBroadcastStateDescriptor,
-            Some(outputTagClusterMetadata))).name("calculate clusters")
+            Some(outputTagClusterMetadata)))
+        .name("Update cluster model")
         .setParallelism(1)
 
     val clusterMetadata: DataStream[ClusterMetadata] = clusters.getSideOutput(outputTagClusterMetadata)
@@ -289,8 +302,4 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
       .trimResults()
 
   private def tokenize(str: String): Iterable[String] = splitter.split(str).asScala
-
 }
-
-
-
