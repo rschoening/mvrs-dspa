@@ -43,9 +43,9 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     ElasticSearchIndexes.classification.create()
     ElasticSearchIndexes.clusterMetadata.create()
 
-    // val kafkaConsumerGroup = Some("activity-detection")
-    val comments: DataStream[CommentEvent] = streams.comments()
-    val posts: DataStream[PostEvent] = streams.posts()
+    val kafkaConsumerGroup = Some("activity-detection")
+    val comments: DataStream[CommentEvent] = streams.comments(kafkaConsumerGroup)
+    val posts: DataStream[PostEvent] = streams.posts(kafkaConsumerGroup)
 
     // read raw control file lines
     // NOTE generic types have to be enabled, since reading the control parameter file using TextInputFormat
