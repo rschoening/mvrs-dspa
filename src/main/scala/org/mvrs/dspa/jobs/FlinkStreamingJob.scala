@@ -63,9 +63,10 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
     val stateBackend: StateBackend = new FsStateBackend(stateBackendPath, asynchronousSnapshots)
 
     if (stateBackendRocksDb) {
-      val rocksDbStateBackend: StateBackend = new RocksDBStateBackend(stateBackend, TernaryBoolean.fromBoolean(checkpointIncrementally))
+      val rocksDbStateBackend = new RocksDBStateBackend(stateBackend, TernaryBoolean.fromBoolean(checkpointIncrementally))
+      rocksDbStateBackend.setDbStoragePath(rocksDbPath)
 
-      env.setStateBackend(rocksDbStateBackend)
+      env.setStateBackend(rocksDbStateBackend.asInstanceOf[StateBackend])
     }
     else {
       env.setStateBackend(stateBackend)
