@@ -87,12 +87,12 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
 
     // write classification result to kafka/elasticsearch
     classifiedEvents
-      .addSink(ElasticSearchIndexes.classification.createSink(1))
-      .name(s"elastic search: ${ElasticSearchIndexes.classification.indexName}")
+      .addSink(ElasticSearchIndexes.classification.createSink(20))
+      .name(s"ElasticSearch: ${ElasticSearchIndexes.classification.indexName}")
 
     clusterMetadata
-      .addSink(ElasticSearchIndexes.clusterMetadata.createSink(5))
-      .name(s"elastic search: ${ElasticSearchIndexes.clusterMetadata.indexName}")
+      .addSink(ElasticSearchIndexes.clusterMetadata.createSink(2))
+      .name(s"ElasticSearch: ${ElasticSearchIndexes.clusterMetadata.indexName}")
 
     outputErrors(controlParameterParseErrors, clusterParameterParseErrorsOutputPath)
 
