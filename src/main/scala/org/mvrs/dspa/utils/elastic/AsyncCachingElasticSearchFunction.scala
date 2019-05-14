@@ -26,6 +26,8 @@ import scala.util.{Failure, Success}
   * @param maximumCacheSize   the maximum cache size for the LRU cache
   * @param cacheEmptyResponse indicates if an empty database response is cached, i.e. the query is not retried if it
   *                           once returned empty for a given cache key.
+  * @param checkpointCache    indicates if the cache content should be included in checkpoints. If false, the cache will
+  *                           be empty on recovery.
   * @tparam IN  type of input elements
   * @tparam OUT type of output elements
   * @tparam V   type of cached value. This value can be different from the output element, which often also included
@@ -36,7 +38,8 @@ import scala.util.{Failure, Success}
 abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: TypeInformation, R](getCacheKey: IN => String,
                                                                                                   nodes: Seq[ElasticSearchNode],
                                                                                                   maximumCacheSize: Long = 10000,
-                                                                                                  cacheEmptyResponse: Boolean = false)
+                                                                                                  cacheEmptyResponse: Boolean = false,
+                                                                                                  checkpointCache: Boolean = true)
   extends AsyncElasticSearchFunction[IN, OUT](nodes)
     with CheckpointedFunction {
 
@@ -134,7 +137,8 @@ abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: Ty
 
   override def snapshotState(context: FunctionSnapshotContext): Unit = {
     listState.clear()
-    listState.add(cache.toMap)
+
+    if (checkpointCache) listState.add(cache.toMap)
   }
 
   override def initializeState(context: FunctionInitializationContext): Unit = {
