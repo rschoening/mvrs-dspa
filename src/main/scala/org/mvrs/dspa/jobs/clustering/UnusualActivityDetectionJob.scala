@@ -141,10 +141,13 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
 
   def outputErrors(errors: DataStream[String], outputPath: String): Unit =
     if (outputPath != null && !outputPath.trim.isEmpty)
-      errors.print()
-    else errors
-      //      .map(_.getMessage)
-      .addSink(createParseErrorSink(outputPath))
+      errors
+        .addSink(createParseErrorSink(outputPath)).name(
+        s"Control parameter parse errors: $outputPath")
+    else
+      errors
+        .print()
+        .name("Print control parameter parse errors")
 
   def createParseErrorSink(outputPath: String): StreamingFileSink[String] = {
     StreamingFileSink
