@@ -1,4 +1,4 @@
-package jobs.preparation
+package streams
 
 import java.util
 import java.util.Collections

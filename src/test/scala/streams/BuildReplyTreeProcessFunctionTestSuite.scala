@@ -1,4 +1,4 @@
-package jobs.preparation
+package streams
 
 import org.mvrs.dspa.model.RawCommentEvent
 import org.mvrs.dspa.streams.BuildReplyTreeProcessFunction
