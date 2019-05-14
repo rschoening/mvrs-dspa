@@ -110,6 +110,8 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
                                        out: Collector[CommentEvent]): Unit = {
     // println(s"processBroadcastElement(${reply.commentId})")
 
+    // verified: element count on broadcast stream is deterministic (no elements lost at end, apparently)
+
     // there should be no events with timestamps older or equal to the watermark
     assert(reply.timestamp > ctx.currentWatermark())
     assert(ctx.currentWatermark() >= currentBroadcastWatermark)
