@@ -14,14 +14,16 @@ object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob(ena
     implicit val esNodes: Seq[ElasticSearchNode] = Settings.elasticSearchNodes
     val batchSize = Settings.config.getInt("jobs.active-post-statistics.post-statistics-elasticsearch-batch-size")
 
-    val esIndex = ElasticSearchIndexes.activePostStatistics;
+    val esIndex = ElasticSearchIndexes.activePostStatistics
     esIndex.create()
 
     val postStatisticsStream: DataStream[PostStatistics] = streams.postStatistics("move-post-statistics")
 
     enrichPostStatistics(postStatisticsStream)
+      .disableChaining()
       .addSink(esIndex.createSink(batchSize))
       .name(s"ElasticSearch: ${esIndex.indexName}")
+      .disableChaining() // to be able to observe back-pressure on preceding operators
 
     // execute program
     env.execute("Move enriched post statistics from Kafka to ElasticSearch")
