@@ -215,12 +215,12 @@ package object streams {
     val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
 
     val consumer = topic.consumer(consumerGroup)
+    consumer.assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[T](maxOutOfOrderness, extractTime))
 
     env.addSource(consumer)
       .name(s"Kafka: ${topic.name}")
       .map(new SimpleScaledReplayFunction[T](extractTime, speedupFactor))
       .name(s"replay speedup (x $speedupFactor)")
-      .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[T](maxOutOfOrderness, extractTime))
   }
 
   private def getSpeedupFactor(speedupFactorOverride: Option[Double]): Double =
