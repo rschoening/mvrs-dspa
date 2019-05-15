@@ -36,6 +36,7 @@ services:
       - JOB_MANAGER_RPC_ADDRESS=jobmanager
       - MVRS_DSPA_KAFKA_BROKERS=kafka:9093         # instead of localhost:9092 when connecting from local machine
       - MVRS_DSPA_ELASTICSEARCH_NODE=elasticsearch # instead of localhost when connecting from local machine
+      - MVRS_DSPA_ELASTICSEARCH_PORT=9200
       - MVRS_DSPA_DATA_DIR=file:///usr/share/flink/data
     volumes:
       - ./flink/conf/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
@@ -59,6 +60,7 @@ services:
       - JOB_MANAGER_RPC_ADDRESS=jobmanager
       - MVRS_DSPA_KAFKA_BROKERS=kafka:9093         # instead of localhost:9092 when connecting from local machine
       - MVRS_DSPA_ELASTICSEARCH_NODE=elasticsearch # instead of localhost when connecting from local machine
+      - MVRS_DSPA_ELASTICSEARCH_PORT=9200
       - MVRS_DSPA_DATA_DIR=file:///usr/share/flink/data
     volumes:
       - ./flink/conf/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
@@ -84,9 +86,11 @@ services:
       - type: volume
         source: esdata1
         target: /usr/share/elasticsearch/data
+  #  expose:
+  #    - "9200"
     ports:
       - "9201:9200" # rest api
-      - "9301:9300" # transport client api
+  #    - "9301:9300" # transport client api
 
   kibana:
     image: docker.elastic.co/kibana/kibana:6.7.2
