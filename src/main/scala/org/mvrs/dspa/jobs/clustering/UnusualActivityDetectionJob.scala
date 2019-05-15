@@ -14,6 +14,7 @@ import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.model._
+import org.mvrs.dspa.utils.elastic.ElasticSearchNode
 import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
 import org.mvrs.dspa.{Settings, streams}
 
@@ -27,7 +28,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
   // - if a cluster gets too small, split the largest cluster
   // - come up with better text features
   def execute(): Unit = {
-
+    // read settings
     val clusterParameterFilePath = Settings.config.getString("jobs.activity-detection.cluster-parameter-file-path")
     val clusterParameterParseErrorsOutputPath = Settings.config.getString("jobs.activity-detection.cluster-parameter-file-parse-errors-path")
     val frequencyWindowSize = Settings.duration("jobs.activity-detection.frequency-window-size")
@@ -37,9 +38,14 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     val clusterWindowSize = Settings.duration("jobs.activity-detection.cluster-window-size")
     val minClusterElementCount = Settings.config.getInt("jobs.activity-detection.minimum-cluster-element-count")
     val maxClusterElementCount = Settings.config.getInt("jobs.activity-detection.maximum-cluster-element.count")
+    val speedupFactor = Settings.config.getInt("data.speedup-factor")
+    val classifiedEventsBatchSize = Settings.config.getInt("jobs.activity-detection.classified-events-elasticsearch-batch-size")
+    val clusterMetadataBatchSize = Settings.config.getInt("jobs.activity-detection.cluster-metadata-elasticsearch-batch-size")
 
-    val aggregateFeaturesStateTtl = FlinkUtils.getTtl(Time.hours(3), Settings.config.getInt("data.speedup-factor"))
+    // implicits
+    implicit val esNodes: Seq[ElasticSearchNode] = Settings.elasticSearchNodes
 
+    // (re)create ElasticSearch indexes for classification results and cluster metadata
     ElasticSearchIndexes.classification.create()
     ElasticSearchIndexes.clusterMetadata.create()
 
@@ -64,7 +70,11 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
 
     // get aggregated features (text and frequency-based)
     val aggregatedFeaturesStream: DataStream[FeaturizedEvent] =
-      aggregateFeatures(eventFeaturesStream, frequencyStream, aggregateFeaturesStateTtl)
+      aggregateFeatures(
+        eventFeaturesStream,
+        frequencyStream,
+        FlinkUtils.getTtl(Time.hours(3), speedupFactor)
+      )
 
     // cluster combined features (on a single worker) in a custom window:
     // - tumbling window of configured size
@@ -85,15 +95,17 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
 
     // set up sinks
 
-    // write classification result to kafka/elasticsearch
+    // write classification result to ElasticSearch
     classifiedEvents
-      .addSink(ElasticSearchIndexes.classification.createSink(20))
+      .addSink(ElasticSearchIndexes.classification.createSink(classifiedEventsBatchSize))
       .name(s"ElasticSearch: ${ElasticSearchIndexes.classification.indexName}")
 
+    // write cluster metadata to ElasticSearch
     clusterMetadata
-      .addSink(ElasticSearchIndexes.clusterMetadata.createSink(2))
+      .addSink(ElasticSearchIndexes.clusterMetadata.createSink(clusterMetadataBatchSize))
       .name(s"ElasticSearch: ${ElasticSearchIndexes.clusterMetadata.indexName}")
 
+    // write cluster parameter parse errors to text file sink
     outputErrors(controlParameterParseErrors, clusterParameterParseErrorsOutputPath)
 
     env.execute()
@@ -105,24 +117,21 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     inputFormat.setNumSplits(1)
 
     env
-      .readFile(
-        inputFormat,
-        controlFilePath,
-        FileProcessingMode.PROCESS_CONTINUOUSLY,
-        updateInterval)
+      .readFile(inputFormat, controlFilePath, FileProcessingMode.PROCESS_CONTINUOUSLY, updateInterval)
       .name(s"Control parameters: $controlFilePath")
       .setParallelism(1) // otherwise the empty splits never emit watermarks, timers never fire etc.
       .assignTimestampsAndWatermarks(
-      FlinkUtils.timeStampExtractor[String](Time.seconds(0),
+      FlinkUtils.timeStampExtractor[String](
+        Time.seconds(0),
         _ => Long.MaxValue)) // required for downstream timers
   }
 
   def parseControlParameters(controlParameterLines: DataStream[String]): (DataStream[ClusteringParameter], DataStream[String]) = {
     val controlParametersParsed: DataStream[Either[String, ClusteringParameter]] =
       controlParameterLines
-        .flatMap(ClusteringParameter.parse(_).map(_.left.map(_.getMessage)))
-        .name("Parse parameters")
+        .flatMap(ClusteringParameter.parse(_).map(_.left.map(_.getMessage))) // left: parse error message
         .setParallelism(1)
+        .name("Parse parameters")
 
     val controlParameterParseErrors: DataStream[String] =
       controlParametersParsed
