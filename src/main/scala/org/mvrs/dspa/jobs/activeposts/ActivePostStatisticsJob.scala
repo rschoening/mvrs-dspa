@@ -10,11 +10,6 @@ import org.mvrs.dspa.utils.elastic.ElasticSearchNode
 import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
 import org.mvrs.dspa.{Settings, streams}
 
-// TODO observe checkpoint size/time (growth?)
-// TODO consider carrying forum id with post id, caching it (with LRU-based eviction and async db lookup in case of cache miss)
-// TODO should post infos be processed in a separate stream, to avoid backpressure to source and hence slowing down also the statistics calculation?
-//      --> separate kafka consumer group
-//      --> maybe still in same job?
 // NOTE: KafkaTopicPartition is treated as generic type, must enable generic types
 object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = true) {
   def execute(): Unit = {
