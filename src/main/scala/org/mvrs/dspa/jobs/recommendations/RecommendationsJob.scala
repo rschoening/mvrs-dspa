@@ -3,7 +3,6 @@ package org.mvrs.dspa.jobs.recommendations
 import java.lang
 
 import com.twitter.algebird.{MinHashSignature, MinHasher32}
-import org.apache.flink.api.common.state.{MapStateDescriptor, StateTtlConfig}
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.db.ElasticSearchIndexes
@@ -56,8 +55,6 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
 
     // gather the posts that the user interacted with in a sliding window
     val postIds: DataStream[(Long, Set[Long])] = collectPostsInteractedWith(forumEvents, windowSize, windowSlide)
-
-    // TODO carry along window timestamps
 
     // look up the tags for these posts (from post and from the post's forum) => (person id -> set of features)
     val personActivityFeatures: DataStream[(Long, Set[String])] = lookupPostFeaturesForPerson(postIds)
@@ -214,18 +211,16 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
   def filterToActiveUsers(candidates: DataStream[(Long, MinHashSignature, Set[Long])],
                           forumEvents: DataStream[(Long, Long)],
                           activityTimeout: Time) = {
-    val stateDescriptor = createActiveUsersStateDescriptor(activityTimeout)
-
     val broadcastActivePersons =
       forumEvents
         .map(_._1)
         .name("Map: -> person Id")
-        .broadcast(stateDescriptor)
+        .broadcast()
 
     candidates
       .connect(broadcastActivePersons)
-      .process(new FilterToActivePersonsFunction(activityTimeout, stateDescriptor))
-      .name("Filter to active persons")
+      .process(new FilterToActivePersonsFunction(activityTimeout))
+      .name("CoProcess: filter to active persons")
   }
 
   def collectPostsInteractedWith(forumEvents: DataStream[(Long, Long)],
@@ -241,22 +236,6 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
       .name("Collect posts with which the person interacted " +
         s"(window: ${DateTimeUtils.formatDuration(windowSize.toMilliseconds)}" +
         s"slide ${DateTimeUtils.formatDuration(windowSlide.toMilliseconds)})")
-  }
-
-  def createActiveUsersStateDescriptor(timeout: Time): MapStateDescriptor[Long, Long] = {
-    val ttlConfig = StateTtlConfig
-      .newBuilder(timeout)
-      .setUpdateType(StateTtlConfig.UpdateType.OnReadAndWrite)
-      .setStateVisibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
-      .build
-
-    val descriptor: MapStateDescriptor[Long, Long] = new MapStateDescriptor(
-      "active-users",
-      createTypeInformation[Long],
-      createTypeInformation[Long])
-
-    descriptor.enableTimeToLive(ttlConfig)
-    descriptor
   }
 
   def lookupCandidateUsers(personActivityMinHash: DataStream[(Long, MinHashSignature)])
