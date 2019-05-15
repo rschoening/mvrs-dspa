@@ -6,6 +6,7 @@ import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.model._
 import org.mvrs.dspa.streams.KafkaTopics
+import org.mvrs.dspa.utils.elastic.ElasticSearchNode
 import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
 import org.mvrs.dspa.{Settings, streams}
 
@@ -24,6 +25,9 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
     val batchSize = Settings.config.getInt("jobs.active-post-statistics.post-info-elasticsearch-batch-size")
     val stateTtl = FlinkUtils.getTtl(windowSize, Settings.config.getInt("data.speedup-factor"))
     val postInfoIndex = ElasticSearchIndexes.postInfos
+
+    // implicits
+    implicit val esNodes: Seq[ElasticSearchNode] = Settings.elasticSearchNodes
 
     // (re)create elasticsearch index for post infos
     postInfoIndex.create()
@@ -81,12 +85,13 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
       )
   }
 
-  private def lookupForumFeatures(postsStream: DataStream[PostEvent]): DataStream[PostInfo] =
+  private def lookupForumFeatures(postsStream: DataStream[PostEvent])
+                                 (implicit esNodes: Seq[ElasticSearchNode]): DataStream[PostInfo] =
     FlinkUtils.asyncStream(
       postsStream,
       new AsyncForumTitleLookupFunction(
         ElasticSearchIndexes.forumFeatures.indexName,
-        Settings.elasticSearchNodes: _*)).name("DB: look up forum title for post")
+        esNodes: _*)).name("Async I/O: look up forum title for post")
       .map(t => createPostInfo(t._1, t._2)).name("map: post info record")
 
   private def createPostInfo(postEvent: PostEvent, forumTitle: String): PostInfo =
