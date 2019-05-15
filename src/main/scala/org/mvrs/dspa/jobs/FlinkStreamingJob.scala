@@ -1,5 +1,6 @@
 package org.mvrs.dspa.jobs
 
+import org.apache.flink.api.common.restartstrategy.RestartStrategies
 import org.apache.flink.contrib.streaming.state.RocksDBStateBackend
 import org.apache.flink.runtime.state.StateBackend
 import org.apache.flink.runtime.state.filesystem.FsStateBackend
@@ -38,6 +39,8 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
   private val checkpointMinPause = Settings.duration("jobs.checkpoint-min-pause").toMilliseconds
   private val checkpointIncrementally = Settings.config.getBoolean("jobs.checkpoint-incrementally")
   private val asynchronousSnapshots = Settings.config.getBoolean("jobs.asynchronous-snapshots")
+  private val restartAttempts = Settings.config.getInt("jobs.restart-attempts")
+  private val delayBetweenAttempts = Settings.config.getLong("jobs.delay-between-attempts")
 
   // localWithUI is set by base class based on program arguments
   implicit val env: StreamExecutionEnvironment = FlinkUtils.createStreamExecutionEnvironment(localWithUI)
@@ -56,6 +59,10 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
   if (checkpointInterval > 0) {
     env.enableCheckpointing(checkpointInterval, CheckpointingMode.EXACTLY_ONCE)
     env.getCheckpointConfig.setMinPauseBetweenCheckpoints(checkpointMinPause)
+  }
+
+  if (restartAttempts > 0) {
+    env.setRestartStrategy(RestartStrategies.fixedDelayRestart(restartAttempts, delayBetweenAttempts))
   }
 
   if (stateBackendPath.length > 0) {
