@@ -4,6 +4,9 @@ import com.twitter.algebird.MinHashSignature
 import org.apache.flink.api.common.state.{ListState, ListStateDescriptor}
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.api.scala._
+import org.apache.flink.api.scala.metrics.ScalaGauge
+import org.apache.flink.configuration.Configuration
+import org.apache.flink.metrics.{Counter, Gauge}
 import org.apache.flink.runtime.state.{FunctionInitializationContext, FunctionSnapshotContext}
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction
 import org.apache.flink.streaming.api.functions.co.BroadcastProcessFunction
@@ -29,11 +32,27 @@ class FilterToActivePersonsFunction(activityTimeout: Time, minimumCleanupInterva
   @transient private lazy val lastActivityPerPerson: mutable.Map[Long, Long] = mutable.Map()
   @transient private var lastCleanup: Long = 0L
   @transient private var lastWatermark: Long = 0L
+  @transient private var lastCleanupDifference: Long = 0L
+
+  // metrics
+  @transient private var cleanupCounter: Counter = _
+  @transient private var lastCleanupDifferenceMeter: Gauge[Long] = _
+  @transient private var mapSize: Gauge[Long] = _
 
   // NOTE a ttl configuration on broadcast state was initially tried. That does not work because
   // 1) broadcast state is expected to be identical for all operators, to allow redistribution on recover/scaling
   // 2) ttl state configuration seems not to be used on broadcast state
   @transient private var listState: ListState[(Long, Long)] = _ // union list state
+
+  override def open(parameters: Configuration): Unit = {
+    // metrics
+    val group = getRuntimeContext.getMetricGroup
+    cleanupCounter = group.counter("cleanupCount")
+    lastCleanupDifferenceMeter = group.gauge[Long, ScalaGauge[Long]]("lastCleanupDifference",
+      ScalaGauge[Long](() => lastCleanupDifference))
+    mapSize = group.gauge[Long, ScalaGauge[Long]]("mapSize",
+      ScalaGauge[Long](() => lastActivityPerPerson.size))
+  }
 
   override def processElement(value: (Long, MinHashSignature, Set[Long]),
                               ctx: BroadcastProcessFunction[(Long, MinHashSignature, Set[Long]), Long, (Long, MinHashSignature, Set[Long])]#ReadOnlyContext,
@@ -55,14 +74,15 @@ class FilterToActivePersonsFunction(activityTimeout: Time, minimumCleanupInterva
 
       val now = System.currentTimeMillis()
       val size = lastActivityPerPerson.size // original size
-
-      if (size > 100 && now - lastCleanup >= minimumCleanupIntervalMillis) {
+      if (now - lastCleanup >= minimumCleanupIntervalMillis) {
         lastCleanup = now
         lastActivityPerPerson.retain { case (_, lastActivityTimestamp) => isWithinTimeout(lastActivityTimestamp, ctx.currentWatermark()) }
 
-        // TODO replace with metrics on cache size / cleanup rate etc
-        println(s"CLEANED UP: $size -> ${lastActivityPerPerson.size}")
+        // metrics
+        cleanupCounter.inc()
+        lastCleanupDifference = size - lastActivityPerPerson.size
       }
+
       lastWatermark = ctx.currentWatermark()
     }
   }
@@ -96,6 +116,7 @@ class FilterToActivePersonsFunction(activityTimeout: Time, minimumCleanupInterva
         }
     }
   }
+
 }
 
 object FilterToActivePersonsFunction {
