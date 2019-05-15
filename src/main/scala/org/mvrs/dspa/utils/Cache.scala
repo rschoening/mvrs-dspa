@@ -9,6 +9,16 @@ import scalacache.{Entry, sync}
 
 import scala.collection.JavaConverters._
 
+/**
+  * Cache with bounded size and LRU-based and ttl-based eviction, based on
+  * scalacache ([[https://github.com/cb372/scalacache]]) backed by Caffeine [[https://github.com/ben-manes/caffeine]] and
+  * using the Read Typeclass from [[https://github.com/ChristopherDavenport/read]]
+  *
+  * @param maximumSize the maximum cache size (not a hard limit, see [[https://github.com/ben-manes/caffeine/blob/master/caffeine/src/main/java/com/github/benmanes/caffeine/cache/Caffeine.java]])
+  * @param read        implicit reader to convert the cache key from String to the key type
+  * @tparam K key type
+  * @tparam V value type
+  */
 class Cache[K: Read, V](@Nonnegative maximumSize: Long = 10000L)
                        (implicit read: Read[K]) {
   private val underlyingCaffeineCache =
