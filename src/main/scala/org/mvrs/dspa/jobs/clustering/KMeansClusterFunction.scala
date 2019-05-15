@@ -27,6 +27,10 @@ class KMeansClusterFunction(k: Int, decay: Double = 0.9,
   require(maxElementCount > 0, s"invalid maximum element count: $maxElementCount")
   require(decay >= 0 && decay <= 1, s"invalid decay: $decay (must be between 0 and 1)")
 
+  // TODO metrics
+  // TODO @transient
+  // TODO revise everything
+
   // NOTE: use createTypeInformation to ensure serialization by Flink (not Kryo)
   private val elementsStateDescriptor = new ListStateDescriptor("elements", createTypeInformation[Vector[Double]])
   private val nextElementsStateDescriptor = new ListStateDescriptor("next-elements", createTypeInformation[Vector[Double]])

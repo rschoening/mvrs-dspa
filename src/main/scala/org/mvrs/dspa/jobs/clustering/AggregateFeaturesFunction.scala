@@ -16,7 +16,7 @@ class AggregateFeaturesFunction(stateTtl: Time) extends CoProcessFunction[Featur
                                out: Collector[FeaturizedEvent]): Unit = {
     val frequencyForPerson = getRuntimeContext.getState(frequencyStateDescriptor).value()
 
-    value.features.append(frequencyForPerson) // in place!
+    value.features.append(frequencyForPerson) // in place, features is mutable ArrayBuffer
 
     out.collect(value)
   }

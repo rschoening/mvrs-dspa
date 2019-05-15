@@ -5,6 +5,8 @@ import org.apache.avro.Schema
 import org.apache.flink.api.common.serialization.AbstractDeserializationSchema
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.scala.createTypeInformation
+import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner
+import org.apache.flink.streaming.util.serialization.KeyedDeserializationSchema
 
 class Avro4sDeserializationSchema[T: Decoder : TypeInformation](schemaJSon: String)
   extends AbstractDeserializationSchema[T](createTypeInformation[T]) {
@@ -20,8 +22,7 @@ class Avro4sDeserializationSchema[T: Decoder : TypeInformation](schemaJSon: Stri
     else schema
 
   override def deserialize(message: Array[Byte]): T = {
-    // TODO: determine writer schema id based on first byte, same as confluent registry
-    // TODO: how is this id actually written? by kafka itself?
+    // NOTE: can be extended to work with schema registry -> determine writer schema id based on first byte, same as confluent registry
     ensureInitialized()
 
     val avroInputStream =

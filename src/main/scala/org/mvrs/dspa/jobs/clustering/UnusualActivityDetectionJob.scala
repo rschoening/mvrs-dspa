@@ -212,7 +212,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
       .timeWindow(FlinkUtils.convert(windowSize), FlinkUtils.convert(windowSlide))
       .sum(1)
       .name("calculate post/comment frequency per person" +
-        s"(window: ${DateTimeUtils.formatDuration(windowSize.toMilliseconds)}" +
+        s"(window: ${DateTimeUtils.formatDuration(windowSize.toMilliseconds)} " +
         s"slide ${DateTimeUtils.formatDuration(windowSlide.toMilliseconds)})")
   }
 
