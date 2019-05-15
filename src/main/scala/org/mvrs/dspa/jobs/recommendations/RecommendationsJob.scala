@@ -268,7 +268,6 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
         ElasticSearchIndexes.lshBuckets.indexName,
         minHasher, esNodes: _*))
       .name("Async I/O: get candidates in same LSH buckets")
-      .startNewChain()
   }
 
   def excludeKnownPersons(candidates: DataStream[(Long, MinHashSignature, Set[Long])])
@@ -280,7 +279,6 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
         ElasticSearchIndexes.knownPersons.typeName,
         esNodes: _*))
       .name("Async I/O: exclude known persons from candidates")
-      .startNewChain()
   }
 
   def recommendUsers(candidatesWithoutInactiveUsers: DataStream[(Long, MinHashSignature, Set[Long])], maxCount: Int, minSimilarity: Double)
@@ -293,7 +291,6 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
         minHasher, maxCount, minSimilarity,
         esNodes: _*))
       .name("Async I/O: sort and filter candidates based on their MinHash-approximated similarity")
-      .startNewChain()
   }
 }
 
