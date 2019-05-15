@@ -25,6 +25,7 @@ package object streams {
       commentsFromKafka(
         _,
         getSpeedupFactor(speedupFactorOverride)
+        // TODO outoforderness
       )
     ).getOrElse(
       commentsFromCsv(
@@ -43,12 +44,14 @@ package object streams {
     * @param env                   the implicit stream execution environment
     * @return stream of post events
     */
-  def posts(kafkaConsumerGroup: Option[String] = None, speedupFactorOverride: Option[Double] = None)
+  def posts(kafkaConsumerGroup: Option[String] = None,
+            speedupFactorOverride: Option[Double] = None)
            (implicit env: StreamExecutionEnvironment): DataStream[PostEvent] =
     kafkaConsumerGroup.map(
       postsFromKafka(
         _,
         getSpeedupFactor(speedupFactorOverride),
+        // TODO outoforderness
       )
     ).getOrElse(
       postsFromCsv(
@@ -67,12 +70,14 @@ package object streams {
     * @param env                   the implicit stream execution environment
     * @return stream of like events
     */
-  def likes(kafkaConsumerGroup: Option[String] = None, speedupFactorOverride: Option[Double] = None)
+  def likes(kafkaConsumerGroup: Option[String] = None,
+            speedupFactorOverride: Option[Double] = None)
            (implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] =
     kafkaConsumerGroup.map(
       likesFromKafka(
         _,
         getSpeedupFactor(speedupFactorOverride),
+        // TODO outoforderness
       )
     ).getOrElse(
       likesFromCsv(
@@ -148,21 +153,29 @@ package object streams {
     ).name(s"$filePath (speedup: x $speedupFactor; randomDelay: $randomDelay)")
   }
 
-  def commentsFromKafka(consumerGroup: String, speedupFactor: Double = 0, randomDelay: Long = 0)
+  def commentsFromKafka(consumerGroup: String,
+                        speedupFactor: Double = 0,
+                        maxOutOfOrderness: Time = Time.milliseconds(0))
                        (implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] =
-    fromKafka(KafkaTopics.comments, consumerGroup, _.timestamp, speedupFactor, randomDelay)
+    fromKafka(KafkaTopics.comments, consumerGroup, _.timestamp, speedupFactor, maxOutOfOrderness)
 
-  def postStatisticsFromKafka(consumerGroup: String, speedupFactor: Double = 0, randomDelay: Long = 0)
+  def postStatisticsFromKafka(consumerGroup: String,
+                              speedupFactor: Double = 0,
+                              maxOutOfOrderness: Time = Time.milliseconds(0))
                              (implicit env: StreamExecutionEnvironment): DataStream[PostStatistics] =
-    fromKafka(KafkaTopics.postStatistics, consumerGroup, _.time, speedupFactor, randomDelay)
+    fromKafka(KafkaTopics.postStatistics, consumerGroup, _.time, speedupFactor, maxOutOfOrderness)
 
-  def postsFromKafka(consumerGroup: String, speedupFactor: Double = 0, randomDelay: Long = 0)
+  def postsFromKafka(consumerGroup: String,
+                     speedupFactor: Double = 0,
+                     maxOutOfOrderness: Time = Time.milliseconds(0))
                     (implicit env: StreamExecutionEnvironment): DataStream[PostEvent] =
-    fromKafka(KafkaTopics.posts, consumerGroup, _.timestamp, speedupFactor, randomDelay)
+    fromKafka(KafkaTopics.posts, consumerGroup, _.timestamp, speedupFactor, maxOutOfOrderness)
 
-  def likesFromKafka(consumerGroup: String, speedupFactor: Double = 0, randomDelay: Long = 0)
+  def likesFromKafka(consumerGroup: String,
+                     speedupFactor: Double = 0,
+                     maxOutOfOrderness: Time = Time.milliseconds(0))
                     (implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] =
-    fromKafka(KafkaTopics.likes, consumerGroup, _.timestamp, speedupFactor, randomDelay)
+    fromKafka(KafkaTopics.likes, consumerGroup, _.timestamp, speedupFactor, maxOutOfOrderness)
 
   def resolveReplyTree(rawComments: DataStream[RawCommentEvent]): DataStream[CommentEvent] =
     resolveReplyTree(rawComments, droppedRepliesStream = false)._1
@@ -210,9 +223,8 @@ package object streams {
                                             consumerGroup: String,
                                             extractTime: T => Long,
                                             speedupFactor: Double,
-                                            randomDelay: Long)
+                                            maxOutOfOrderness: Time)
                                            (implicit env: StreamExecutionEnvironment): DataStream[T] = {
-    val maxOutOfOrderness: Time = getMaxOutOfOrderness(speedupFactor, randomDelay)
 
     val consumer = topic.consumer(consumerGroup)
     consumer.assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[T](maxOutOfOrderness, extractTime))
@@ -230,6 +242,7 @@ package object streams {
 
   private def randomDelay = Settings.duration("data.random-delay").toMilliseconds
 
+  // TODO revise
   private def getMaxOutOfOrderness(speedupFactor: Double, randomDelay: Long): Time =
     Time.milliseconds(if (speedupFactor == 0.0) randomDelay else (randomDelay / speedupFactor).ceil.toLong)
 }
