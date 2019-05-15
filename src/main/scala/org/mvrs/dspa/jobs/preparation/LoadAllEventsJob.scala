@@ -6,6 +6,9 @@ import org.mvrs.dspa.streams.KafkaTopics
 import org.mvrs.dspa.utils.FlinkUtils
 
 object LoadAllEventsJob extends FlinkStreamingJob(
+  parallelism = 1, // important to ensure defined order (controlled by randomDelay) in Kafka
+  // (otherwise order is dependent on task scheduling, with out-of-orderness orders of magnitude greater
+  // than what would normally be specified for randomDelay)
   checkpointIntervalOverride = Some(0), // disable checkpointing for the load job - not fault-tolerant due to reordering step
   autoWatermarkInterval = 50
 ) {
