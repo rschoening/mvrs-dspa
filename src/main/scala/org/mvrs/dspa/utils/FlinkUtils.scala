@@ -55,7 +55,7 @@ object FlinkUtils {
       else
         minimumTimeMillis,
       TimeUnit.MILLISECONDS
-    )
+    ) // TODO actual replay speed may be lower due to backpressure/slow source -> apply some factor to account for that? Or just let the caller reduce the speedup factor for this?
 
   def createStreamExecutionEnvironment(localWithUI: Boolean = false): StreamExecutionEnvironment = {
     // TODO include metrics always? or rely on flink config file only when running in cluster?

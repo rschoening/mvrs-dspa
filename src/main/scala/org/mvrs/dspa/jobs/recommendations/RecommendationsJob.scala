@@ -100,46 +100,46 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
       // NOTE it *seems* that disableChaining() calls alter the output - needs further investigation. For now: don't do it
 
       if (personIds.nonEmpty) {
-        val length = 40
+        val padLength = 40
         postIds
           .filter(t => personIds.contains(t._1))
           .name("Filter: trace persons")
-          .print("1) Activity in window - post Ids:".padTo(length, ' '))
+          .print("1) Activity in window - post Ids:".padTo(padLength, ' '))
           .name("print")
 
         personActivityFeatures
           .filter(t => personIds.contains(t._1))
           .name("Filter: trace persons")
-          .print("2) Activity in window - post features".padTo(length, ' '))
+          .print("2) Activity in window - post features".padTo(padLength, ' '))
           .name("print")
 
         allPersonFeatures
           .filter(t => personIds.contains(t._1))
           .name("Filter: trace persons")
-          .print("3) Combined person features:".padTo(length, ' '))
+          .print("3) Combined person features:".padTo(padLength, ' '))
           .name("print")
 
         candidates
           .filter(t => personIds.contains(t._1))
           .name("Filter: trace persons")
-          .print("4) Candidates from same LSH buckets:".padTo(length, ' '))
+          .print("4) Candidates from same LSH buckets:".padTo(padLength, ' '))
           .name("print")
 
         candidatesWithoutKnownPersons
           .filter(t => personIds.contains(t._1))
           .name("Filter: trace persons")
-          .print("5) Candidates without known persons:".padTo(length, ' '))
+          .print("5) Candidates without known persons:".padTo(padLength, ' '))
           .name("print")
 
         candidatesWithoutInactiveUsers
           .filter(t => personIds.contains(t._1))
           .name("Filter: trace persons")
-          .print("6) Candidates except inactive:".padTo(length, ' '))
+          .print("6) Candidates except inactive:".padTo(padLength, ' '))
           .name("print")
 
         recommendations
           .filter(t => personIds.contains(t._1))
-          .print("-> Resulting recommendation:".padTo(length, ' '))
+          .print("-> Resulting recommendation:".padTo(padLength, ' '))
           .name("print")
       }
     }
