@@ -24,6 +24,8 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
     val tracedPersonIds = Settings.config.getLongList("jobs.recommendation.trace-person-ids").asScala.toSet
     val maxRecommendationCount = Settings.config.getInt("jobs.recommendation.max-recommendation-count")
     val minRecommendationSimilarity = Settings.config.getInt("jobs.recommendation.min-recommendation-similarity")
+    val postFeaturesBatchSize = Settings.config.getInt("jobs.recommendation.post-features-elasticsearch-batch-size")
+    val recommendationsBatchSize = Settings.config.getInt("jobs.recommendation.recommendations-elasticsearch-batch-size")
 
     // implicit values
     implicit val esNodes: Seq[ElasticSearchNode] = Settings.elasticSearchNodes
@@ -84,11 +86,11 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
 
     // add sinks
     postFeatures
-      .addSink(ElasticSearchIndexes.postFeatures.createSink(10))
+      .addSink(ElasticSearchIndexes.postFeatures.createSink(postFeaturesBatchSize))
       .name("ElasticSearch: post features")
 
     recommendations
-      .addSink(ElasticSearchIndexes.recommendations.createSink(batchSize = 100))
+      .addSink(ElasticSearchIndexes.recommendations.createSink(recommendationsBatchSize))
       .name("ElasticSearch: recommendations")
 
     env.execute("recommendations")
