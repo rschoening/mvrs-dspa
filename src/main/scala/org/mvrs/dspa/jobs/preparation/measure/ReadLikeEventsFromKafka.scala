@@ -1,26 +1,27 @@
-package org.mvrs.dspa.jobs.clustering.measure
+package org.mvrs.dspa.jobs.preparation.measure
 
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.api.scala._
-import org.mvrs.dspa.functions.{ProgressInfo, ProgressMonitorFunction}
+import org.mvrs.dspa.functions.ProgressMonitorFunction
 import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.model.LikeEvent
 import org.mvrs.dspa.streams
-import org.mvrs.dspa.utils.DateTimeUtils
 
-object ReadLikesFromKafkaJob extends FlinkStreamingJob(enableGenericTypes = true) {
+object ReadLikeEventsFromKafka extends FlinkStreamingJob(enableGenericTypes = true) {
 
   def execute(): Unit = {
     env.setParallelism(4)
 
-    env.getConfig.setAutoWatermarkInterval(1L)
+    env.getConfig.setAutoWatermarkInterval(1000L)
 
     streams
-      .likesFromKafka("testConsumer", 200000, Time.hours(0)).startNewChain()
+      .likesFromKafka("testConsumer", 100000, Time.milliseconds(1000)).startNewChain()
       .process(new ProgressMonitorFunction[LikeEvent]())
       .map(_._2)
-      //.filter(p => p.isLate) //  && p.totalCountSoFar % 100 == 0)
-      .filter(p => p.isLate || p.isBehindNewest || !p.hasWatermark)
+//      .filter(p => p.totalCountSoFar % 10000 == 0)
+      // .filter(_.subtask == 1)
+      //.filter(p => p.watermarkAdvanced || p.isLate || p.isBehindNewest)
+      .filter(p => p.isLate) //  || p.isBehindNewest || p.totalCountSoFar % 10000 == 0)
       .map(_.toString)
       .print
 
@@ -52,24 +53,15 @@ object ReadLikesFromKafkaJob extends FlinkStreamingJob(enableGenericTypes = true
     // - after 2012-02-05 for interval = 1!
     // --> set interval low
 
+    // autowatermark interval -> first watermark (speedup = 20000)
+    // 1ms   -> 2012-02-07 / 08
+    // 10ms  -> 2012-02-08
+    // 100ms -> 2012-02-13
+
     // INCORRECT: NOTE when specifying a speedupfactor > 0 then there are NO watermarks issued (when extracting watermarks PER PARTITION) when doing it AFTERWARDS
     // - after the SimpleScaledReplay map function: watermarks are issued normally
 
 
     env.execute("Read likes from Kafka")
   }
-
-  def format(p: ProgressInfo): String =
-    s"subtask: ${p.subtask} " +
-      s"ts: ${DateTimeUtils.formatTimestamp(p.timestamp)} " +
-      (if (p.isBehindNewest) s"- behind by: ${DateTimeUtils.formatDuration(p.millisBehindNewest)} " else " - ") +
-      (if (p.isLate) s"- late by: ${DateTimeUtils.formatDuration(p.millisBehindWatermark)} " else " - ") +
-      (if (!p.hasWatermark) "NO WM " else s"watermark: ${DateTimeUtils.formatTimestamp(p.watermark)} ") +
-      s"| late: ${p.lateCountSoFar} " +
-      s"- behind: ${p.behindNewestCountSoFar} " +
-      s"- total: ${p.totalCountSoFar} " +
-      s"- no watermark: ${p.noWatermarkCountSoFar} " +
-      s"| max. lateness: ${DateTimeUtils.formatDuration(p.maximumLatenessSoFar)} " +
-      s"- max. behindness: ${DateTimeUtils.formatDuration(p.maximumBehindnessSoFar)}"
-
 }
