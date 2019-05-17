@@ -10,7 +10,6 @@ object LoadAllEventsJob extends FlinkStreamingJob(
   // (otherwise order is dependent on task scheduling, with out-of-orderness orders of magnitude greater
   // than what would normally be specified for randomDelay)
   checkpointIntervalOverride = Some(0), // disable checkpointing for the load job - not fault-tolerant due to reordering step
-  autoWatermarkInterval = 50
 ) {
   def execute(): Unit = {
     val speedup = Some(0.0) // don't use speedup for writing events to kafka
