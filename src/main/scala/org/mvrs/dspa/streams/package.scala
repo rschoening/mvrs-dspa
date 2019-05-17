@@ -226,13 +226,31 @@ package object streams {
                                             maxOutOfOrderness: Time)
                                            (implicit env: StreamExecutionEnvironment): DataStream[T] = {
 
+    // NOTE: if watermark assigner is inserted BEFORE the SimpleScaledReplayFunction, then the AutoWatermarkInterval skips over
+    //       the wait times, i.e. the clock stops during backpressure, with regard to this interval
+    // An alternative would be to not block but use processing-time timers instead, however
+    // 1) this would require the input stream to be keyed - at this point this should not be a requirement
+    // 2) emitting events would depend on the arrival of watermarks (to trigger the timers), leading to an unexpectedly bursty stream
+    //
+    // on the other hand, assigning watermarks on the union of the per-partition streams can cause late events even if the
+    // individual partitions were written in timestamp order, due to uneven reading. This is especially notable with no replay scaling
+    // (speedup = 0).
+    // -> for speedup = 0: assign watermarks per partition
+    // -> for speedup > 0: assign watermarks after the scaled replay function, and make sure to use large-enough value for maxOutOfOrderness
+    // --> in both cases, the AutoWatermarkInterval can be interpreted as processing-time independent of scaled-replay
+    // --> TO BE VERIFIED: there should be no late events with speedup == 0
     val consumer = topic.consumer(consumerGroup)
-    consumer.assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[T](maxOutOfOrderness, extractTime))
 
-    env.addSource(consumer)
-      .name(s"Kafka: ${topic.name}")
-      .map(new SimpleScaledReplayFunction[T](extractTime, speedupFactor))
+    val assigner = FlinkUtils.timeStampExtractor[T](maxOutOfOrderness, extractTime)
+
+    if (speedupFactor == 0) consumer.assignTimestampsAndWatermarks(assigner)
+
+    val stream = env.addSource(consumer).name(s"Kafka: ${topic.name}")
+
+    if (speedupFactor == 0) stream
+    else stream.map(new SimpleScaledReplayFunction[T](extractTime, speedupFactor))
       .name(s"replay speedup (x $speedupFactor)")
+      .assignTimestampsAndWatermarks(assigner)
   }
 
   private def getSpeedupFactor(speedupFactorOverride: Option[Double]): Double =
