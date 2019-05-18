@@ -20,6 +20,7 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
       KAFKA_DELETE_TOPIC_ENABLE: "true"
+      KAFKA_TRANSACTION_MAX_TIMEOUT_MS: 3600000
     # NOTE kafka starts up with no topics - topics are created by flink jobs
     # this could be changed by specifying persistent volume (NOTE: this is also required for zookeeper,
     # otherwise topics are effectively gone even if the log files still exist!)
