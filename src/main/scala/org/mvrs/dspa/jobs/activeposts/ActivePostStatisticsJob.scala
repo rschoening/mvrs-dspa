@@ -46,7 +46,13 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
       windowSize, windowSlide, stateTtl, countPostAuthor)
 
     // write to kafka topic (key by post id to preserve order) TODO confirm that default kafka partitioner picks up key
-    FlinkUtils.writeToNewKafkaTopic(statsStream.keyBy(_.postId), KafkaTopics.postStatistics)
+    FlinkUtils.writeToNewKafkaTopic(
+      statsStream.keyBy(_.postId),
+      KafkaTopics.postStatistics,
+      Settings.config.getInt("data.kafka-partition-count"),
+      None,
+      Settings.config.getInt("data.kafka-replica-count").toShort
+    )
 
     env.execute("write post statistics to kafka (and post info to elasticsearch)")
   }

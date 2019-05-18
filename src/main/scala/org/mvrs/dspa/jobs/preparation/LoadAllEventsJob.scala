@@ -1,9 +1,9 @@
 package org.mvrs.dspa.jobs.preparation
 
 import org.mvrs.dspa.jobs.FlinkStreamingJob
-import org.mvrs.dspa.streams
 import org.mvrs.dspa.streams.KafkaTopics
 import org.mvrs.dspa.utils.FlinkUtils
+import org.mvrs.dspa.{Settings, streams}
 
 object LoadAllEventsJob extends FlinkStreamingJob(
   parallelism = 1, // important to ensure defined order (controlled by randomDelay) in Kafka
@@ -14,11 +14,29 @@ object LoadAllEventsJob extends FlinkStreamingJob(
   def execute(): Unit = {
     val speedup = Some(0.0) // don't use speedup for writing events to kafka
 
-    FlinkUtils.writeToNewKafkaTopic(streams.comments(speedupFactorOverride = speedup), KafkaTopics.comments)
+    FlinkUtils.writeToNewKafkaTopic(
+      streams.comments(speedupFactorOverride = speedup),
+      KafkaTopics.comments,
+      Settings.config.getInt("data.kafka-partition-count"),
+      None,
+      Settings.config.getInt("data.kafka-replica-count").toShort
+    )
 
-    FlinkUtils.writeToNewKafkaTopic(streams.likes(speedupFactorOverride = speedup), KafkaTopics.likes)
+    FlinkUtils.writeToNewKafkaTopic(
+      streams.likes(speedupFactorOverride = speedup),
+      KafkaTopics.likes,
+      Settings.config.getInt("data.kafka-partition-count"),
+      None,
+      Settings.config.getInt("data.kafka-replica-count").toShort
+    )
 
-    FlinkUtils.writeToNewKafkaTopic(streams.posts(speedupFactorOverride = speedup), KafkaTopics.posts)
+    FlinkUtils.writeToNewKafkaTopic(
+      streams.posts(speedupFactorOverride = speedup),
+      KafkaTopics.posts,
+      Settings.config.getInt("data.kafka-partition-count"),
+      None,
+      Settings.config.getInt("data.kafka-replica-count").toShort
+    )
 
     env.execute("Import all events from csv file to Kafka")
   }
