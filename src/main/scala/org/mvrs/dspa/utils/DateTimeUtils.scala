@@ -10,7 +10,7 @@ object DateTimeUtils {
   private val dateFormat =
     ThreadLocal.withInitial[SimpleDateFormat](() => new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
   private val shortDateFormat =
-    ThreadLocal.withInitial[SimpleDateFormat](() => new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'"))
+    ThreadLocal.withInitial[SimpleDateFormat](() => new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss"))
 
   def toDate(millis: Long): Date = Date.from(Instant.ofEpochMilli(millis))
 

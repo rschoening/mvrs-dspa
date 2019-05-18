@@ -156,24 +156,24 @@ case class ProgressInfo(subtask: Int,
     (if (isBehindNewest)
       s"| behind by: ${DateTimeUtils.formatDuration(millisBehindNewest, shortFormat = true)} "
     else
-      "| latest").padTo(24,' ') +
+      "|     * latest *").padTo(22, ' ') +
     (if (isLate)
       s"| late by: ${DateTimeUtils.formatDuration(millisBehindWatermark, shortFormat = true)} "
     else
-      "| on time").padTo(22, ' ') +
+      "|     * on time *").padTo(21, ' ') +
     (if (!hasWatermark)
-      "| NO watermark "
+      "|   * NO watermark *"
     else
-      s"| wm: ${DateTimeUtils.formatTimestamp(watermark, shortFormat = true)} ") +
+      s"| wm: ${DateTimeUtils.formatTimestamp(watermark, shortFormat = true)} ").padTo(26, ' ') +
     (if (watermarkAdvanced) "+ " else "= ") +
-    s"| late: $lateCountSoFar ".padTo(13, ' ') +
+    s"| late: $lateCountSoFar ".padTo(14, ' ') +
     s"| behind: $behindNewestCountSoFar ".padTo(15, ' ') +
-    s"| events: $totalCountSoFar ".padTo(16, ' ') +
+    s"| total: $totalCountSoFar ".padTo(15, ' ') +
     s"| no wm: $noWatermarkCountSoFar " +
     s"| wm+: $watermarkAdvancedCount ".padTo(11, ' ') +
     s"| max. late: ${if (maximumLatenessSoFar == 0) '-' else DateTimeUtils.formatDuration(maximumLatenessSoFar, shortFormat = true)} " +
     s"| max. behind: ${if (maximumBehindnessSoFar == 0) '-' else DateTimeUtils.formatDuration(maximumBehindnessSoFar, shortFormat = true)} " +
-    s"| time since start: ${DateTimeUtils.formatDuration(nanosSinceStart / 1000 / 1000, shortFormat = true)} " +
     s"| wm+/sec: ${math.round(avgWatermarksPerSecond * 10) / 10.0} ".padTo(17, ' ') +
-    s"| events/sec: ${math.round(avgEventsPerSecond * 10) / 10.0} "
+    s"| e/sec: ${math.round(avgEventsPerSecond * 10) / 10.0} " +
+    s"| runtime: ${DateTimeUtils.formatDuration(nanosSinceStart / 1000 / 1000, shortFormat = true)} "
 }
