@@ -141,7 +141,7 @@ case class ProgressInfo(subtask: Int,
                         avgEventsPerSecond: Double) {
   // NOTE: timestamp == watermark would also be considered late (watermark indicates that no events with t_event <= t_watermark will be observed)
   // however it seems that the Kafka consumer issues the watermarks such that this can occur even on ordered topics
-  def isLate: Boolean = timestamp <= watermark
+  def isLate: Boolean = timestamp < watermark
 
   def hasWatermark: Boolean = watermark != Long.MinValue
 
@@ -152,28 +152,28 @@ case class ProgressInfo(subtask: Int,
   def millisBehindNewest: Long = maximumTimestamp - timestamp
 
   override def toString: String = s"[$subtask] " +
-    s"ts: ${DateTimeUtils.formatTimestamp(timestamp)} " +
+    s"ts: ${DateTimeUtils.formatTimestamp(timestamp, shortFormat = true)} " +
     (if (isBehindNewest)
-      s"| behind by: ${DateTimeUtils.formatDuration(millisBehindNewest)} ".padTo(28, ' ')
+      s"| behind by: ${DateTimeUtils.formatDuration(millisBehindNewest, shortFormat = true)} "
     else
-      "| latest ") +
+      "| latest").padTo(24,' ') +
     (if (isLate)
-      s"| late by: ${DateTimeUtils.formatDuration(millisBehindWatermark)} ".padTo(26, ' ')
+      s"| late by: ${DateTimeUtils.formatDuration(millisBehindWatermark, shortFormat = true)} "
     else
-      "| on time ") +
+      "| on time").padTo(22, ' ') +
     (if (!hasWatermark)
-      "| NO WM "
+      "| NO watermark "
     else
-      s"| wm: ${DateTimeUtils.formatTimestamp(watermark)} ") +
+      s"| wm: ${DateTimeUtils.formatTimestamp(watermark, shortFormat = true)} ") +
     (if (watermarkAdvanced) "+ " else "= ") +
     s"| late: $lateCountSoFar ".padTo(13, ' ') +
     s"| behind: $behindNewestCountSoFar ".padTo(15, ' ') +
     s"| events: $totalCountSoFar ".padTo(16, ' ') +
     s"| no wm: $noWatermarkCountSoFar " +
     s"| wm+: $watermarkAdvancedCount ".padTo(11, ' ') +
-    s"| max. late: ${if (maximumLatenessSoFar == 0) '-' else DateTimeUtils.formatDuration(maximumLatenessSoFar)} " +
-    s"| max. behind: ${if (maximumBehindnessSoFar == 0) '-' else DateTimeUtils.formatDuration(maximumBehindnessSoFar)} " +
-    s"| time since start: ${DateTimeUtils.formatDuration(nanosSinceStart / 1000 / 1000)} " +
+    s"| max. late: ${if (maximumLatenessSoFar == 0) '-' else DateTimeUtils.formatDuration(maximumLatenessSoFar, shortFormat = true)} " +
+    s"| max. behind: ${if (maximumBehindnessSoFar == 0) '-' else DateTimeUtils.formatDuration(maximumBehindnessSoFar, shortFormat = true)} " +
+    s"| time since start: ${DateTimeUtils.formatDuration(nanosSinceStart / 1000 / 1000, shortFormat = true)} " +
     s"| wm+/sec: ${math.round(avgWatermarksPerSecond * 10) / 10.0} ".padTo(17, ' ') +
     s"| events/sec: ${math.round(avgEventsPerSecond * 10) / 10.0} "
 }
