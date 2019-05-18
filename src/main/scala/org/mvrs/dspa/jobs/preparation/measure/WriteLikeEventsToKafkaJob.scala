@@ -9,9 +9,11 @@ object WriteLikeEventsToKafkaJob extends FlinkStreamingJob {
 
     env.setParallelism(1)
 
-    KafkaTopics.likes.create(3, 1, overwrite = true)
+    KafkaTopics.likes.create(1, 1, overwrite = true)
 
-    streams.likes(speedupFactorOverride = Some(0)).addSink(KafkaTopics.likes.producer())
+    streams
+      .likes(speedupFactorOverride = Some(0))
+      .addSink(KafkaTopics.likes.producer())
 
     // execute program
     env.execute("Import like events from csv file to Kafka")
