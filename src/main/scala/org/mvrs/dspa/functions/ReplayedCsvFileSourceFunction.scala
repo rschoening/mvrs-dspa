@@ -23,7 +23,8 @@ import scala.io.Codec
   * @param extractEventTime        the function to extract the event time from a parsed element
   * @param speedupFactor           the speedup factor relative to the event times
   * @param maximumDelayMillis      the upper bound to the expected delays (non-late elements). The emitted watermark will be based on this value.
-  * @param delay                   the function to determine the delay based on a parsed element. For unit testing, a function that
+  * @param delay                   the function to determine the delay based on a parsed element. For unit testing, a function can be passed that
+  *                                deterministically returns delays for given elements
   * @param watermarkIntervalMillis the interval for emitting watermarks
   * @param charsetName             the java.nio charset name. Default: UTF8
   * @param rowDecoder              required implicit row decoder for the type (kantan.csv)
