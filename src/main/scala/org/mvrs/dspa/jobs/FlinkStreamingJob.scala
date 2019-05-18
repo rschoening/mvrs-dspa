@@ -30,7 +30,7 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
   // - read job-independent global preferences from settings (application.conf)
   // - get job-dependent settings via constructor arguments
   // To make the class more general-purpose, read settings in project-specific subclass and provide constructor args for all these here
-  private val autoWatermarkInterval = Settings.duration("data.auto-watermark-interval").toMilliseconds
+  private val autoWatermarkInterval = Settings.duration("jobs.auto-watermark-interval").toMilliseconds
   private val latencyTrackingInterval = Settings.config.getInt("jobs.latency-tracking-interval")
   private val stateBackendRocksDb = Settings.config.getBoolean("jobs.state-backend-rocksdb")
   private val stateBackendPath = Settings.config.getString("jobs.state-backend-path")
