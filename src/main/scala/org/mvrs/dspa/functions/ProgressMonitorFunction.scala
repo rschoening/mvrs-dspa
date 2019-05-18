@@ -167,7 +167,7 @@ case class ProgressInfo(subtask: Int,
       s"| wm: ${DateTimeUtils.formatTimestamp(watermark, shortFormat = true)} ").padTo(26, ' ') +
     (if (watermarkAdvanced) "+ " else "= ") +
     s"| late: $lateCountSoFar ".padTo(14, ' ') +
-    s"| behind: $behindNewestCountSoFar ".padTo(15, ' ') +
+    s"| behind: $behindNewestCountSoFar ".padTo(17, ' ') +
     s"| total: $totalCountSoFar ".padTo(15, ' ') +
     s"| no wm: $noWatermarkCountSoFar " +
     s"| wm+: $watermarkAdvancedCount ".padTo(11, ' ') +
