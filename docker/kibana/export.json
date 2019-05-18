@@ -1,27 +1,5 @@
 [
   {
-    "_id": "a0af2f50-4f0f-11e9-acde-e1c8a6292b89",
-    "_type": "dashboard",
-    "_source": {
-      "title": "[DSPA]  Active post statistics",
-      "hits": 0,
-      "description": "",
-      "panelsJSON": "[{\"embeddableConfig\":{},\"gridData\":{\"h\":11,\"i\":\"1\",\"w\":48,\"x\":0,\"y\":20},\"id\":\"dc1e10a0-4fba-11e9-89dd-8bb1ab045918\",\"panelIndex\":\"1\",\"type\":\"visualization\",\"version\":\"6.6.1\"},{\"embeddableConfig\":{\"vis\":{\"params\":{\"sort\":{\"columnIndex\":6,\"direction\":null}}}},\"gridData\":{\"h\":20,\"i\":\"2\",\"w\":31,\"x\":0,\"y\":0},\"id\":\"541e04f0-588c-11e9-8f64-51805961c8e0\",\"panelIndex\":\"2\",\"type\":\"visualization\",\"version\":\"6.6.1\"},{\"embeddableConfig\":{},\"gridData\":{\"h\":10,\"i\":\"5\",\"w\":17,\"x\":31,\"y\":10},\"id\":\"52213190-6845-11e9-9ba6-39d0e49adb7a\",\"panelIndex\":\"5\",\"type\":\"visualization\",\"version\":\"6.7.1\"},{\"embeddableConfig\":{},\"gridData\":{\"h\":10,\"i\":\"6\",\"w\":17,\"x\":31,\"y\":0},\"id\":\"47edacc0-698b-11e9-ba9d-bb8bdc29536e\",\"panelIndex\":\"6\",\"type\":\"visualization\",\"version\":\"6.7.1\"}]",
-      "optionsJSON": "{\"darkTheme\":true,\"hidePanelTitles\":false,\"useMargins\":true}",
-      "version": 1,
-      "timeRestore": true,
-      "timeTo": "2012-04-12T22:59:59.999Z",
-      "timeFrom": "2012-04-04T23:00:00.000Z",
-      "refreshInterval": {
-        "pause": false,
-        "value": 5000
-      },
-      "kibanaSavedObjectMeta": {
-        "searchSourceJSON": "{\"query\":{\"language\":\"lucene\",\"query\":\"\"},\"filter\":[]}"
-      }
-    }
-  },
-  {
     "_id": "7c230710-6855-11e9-9ba6-39d0e49adb7a",
     "_type": "dashboard",
     "_source": {
@@ -44,12 +22,12 @@
       "title": "[DSPA] Unusual activity detection",
       "hits": 0,
       "description": "",
-      "panelsJSON": "[{\"embeddableConfig\":{},\"gridData\":{\"x\":0,\"y\":0,\"w\":38,\"h\":12,\"i\":\"3\"},\"id\":\"3b71e2e0-5bad-11e9-8324-55d54309c27f\",\"panelIndex\":\"3\",\"type\":\"visualization\",\"version\":\"6.7.1\"},{\"embeddableConfig\":{},\"gridData\":{\"x\":0,\"y\":12,\"w\":25,\"h\":19,\"i\":\"4\"},\"id\":\"68594fb0-65cf-11e9-8720-8fbcdbbcf36c\",\"panelIndex\":\"4\",\"type\":\"visualization\",\"version\":\"6.7.1\"},{\"embeddableConfig\":{},\"gridData\":{\"x\":38,\"y\":0,\"w\":10,\"h\":12,\"i\":\"6\"},\"id\":\"93f0ebf0-6846-11e9-9ba6-39d0e49adb7a\",\"panelIndex\":\"6\",\"type\":\"visualization\",\"version\":\"6.7.1\"},{\"gridData\":{\"x\":25,\"y\":12,\"w\":23,\"h\":19,\"i\":\"7\"},\"version\":\"6.7.1\",\"panelIndex\":\"7\",\"type\":\"search\",\"id\":\"5a1714d0-6a54-11e9-ba9d-bb8bdc29536e\",\"embeddableConfig\":{\"columns\":[]}}]",
+      "panelsJSON": "[{\"embeddableConfig\":{},\"gridData\":{\"x\":0,\"y\":0,\"w\":30,\"h\":12,\"i\":\"3\"},\"id\":\"3b71e2e0-5bad-11e9-8324-55d54309c27f\",\"panelIndex\":\"3\",\"type\":\"visualization\",\"version\":\"6.7.1\"},{\"embeddableConfig\":{},\"gridData\":{\"x\":0,\"y\":12,\"w\":25,\"h\":19,\"i\":\"4\"},\"id\":\"68594fb0-65cf-11e9-8720-8fbcdbbcf36c\",\"panelIndex\":\"4\",\"type\":\"visualization\",\"version\":\"6.7.1\"},{\"embeddableConfig\":{\"columns\":[]},\"gridData\":{\"x\":25,\"y\":12,\"w\":23,\"h\":19,\"i\":\"7\"},\"id\":\"5a1714d0-6a54-11e9-ba9d-bb8bdc29536e\",\"panelIndex\":\"7\",\"type\":\"search\",\"version\":\"6.7.1\"},{\"embeddableConfig\":{\"vis\":{\"legendOpen\":true}},\"gridData\":{\"x\":37,\"y\":0,\"w\":11,\"h\":12,\"i\":\"8\"},\"id\":\"660f3f30-7713-11e9-825e-6f0806d98f1a\",\"panelIndex\":\"8\",\"type\":\"visualization\",\"version\":\"6.7.2\"},{\"gridData\":{\"x\":30,\"y\":0,\"w\":7,\"h\":12,\"i\":\"10\"},\"version\":\"6.7.2\",\"panelIndex\":\"10\",\"type\":\"visualization\",\"id\":\"b75859b0-7715-11e9-825e-6f0806d98f1a\",\"embeddableConfig\":{\"vis\":{\"defaultColors\":{\"0 - 50\":\"rgb(0,104,55)\",\"50 - 75\":\"rgb(255,255,190)\",\"75 - 100\":\"rgb(165,0,38)\"},\"legendOpen\":true}}}]",
       "optionsJSON": "{\"darkTheme\":true,\"hidePanelTitles\":false,\"useMargins\":true}",
       "version": 1,
       "timeRestore": true,
-      "timeTo": "2012-03-27T22:59:59.999Z",
-      "timeFrom": "2012-03-19T23:00:00.000Z",
+      "timeTo": "2012-05-30T22:59:59.999Z",
+      "timeFrom": "2012-05-22T23:00:00.000Z",
       "refreshInterval": {
         "pause": false,
         "value": 5000
@@ -60,16 +38,25 @@
     }
   },
   {
-    "_id": "1e9c9600-66d0-11e9-8c7b-11404659cac1",
-    "_type": "index-pattern",
+    "_id": "a0af2f50-4f0f-11e9-acde-e1c8a6292b89",
+    "_type": "dashboard",
     "_source": {
-      "title": "mvrs-active-post-statistics",
-      "timeFieldName": "timestamp",
-      "fields": "[{\"name\":\"_id\",\"type\":\"string\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":false},{\"name\":\"_index\",\"type\":\"string\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":false},{\"name\":\"_score\",\"type\":\"number\",\"count\":0,\"scripted\":false,\"searchable\":false,\"aggregatable\":false,\"readFromDocValues\":false},{\"name\":\"_source\",\"type\":\"_source\",\"count\":0,\"scripted\":false,\"searchable\":false,\"aggregatable\":false,\"readFromDocValues\":false},{\"name\":\"_type\",\"type\":\"string\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":false},{\"name\":\"commentCount\",\"type\":\"number\",\"count\":0,\"scripted\":false,\"searchable\":false,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"content\",\"type\":\"string\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"distinctUserCount\",\"type\":\"number\",\"count\":0,\"scripted\":false,\"searchable\":false,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"forumTitle\",\"type\":\"string\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"likeCount\",\"type\":\"number\",\"count\":0,\"scripted\":false,\"searchable\":false,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"newPost\",\"type\":\"boolean\",\"count\":0,\"scripted\":false,\"searchable\":false,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"postId\",\"type\":\"number\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"replyCount\",\"type\":\"number\",\"count\":0,\"scripted\":false,\"searchable\":false,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"timestamp\",\"type\":\"date\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"EventCount\",\"type\":\"number\",\"count\":0,\"scripted\":true,\"script\":\"doc['commentCount'].value + doc['replyCount'].value + doc['likeCount'].value\",\"lang\":\"painless\",\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":false}]",
-      "fieldFormatMap": "{\"EventCount\":{}}"
-    },
-    "_migrationVersion": {
-      "index-pattern": "6.5.0"
+      "title": "[DSPA]  Active post statistics",
+      "hits": 0,
+      "description": "",
+      "panelsJSON": "[{\"embeddableConfig\":{},\"gridData\":{\"x\":0,\"y\":21,\"w\":48,\"h\":11,\"i\":\"1\"},\"id\":\"dc1e10a0-4fba-11e9-89dd-8bb1ab045918\",\"panelIndex\":\"1\",\"type\":\"visualization\",\"version\":\"6.6.1\"},{\"embeddableConfig\":{\"vis\":{\"params\":{\"sort\":{\"columnIndex\":6,\"direction\":null}}}},\"gridData\":{\"x\":0,\"y\":0,\"w\":32,\"h\":21,\"i\":\"2\"},\"id\":\"541e04f0-588c-11e9-8f64-51805961c8e0\",\"panelIndex\":\"2\",\"type\":\"visualization\",\"version\":\"6.6.1\"},{\"embeddableConfig\":{},\"gridData\":{\"x\":32,\"y\":0,\"w\":16,\"h\":10,\"i\":\"6\"},\"id\":\"47edacc0-698b-11e9-ba9d-bb8bdc29536e\",\"panelIndex\":\"6\",\"type\":\"visualization\",\"version\":\"6.7.1\"},{\"embeddableConfig\":{},\"gridData\":{\"x\":32,\"y\":10,\"w\":8,\"h\":11,\"i\":\"7\"},\"id\":\"fdc97550-794a-11e9-a466-a9bbe178e327\",\"panelIndex\":\"7\",\"type\":\"visualization\",\"version\":\"6.7.2\"},{\"embeddableConfig\":{},\"gridData\":{\"x\":40,\"y\":10,\"w\":8,\"h\":11,\"i\":\"8\"},\"id\":\"b6df5af0-794b-11e9-a466-a9bbe178e327\",\"panelIndex\":\"8\",\"type\":\"visualization\",\"version\":\"6.7.2\"}]",
+      "optionsJSON": "{\"darkTheme\":true,\"hidePanelTitles\":false,\"useMargins\":true}",
+      "version": 1,
+      "timeRestore": true,
+      "timeTo": "2012-03-19T22:59:59.999Z",
+      "timeFrom": "2012-03-11T23:00:00.000Z",
+      "refreshInterval": {
+        "pause": false,
+        "value": 5000
+      },
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"query\":{\"language\":\"lucene\",\"query\":\"\"},\"filter\":[]}"
+      }
     }
   },
   {
@@ -145,12 +132,25 @@
     }
   },
   {
+    "_id": "1e9c9600-66d0-11e9-8c7b-11404659cac1",
+    "_type": "index-pattern",
+    "_source": {
+      "title": "mvrs-active-post-statistics",
+      "timeFieldName": "timestamp",
+      "fields": "[{\"name\":\"_id\",\"type\":\"string\",\"count\":1,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":false},{\"name\":\"_index\",\"type\":\"string\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":false},{\"name\":\"_score\",\"type\":\"number\",\"count\":0,\"scripted\":false,\"searchable\":false,\"aggregatable\":false,\"readFromDocValues\":false},{\"name\":\"_source\",\"type\":\"_source\",\"count\":0,\"scripted\":false,\"searchable\":false,\"aggregatable\":false,\"readFromDocValues\":false},{\"name\":\"_type\",\"type\":\"string\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":false},{\"name\":\"commentCount\",\"type\":\"number\",\"count\":0,\"scripted\":false,\"searchable\":false,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"content\",\"type\":\"string\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"distinctUserCount\",\"type\":\"number\",\"count\":0,\"scripted\":false,\"searchable\":false,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"forumTitle\",\"type\":\"string\",\"count\":1,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"likeCount\",\"type\":\"number\",\"count\":0,\"scripted\":false,\"searchable\":false,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"newPost\",\"type\":\"boolean\",\"count\":0,\"scripted\":false,\"searchable\":false,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"postId\",\"type\":\"number\",\"count\":1,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"replyCount\",\"type\":\"number\",\"count\":0,\"scripted\":false,\"searchable\":false,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"timestamp\",\"type\":\"date\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"EventCount\",\"type\":\"number\",\"count\":0,\"scripted\":true,\"script\":\"doc['commentCount'].value + doc['replyCount'].value + doc['likeCount'].value\",\"lang\":\"painless\",\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":false}]",
+      "fieldFormatMap": "{\"EventCount\":{}}"
+    },
+    "_migrationVersion": {
+      "index-pattern": "6.5.0"
+    }
+  },
+  {
     "_id": "640ba410-718e-11e9-af2c-cd882a569f50",
     "_type": "index-pattern",
     "_source": {
       "title": "mvrs-active-post-statistics-postinfos",
       "timeFieldName": "timestamp",
-      "fields": "[{\"name\":\"_id\",\"type\":\"string\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":false},{\"name\":\"_index\",\"type\":\"string\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":false},{\"name\":\"_score\",\"type\":\"number\",\"count\":0,\"scripted\":false,\"searchable\":false,\"aggregatable\":false,\"readFromDocValues\":false},{\"name\":\"_source\",\"type\":\"_source\",\"count\":0,\"scripted\":false,\"searchable\":false,\"aggregatable\":false,\"readFromDocValues\":false},{\"name\":\"_type\",\"type\":\"string\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":false},{\"name\":\"content\",\"type\":\"string\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":false,\"readFromDocValues\":false},{\"name\":\"forumId\",\"type\":\"number\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"forumTitle\",\"type\":\"string\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"imageFile\",\"type\":\"string\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":false,\"readFromDocValues\":false},{\"name\":\"personId\",\"type\":\"number\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"timestamp\",\"type\":\"date\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":true}]"
+      "fields": "[{\"name\":\"_id\",\"type\":\"string\",\"count\":1,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":false},{\"name\":\"_index\",\"type\":\"string\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":false},{\"name\":\"_score\",\"type\":\"number\",\"count\":0,\"scripted\":false,\"searchable\":false,\"aggregatable\":false,\"readFromDocValues\":false},{\"name\":\"_source\",\"type\":\"_source\",\"count\":0,\"scripted\":false,\"searchable\":false,\"aggregatable\":false,\"readFromDocValues\":false},{\"name\":\"_type\",\"type\":\"string\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":false},{\"name\":\"content\",\"type\":\"string\",\"count\":2,\"scripted\":false,\"searchable\":true,\"aggregatable\":false,\"readFromDocValues\":false},{\"name\":\"forumId\",\"type\":\"number\",\"count\":3,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"forumTitle\",\"type\":\"string\",\"count\":3,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"imageFile\",\"type\":\"string\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":false,\"readFromDocValues\":false},{\"name\":\"personId\",\"type\":\"number\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":true},{\"name\":\"timestamp\",\"type\":\"date\",\"count\":0,\"scripted\":false,\"searchable\":true,\"aggregatable\":true,\"readFromDocValues\":true}]"
     },
     "_migrationVersion": {
       "index-pattern": "6.5.0"
@@ -215,23 +215,6 @@
     }
   },
   {
-    "_id": "bf3b9fb0-6857-11e9-9ba6-39d0e49adb7a",
-    "_type": "visualization",
-    "_source": {
-      "title": "[DSPA] Recommendation rate",
-      "visState": "{\"aggs\":[{\"enabled\":true,\"id\":\"1\",\"params\":{\"customBucket\":{\"enabled\":true,\"id\":\"1-bucket\",\"params\":{\"customInterval\":\"2h\",\"drop_partials\":false,\"extended_bounds\":{},\"field\":\"lastUpdate\",\"interval\":\"auto\",\"min_doc_count\":1,\"useNormalizedEsInterval\":true},\"schema\":{\"aggFilter\":[],\"deprecate\":false,\"editor\":false,\"group\":\"none\",\"max\":null,\"min\":0,\"name\":\"bucketAgg\",\"params\":[],\"title\":\"Bucket Agg\"},\"type\":\"date_histogram\"},\"customMetric\":{\"enabled\":true,\"id\":\"1-metric\",\"params\":{},\"schema\":{\"aggFilter\":[\"!top_hits\",\"!percentiles\",\"!percentile_ranks\",\"!median\",\"!std_dev\",\"!sum_bucket\",\"!avg_bucket\",\"!min_bucket\",\"!max_bucket\",\"!derivative\",\"!moving_avg\",\"!serial_diff\",\"!cumulative_sum\"],\"deprecate\":false,\"editor\":false,\"group\":\"none\",\"max\":null,\"min\":0,\"name\":\"metricAgg\",\"params\":[],\"title\":\"Metric Agg\"},\"type\":\"count\"}},\"schema\":\"metric\",\"type\":\"avg_bucket\"}],\"params\":{\"addLegend\":true,\"addTooltip\":true,\"gauge\":{\"backStyle\":\"Full\",\"colorSchema\":\"Greens\",\"colorsRange\":[{\"from\":0,\"to\":333},{\"from\":333,\"to\":666},{\"from\":666,\"to\":1000}],\"extendRange\":true,\"gaugeColorMode\":\"Labels\",\"gaugeStyle\":\"Full\",\"gaugeType\":\"Arc\",\"invertColors\":false,\"labels\":{\"color\":\"black\",\"show\":false},\"orientation\":\"vertical\",\"percentageMode\":false,\"scale\":{\"color\":\"#333\",\"labels\":false,\"show\":true},\"style\":{\"bgColor\":false,\"bgFill\":\"#eee\",\"bgMask\":false,\"bgWidth\":0.9,\"fontSize\":60,\"labelColor\":true,\"mask\":false,\"maskBars\":50,\"subText\":\"\",\"width\":0.9},\"type\":\"meter\",\"verticalSplit\":false},\"isDisplayWarning\":false,\"type\":\"gauge\"},\"title\":\"[DSPA] Recommendation rate\",\"type\":\"gauge\"}",
-      "uiStateJSON": "{\"vis\":{\"defaultColors\":{\"0 - 333\":\"rgb(247,252,245)\",\"333 - 666\":\"rgb(116,196,118)\",\"666 - 1000\":\"rgb(0,68,27)\"}}}",
-      "description": "",
-      "version": 1,
-      "kibanaSavedObjectMeta": {
-        "searchSourceJSON": "{\"index\":\"84a5ad90-66cd-11e9-8c7b-11404659cac1\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
-      }
-    },
-    "_migrationVersion": {
-      "visualization": "6.7.2"
-    }
-  },
-  {
     "_id": "93f0ebf0-6846-11e9-9ba6-39d0e49adb7a",
     "_type": "visualization",
     "_source": {
@@ -242,23 +225,6 @@
       "version": 1,
       "kibanaSavedObjectMeta": {
         "searchSourceJSON": "{\"index\":\"49ec67f0-66e3-11e9-9c5c-93c3e6e98d86\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
-      }
-    },
-    "_migrationVersion": {
-      "visualization": "6.7.2"
-    }
-  },
-  {
-    "_id": "47edacc0-698b-11e9-ba9d-bb8bdc29536e",
-    "_type": "visualization",
-    "_source": {
-      "title": "[DSPA] Forums containing posts with most involved users",
-      "visState": "{\"title\":\"[DSPA] Forums containing posts with most involved users\",\"type\":\"tagcloud\",\"params\":{\"scale\":\"linear\",\"orientation\":\"single\",\"minFontSize\":16,\"maxFontSize\":48,\"showLabel\":false},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"max\",\"schema\":\"metric\",\"params\":{\"field\":\"distinctUserCount\"}},{\"id\":\"2\",\"enabled\":true,\"type\":\"terms\",\"schema\":\"segment\",\"params\":{\"field\":\"forumTitle\",\"size\":5,\"order\":\"desc\",\"orderBy\":\"1\",\"otherBucket\":false,\"otherBucketLabel\":\"Other\",\"missingBucket\":false,\"missingBucketLabel\":\"Missing\"}}]}",
-      "uiStateJSON": "{}",
-      "description": "",
-      "version": 1,
-      "kibanaSavedObjectMeta": {
-        "searchSourceJSON": "{\"index\":\"1e9c9600-66d0-11e9-8c7b-11404659cac1\",\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
       }
     },
     "_migrationVersion": {
@@ -327,6 +293,23 @@
       "version": 1,
       "kibanaSavedObjectMeta": {
         "searchSourceJSON": "{\"query\":{\"language\":\"kuery\",\"query\":\"\"},\"filter\":[]}"
+      }
+    },
+    "_migrationVersion": {
+      "visualization": "6.7.2"
+    }
+  },
+  {
+    "_id": "b75859b0-7715-11e9-825e-6f0806d98f1a",
+    "_type": "visualization",
+    "_source": {
+      "title": "[DSPA] Activity classification - classified events per hour",
+      "visState": "{\"aggs\":[{\"enabled\":true,\"id\":\"2\",\"params\":{\"customBucket\":{\"enabled\":true,\"id\":\"2-bucket\",\"params\":{\"customInterval\":\"2h\",\"drop_partials\":true,\"extended_bounds\":{},\"field\":\"timestamp\",\"interval\":\"h\",\"min_doc_count\":1,\"timeRange\":{\"from\":\"2012-05-22T23:00:00.000Z\",\"mode\":\"absolute\",\"to\":\"2012-05-30T22:59:59.999Z\"},\"useNormalizedEsInterval\":true},\"schema\":{\"aggFilter\":[],\"deprecate\":false,\"editor\":false,\"group\":\"none\",\"max\":null,\"min\":0,\"name\":\"bucketAgg\",\"params\":[],\"title\":\"Bucket Agg\"},\"type\":\"date_histogram\"},\"customLabel\":\"Classified events per hour\",\"customMetric\":{\"enabled\":true,\"id\":\"2-metric\",\"params\":{},\"schema\":{\"aggFilter\":[\"!top_hits\",\"!percentiles\",\"!percentile_ranks\",\"!median\",\"!std_dev\",\"!sum_bucket\",\"!avg_bucket\",\"!min_bucket\",\"!max_bucket\",\"!derivative\",\"!moving_avg\",\"!serial_diff\",\"!cumulative_sum\"],\"deprecate\":false,\"editor\":false,\"group\":\"none\",\"max\":null,\"min\":0,\"name\":\"metricAgg\",\"params\":[],\"title\":\"Metric Agg\"},\"type\":\"count\"}},\"schema\":\"metric\",\"type\":\"avg_bucket\"}],\"params\":{\"addLegend\":false,\"addTooltip\":true,\"gauge\":{\"backStyle\":\"Full\",\"colorSchema\":\"Green to Red\",\"colorsRange\":[{\"from\":0,\"to\":50},{\"from\":50,\"to\":75},{\"from\":75,\"to\":100}],\"extendRange\":true,\"gaugeColorMode\":\"Labels\",\"gaugeStyle\":\"Full\",\"gaugeType\":\"Arc\",\"invertColors\":false,\"labels\":{\"color\":\"black\",\"show\":true},\"orientation\":\"vertical\",\"percentageMode\":false,\"scale\":{\"color\":\"#333\",\"labels\":false,\"show\":true},\"style\":{\"bgColor\":false,\"bgFill\":\"#eee\",\"bgMask\":false,\"bgWidth\":0.9,\"fontSize\":60,\"labelColor\":true,\"mask\":false,\"maskBars\":50,\"subText\":\"\",\"width\":0.9},\"type\":\"meter\",\"verticalSplit\":false},\"isDisplayWarning\":false,\"type\":\"gauge\"},\"title\":\"[DSPA] Activity classification - classified events per hour\",\"type\":\"gauge\"}",
+      "uiStateJSON": "{\"vis\":{\"defaultColors\":{\"0 - 50\":\"rgb(0,104,55)\",\"50 - 75\":\"rgb(255,255,190)\",\"75 - 100\":\"rgb(165,0,38)\"}}}",
+      "description": "",
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"49ec67f0-66e3-11e9-9c5c-93c3e6e98d86\",\"query\":{\"language\":\"lucene\",\"query\":\"\"},\"filter\":[]}"
       }
     },
     "_migrationVersion": {
