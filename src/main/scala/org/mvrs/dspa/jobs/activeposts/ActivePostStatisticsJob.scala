@@ -2,6 +2,7 @@ package org.mvrs.dspa.jobs.activeposts
 
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.scala.{DataStream, createTypeInformation}
+import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer.Semantic
 import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.model._
@@ -51,7 +52,8 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
       KafkaTopics.postStatistics,
       Settings.config.getInt("data.kafka-partition-count"),
       None,
-      Settings.config.getInt("data.kafka-replica-count").toShort
+      Settings.config.getInt("data.kafka-replica-count").toShort,
+      semantic = Semantic.EXACTLY_ONCE
     )
 
     env.execute("write post statistics to kafka (and post info to elasticsearch)")

@@ -2,6 +2,7 @@ package org.mvrs.dspa.utils.kafka
 
 import com.sksamuel.avro4s.{Decoder, Encoder, SchemaFor}
 import org.apache.flink.api.common.typeinfo.TypeInformation
+import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer.Semantic
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer, FlinkKafkaProducer}
 import org.mvrs.dspa.utils.avro.{Avro4sDeserializationSchema, Avro4sSerializationSchema}
@@ -37,14 +38,17 @@ class KafkaTopic[T: Decoder : Encoder : TypeInformation](val name: String, val c
     * @param partitioner the partitioner to use. If no partitioner is specified, the default kafka partitioner (round-robin) is used.
     *                    Depending on how the flink producer is created, the default is either flink's fixed partitioner, or
     *                    kafka's default partitioner. This method consistently uses the kafka default if left unspecified.
+    * @param semantic    Defines semantic that will be used by this producer (see [[org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer.Semantic]]).
     * @return
     */
-  def producer(partitioner: Option[FlinkKafkaPartitioner[T]] = None): FlinkKafkaProducer[T] =
+  def producer(partitioner: Option[FlinkKafkaPartitioner[T]] = None,
+               semantic: FlinkKafkaProducer.Semantic = Semantic.AT_LEAST_ONCE): FlinkKafkaProducer[T] =
     FlinkUtils.createKafkaProducer(
       name,
       cluster.servers,
       Avro4sSerializationSchema[T],
-      partitioner)
+      partitioner,
+      semantic)
 
   /**
     * creates a consumer for the topic, for a given consumer group id, with Avro deserialization (based on avro4s)

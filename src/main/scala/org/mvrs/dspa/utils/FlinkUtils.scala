@@ -90,9 +90,10 @@ object FlinkUtils {
                               topic: KafkaTopic[E],
                               numPartitions: Int = 5,
                               partitioner: Option[FlinkKafkaPartitioner[E]] = None,
-                              replicationFactor: Short = 1): DataStreamSink[E] = {
+                              replicationFactor: Short = 1,
+                              semantic: FlinkKafkaProducer.Semantic = Semantic.AT_LEAST_ONCE): DataStreamSink[E] = {
     topic.create(numPartitions, replicationFactor, overwrite = true)
-    stream.addSink(topic.producer(partitioner)).name(s"Kafka: ${topic.name}")
+    stream.addSink(topic.producer(partitioner, semantic)).name(s"Kafka: ${topic.name}")
   }
 
   def createKafkaProducer[T](topicId: String,
