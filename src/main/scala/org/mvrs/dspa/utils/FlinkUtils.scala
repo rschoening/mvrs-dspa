@@ -14,8 +14,10 @@ import org.apache.flink.streaming.api.functions.AssignerWithPeriodicWatermarks
 import org.apache.flink.streaming.api.functions.async.AsyncFunction
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
+import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer.Semantic
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer, FlinkKafkaProducer}
+import org.apache.flink.streaming.util.serialization.KeyedSerializationSchemaWrapper
 import org.mvrs.dspa.utils.kafka.KafkaTopic
 
 import scala.collection.JavaConverters._
@@ -58,7 +60,6 @@ object FlinkUtils {
     ) // TODO actual replay speed may be lower due to backpressure/slow source -> apply some factor to account for that? Or just let the caller reduce the speedup factor for this?
 
   def createStreamExecutionEnvironment(localWithUI: Boolean = false): StreamExecutionEnvironment = {
-    // TODO include metrics always? or rely on flink config file only when running in cluster?
     if (localWithUI) {
       val config = new Configuration
 
@@ -73,9 +74,17 @@ object FlinkUtils {
     else StreamExecutionEnvironment.getExecutionEnvironment
   }
 
+  def createTypeInfoSerializationSchema[T: TypeInformation](implicit env: StreamExecutionEnvironment): TypeInformationSerializationSchema[T] =
+    new TypeInformationSerializationSchema[T](createTypeInformation[T], env.getConfig)
+
+
   def createBatchExecutionEnvironment(localWithUI: Boolean = false): ExecutionEnvironment =
     if (localWithUI) ExecutionEnvironment.createLocalEnvironmentWithWebUI()
     else ExecutionEnvironment.getExecutionEnvironment
+
+  def readCsv[T: ClassTag](path: String)
+                          (implicit env: ExecutionEnvironment, typeInformation: TypeInformation[T]): DataSet[T] =
+    env.readCsvFile[T](path, fieldDelimiter = "|", ignoreFirstLine = true)
 
   def writeToNewKafkaTopic[E](stream: DataStream[E],
                               topic: KafkaTopic[E],
@@ -86,55 +95,29 @@ object FlinkUtils {
     stream.addSink(topic.producer(partitioner)).name(s"Kafka: ${topic.name}")
   }
 
-  def createKafkaProducer[T: TypeInformation](topicId: String,
-                                              bootstrapServers: String,
-                                              partitioner: Option[FlinkKafkaPartitioner[T]] = None)
-                                             (implicit env: StreamExecutionEnvironment): FlinkKafkaProducer[T] = {
-    createKafkaProducer(
-      topicId,
-      bootstrapServers,
-      new TypeInformationSerializationSchema[T](createTypeInformation[T], env.getConfig),
-      partitioner)
-  }
-
   def createKafkaProducer[T](topicId: String,
                              bootstrapServers: String,
                              serializationSchema: SerializationSchema[T],
-                             partitioner: Option[FlinkKafkaPartitioner[T]]): FlinkKafkaProducer[T] = {
+                             partitioner: Option[FlinkKafkaPartitioner[T]],
+                             semantic: FlinkKafkaProducer.Semantic = Semantic.AT_LEAST_ONCE,
+                             kafkaProducerPoolSize: Int = FlinkKafkaProducer.DEFAULT_KAFKA_PRODUCERS_POOL_SIZE,
+                             writeTimestampToKafka: Boolean = false): FlinkKafkaProducer[T] = {
     // if no partitioner is specified, use the default Kafka partitioner (round-robin) instead of the FlinkFixedPartitioner
     val customPartitioner: Optional[FlinkKafkaPartitioner[T]] = Optional.ofNullable(partitioner.orNull)
 
     val producer = new FlinkKafkaProducer[T](
       topicId,
-      serializationSchema,
+      new KeyedSerializationSchemaWrapper(serializationSchema),
       kafka.connectionProperties(bootstrapServers),
-      customPartitioner
+      customPartitioner,
+      semantic,
+      kafkaProducerPoolSize
     )
 
-    // TODO ensure transactional writes
-    producer.setWriteTimestampToKafka(false) // TODO not sure if kafka timestamps will be of any use - deactivate for now
+    // NOTE: EXACTLY_ONCE requires a larger-than-default value for transaction.max.timeout.ms (--> 1h, 3600000)
+    producer.setWriteTimestampToKafka(writeTimestampToKafka)
+
     producer
-  }
-
-  def readCsv[T: ClassTag](path: String)
-                          (implicit env: ExecutionEnvironment, typeInformation: TypeInformation[T]): DataSet[T] =
-    env.readCsvFile[T](path, fieldDelimiter = "|", ignoreFirstLine = true)
-
-  def createKafkaConsumer[T](topic: String, typeInfo: TypeInformation[T], props: Properties)
-                            (implicit env: StreamExecutionEnvironment): FlinkKafkaConsumer[T] = {
-    val consumer = new FlinkKafkaConsumer[T](
-      topic, new TypeInformationSerializationSchema[T](typeInfo, env.getConfig), props)
-    consumer.setStartFromEarliest()
-    consumer
-  }
-
-  def createKafkaConsumer[T: TypeInformation](topic: String, props: Properties, commitOffsetsOnCheckpoints: Boolean = false)
-                                             (implicit env: StreamExecutionEnvironment): FlinkKafkaConsumer[T] = {
-    createKafkaConsumer(
-      topic,
-      props,
-      new TypeInformationSerializationSchema[T](createTypeInformation[T], env.getConfig),
-      commitOffsetsOnCheckpoints)
   }
 
   def createKafkaConsumer[T](topic: String,
@@ -142,7 +125,7 @@ object FlinkUtils {
                              deserializationSchema: DeserializationSchema[T],
                              commitOffsetsOnCheckpoints: Boolean): FlinkKafkaConsumer[T] = {
     val consumer = new FlinkKafkaConsumer[T](topic, deserializationSchema, props)
-    consumer.setStartFromEarliest()
+    consumer.setStartFromEarliest() // by default, start from earliest. Caller can override on returned instance
     consumer.setCommitOffsetsOnCheckpoints(commitOffsetsOnCheckpoints)
     consumer
   }
