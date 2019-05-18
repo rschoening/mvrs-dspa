@@ -24,14 +24,14 @@ package object streams {
     kafkaConsumerGroup.map(
       commentsFromKafka(
         _,
-        getSpeedupFactor(speedupFactorOverride)
-        // TODO calculate outoforderness based on event-time delay and speedup factor and lower bound in proc. time
+        getSpeedupFactor(speedupFactorOverride),
+        getMaxOutOfOrderness
       )
     ).getOrElse(
       commentsFromCsv(
         Settings.config.getString("data.comments-csv-path"),
         getSpeedupFactor(speedupFactorOverride),
-        randomDelay,
+        getRandomDelay,
         csvWatermarkInterval,
       )
     )
@@ -51,13 +51,13 @@ package object streams {
       postsFromKafka(
         _,
         getSpeedupFactor(speedupFactorOverride),
-        // TODO outoforderness
+        getMaxOutOfOrderness
       )
     ).getOrElse(
       postsFromCsv(
         Settings.config.getString("data.posts-csv-path"),
         getSpeedupFactor(speedupFactorOverride),
-        randomDelay,
+        getRandomDelay,
         csvWatermarkInterval,
       )
     )
@@ -77,13 +77,13 @@ package object streams {
       likesFromKafka(
         _,
         getSpeedupFactor(speedupFactorOverride),
-        // TODO outoforderness
+        getMaxOutOfOrderness
       )
     ).getOrElse(
       likesFromCsv(
         Settings.config.getString("data.likes-csv-path"),
         getSpeedupFactor(speedupFactorOverride),
-        randomDelay,
+        getRandomDelay,
         csvWatermarkInterval,
       )
     )
@@ -100,7 +100,10 @@ package object streams {
                     (implicit env: StreamExecutionEnvironment): DataStream[PostStatistics] =
     postStatisticsFromKafka(kafkaConsumerGroup, getSpeedupFactor(speedupFactorOverride))
 
-  def rawCommentsFromCsv(filePath: String, speedupFactor: Double = 0, randomDelay: Long = 0, watermarkInterval: Long = 10000)
+  def rawCommentsFromCsv(filePath: String,
+                         speedupFactor: Double = 0,
+                         randomDelay: Time = Time.milliseconds(0),
+                         watermarkInterval: Long = 10000)
                         (implicit env: StreamExecutionEnvironment): DataStream[RawCommentEvent] = {
     implicit val decoder: RowDecoder[RawCommentEvent] = RawCommentEvent.csvDecoder
 
@@ -110,18 +113,24 @@ package object streams {
         skipFirstLine = true, '|',
         extractEventTime = _.timestamp,
         speedupFactor, // 0 -> unchanged read speed
-        randomDelay,
+        randomDelay.toMilliseconds,
         watermarkInterval
       )
     ).name(s"$filePath")
   }
 
-  def commentsFromCsv(filePath: String, speedupFactor: Double = 0, randomDelay: Long = 0, watermarkInterval: Long = 10000)
+  def commentsFromCsv(filePath: String,
+                      speedupFactor: Double = 0,
+                      randomDelay: Time = Time.milliseconds(0),
+                      watermarkInterval: Long = 10000)
                      (implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] = {
     resolveReplyTree(rawCommentsFromCsv(filePath, speedupFactor, randomDelay, watermarkInterval))
   }
 
-  def likesFromCsv(filePath: String, speedupFactor: Double = 0, randomDelay: Long = 0, watermarkInterval: Long = 10000)
+  def likesFromCsv(filePath: String,
+                   speedupFactor: Double = 0,
+                   randomDelay: Time = Time.milliseconds(0),
+                   watermarkInterval: Long = 10000)
                   (implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] = {
     implicit val decoder: RowDecoder[LikeEvent] = LikeEvent.csvDecoder
 
@@ -131,13 +140,16 @@ package object streams {
         skipFirstLine = true, '|',
         extractEventTime = _.timestamp,
         speedupFactor, // 0 -> unchanged read speed
-        randomDelay,
+        randomDelay.toMilliseconds,
         watermarkInterval
       )
     ).name(s"$filePath")
   }
 
-  def postsFromCsv(filePath: String, speedupFactor: Double = 0, randomDelay: Long = 0, watermarkInterval: Long = 10000)
+  def postsFromCsv(filePath: String,
+                   speedupFactor: Double = 0,
+                   randomDelay: Time = Time.milliseconds(0),
+                   watermarkInterval: Long = 10000)
                   (implicit env: StreamExecutionEnvironment): DataStream[PostEvent] = {
     implicit val decoder: RowDecoder[PostEvent] = PostEvent.csvDecoder
 
@@ -147,7 +159,7 @@ package object streams {
         skipFirstLine = true, '|',
         extractEventTime = _.timestamp,
         speedupFactor, // 0 -> unchanged read speed
-        randomDelay,
+        randomDelay.toMilliseconds,
         watermarkInterval
       )
     ).name(s"$filePath (speedup: x $speedupFactor; randomDelay: $randomDelay)")
@@ -240,7 +252,6 @@ package object streams {
     // -> for speedup > 0: assign watermarks after the scaled replay function, and make sure to use large-enough value for maxOutOfOrderness
     //                     OR use only one Kafka partition (for simulation purposes)
     // --> in both cases, the AutoWatermarkInterval can be interpreted as processing-time, independent of scaled-replay
-    // --> TO BE VERIFIED: there should be no late events with speedup == 0
     val consumer = topic.consumer(consumerGroup, readCommitted)
 
     val assigner = FlinkUtils.timeStampExtractor[T](maxOutOfOrderness, extractTime)
@@ -260,9 +271,7 @@ package object streams {
 
   private def csvWatermarkInterval: Long = Settings.duration("data.csv-watermark-interval").toMilliseconds
 
-  private def randomDelay = Settings.duration("data.random-delay").toMilliseconds
+  private def getRandomDelay: Time = Time.milliseconds(Settings.duration("data.random-delay").toMilliseconds)
 
-  // TODO revise
-  private def getMaxOutOfOrderness(speedupFactor: Double, randomDelay: Long): Time =
-    Time.milliseconds(if (speedupFactor == 0.0) randomDelay else (randomDelay / speedupFactor).ceil.toLong)
+  private def getMaxOutOfOrderness: Time = Time.milliseconds(Settings.duration("data.max-out-of-orderness").toMilliseconds)
 }
