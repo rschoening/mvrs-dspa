@@ -8,6 +8,10 @@ import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.utils.elastic.ElasticSearchNode
 import org.mvrs.dspa.{Settings, streams}
 
+/**
+  * Streaming job for reading post statistics from Kafka, enriching them based on post information available in
+  * ElasticSearch, and writing them to ElasticSearch (DSPA Task #1)
+  */
 object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob(enableGenericTypes = true) {
   def execute(): Unit = {
     // read settings

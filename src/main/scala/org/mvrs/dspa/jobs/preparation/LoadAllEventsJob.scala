@@ -5,6 +5,9 @@ import org.mvrs.dspa.streams.KafkaTopics
 import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.{Settings, streams}
 
+/**
+  * Streaming job for reading events from csv files and writing them to Kafka (data preparation)
+  */
 object LoadAllEventsJob extends FlinkStreamingJob(
   parallelism = 1, // important to ensure defined order (controlled by randomDelay) in Kafka
   // (otherwise order is dependent on task scheduling, with out-of-orderness orders of magnitude greater

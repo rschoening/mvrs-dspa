@@ -8,6 +8,7 @@ import org.apache.flink.util.Collector
 import org.mvrs.dspa.utils.DateTimeUtils
 
 class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)] {
+  // metrics
   @transient private var counter: Counter = _
   @transient private var noWatermarkCounter: Counter = _
   @transient private var behindNewestCounter: Counter = _
@@ -15,6 +16,7 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
   @transient private var watermarkAdvancedCounter: Counter = _
   @transient private var watermarkAdvancedPerSecond: Meter = _
 
+  // state (not checkpointed, as this function is debug-only and does not need to be fault-tolerant)
   @transient private var maxTimestamp: Long = _
   @transient private var maximumLateness: Long = _
   @transient private var maximumBehindness: Long = _
@@ -27,7 +29,7 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
   @transient private var sumOfProcTimeBetweenEventsMillis: Double = 0.0
   @transient private var sumOfProcTimeBetweenWatermarksMillis: Double = 0.0
 
-  @transient lazy val nanosPerMilli: Double = 1000.0 * 1000.0
+  @transient private lazy val nanosPerMilli: Double = 1000.0 * 1000.0
 
   override def open(parameters: Configuration): Unit = {
     val group = getRuntimeContext.getMetricGroup

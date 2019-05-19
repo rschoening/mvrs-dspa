@@ -11,7 +11,10 @@ import org.mvrs.dspa.utils.elastic.ElasticSearchNode
 import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
 import org.mvrs.dspa.{Settings, streams}
 
-// NOTE: KafkaTopicPartition is treated as generic type, must enable generic types
+/**
+  * Streaming job for writing post statistics to Kafka, and writing enriched posts (including forum title)
+  * to ElasticSearch (DSPA Task #1)
+  */
 object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = true) {
   def execute(): Unit = {
     // read settings

@@ -15,6 +15,10 @@ import org.mvrs.dspa.{Settings, streams}
 
 import scala.collection.JavaConverters._
 
+/**
+  * Streaming job for finding similar users based on user activity, and writing recommendations to
+  * ElasticSearch (DSPA Task #2)
+  */
 object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
   def execute(): Unit = {
     // read settings

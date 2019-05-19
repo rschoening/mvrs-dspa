@@ -21,6 +21,9 @@ import org.mvrs.dspa.{Settings, streams}
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
+/**
+  * Streaming job for unusual activity detection (DSPA Task #3)
+  */
 object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes = true) {
   // TODO
   // - add integration tests
