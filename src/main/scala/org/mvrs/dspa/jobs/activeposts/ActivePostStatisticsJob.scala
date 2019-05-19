@@ -49,7 +49,8 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
       commentsStream, postsStream, likesStream,
       windowSize, windowSlide, stateTtl, countPostAuthor)
 
-    // write to kafka topic (key by post id to preserve order) TODO confirm that default kafka partitioner picks up key
+    // write to kafka topic (key by post id to preserve order)
+    // TODO ensure that kafka partitioner picks up the key (KeyedSerializationSchema)
     FlinkUtils.writeToNewKafkaTopic(
       statsStream.keyBy(_.postId),
       KafkaTopics.postStatistics,
