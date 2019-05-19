@@ -1,8 +1,7 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Task 1: active post statistics (kafka -&gt; kafka, post info: kafka -&gt; elasticsearch)" type="Application" factoryName="Application">
-    <option name="MAIN_CLASS_NAME" value="org.mvrs.dspa.jobs.activeposts.ActivePostStatisticsJob" />
+  <configuration default="false" name="Task 1.2: active post statistics - write to elasticsearch" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="org.mvrs.dspa.jobs.activeposts.WriteActivePostStatisticsToElasticSearchJob" />
     <module name="mvrs-dspa" />
-    <option name="PROGRAM_PARAMETERS" value="local-with-ui" />
     <extension name="coverage">
       <pattern>
         <option name="PATTERN" value="org.mvrs.dspa.model.*" />
