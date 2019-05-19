@@ -60,7 +60,7 @@ class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,
            charsetName: Option[String] = None)(implicit rowDecoder: RowDecoder[OUT]) =
     this(filePath, skipFirstLine, cellSeparator, extractEventTime, speedupFactor, maximumDelayMilliseconds,
       if (maximumDelayMilliseconds <= 0) (_: OUT) => 0L
-      else (_: OUT) => FlinkUtils.getNormalDelayMillis(rand, maximumDelayMilliseconds),
+      else (_: OUT) => FlinkUtils.getNormalDelayMillis(rand, maximumDelayMilliseconds)(),
       watermarkInterval, charsetName)
 
   override def open(parameters: Configuration): Unit = {

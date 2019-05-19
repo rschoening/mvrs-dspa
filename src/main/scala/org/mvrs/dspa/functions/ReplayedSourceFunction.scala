@@ -62,7 +62,7 @@ abstract class ReplayedSourceFunction[IN, OUT](parse: IN => OUT,
     this(
       parse, extractEventTime, speedupFactor, maximumDelayMilliseconds,
       if (maximumDelayMilliseconds <= 0) (_: OUT) => 0L
-      else (_: OUT) => FlinkUtils.getNormalDelayMillis(rand, maximumDelayMilliseconds),
+      else (_: OUT) => FlinkUtils.getNormalDelayMillis(rand, maximumDelayMilliseconds)(),
       watermarkIntervalMillis,
       minimumWatermarkEmitIntervalMillis
     )

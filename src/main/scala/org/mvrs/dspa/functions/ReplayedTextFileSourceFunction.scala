@@ -29,7 +29,7 @@ class ReplayedTextFileSourceFunction[OUT](filePath: String,
            watermarkInterval: Int = 1000) =
     this(filePath, skipFirstLine, parse, extractEventTime, speedupFactor, maximumDelayMilliseconds,
       if (maximumDelayMilliseconds <= 0) (_: OUT) => 0L
-      else (_: OUT) => FlinkUtils.getNormalDelayMillis(rand, maximumDelayMilliseconds),
+      else (_: OUT) => FlinkUtils.getNormalDelayMillis(rand, maximumDelayMilliseconds)(),
       watermarkInterval)
 
   override def open(parameters: Configuration): Unit = {

@@ -24,7 +24,7 @@ class ScaledReplayFunction[K, I](extractEventTime: I => Long,
 
   def this(extractEventTime: I => Long, speedupFactor: Double, maximumDelayMilliseconds: Long, expectOrdered: Boolean) =
     this(extractEventTime, speedupFactor, maximumDelayMilliseconds,
-      (_: I) => FlinkUtils.getNormalDelayMillis(rand, maximumDelayMilliseconds),
+      (_: I) => FlinkUtils.getNormalDelayMillis(rand, maximumDelayMilliseconds)(),
       expectOrdered)
 
   override def processElement(value: I, ctx: KeyedProcessFunction[K, I, I]#Context, out: Collector[I]): Unit = {

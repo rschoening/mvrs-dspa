@@ -143,11 +143,24 @@ object FlinkUtils {
       case xs@_ => xs.asScala.toSeq
     }
 
-  def getNormalDelayMillis(rand: scala.util.Random, maximumDelayMilliseconds: Long): Long = {
+  /**
+    * Generates random delay values, with a given mean and standard deviation, and not exceeding a given maximum value.
+    * Default values are chosen for a not too unrealistic skewed delay distribution (maximum value = mean + 1.5 stdev)
+    *
+    * @param rand the random number generator
+    * @param maximumDelayMilliseconds the maximum delay value.
+    * @param mean the mean delay value
+    * @param standardDeviation the standard deviation
+    * @return
+    */
+  def getNormalDelayMillis(rand: scala.util.Random,
+                           @Nonnegative maximumDelayMilliseconds: Long)
+                          (mean: Double = maximumDelayMilliseconds / 4.0,
+                           @Nonnegative standardDeviation: Double = maximumDelayMilliseconds / 2.0): Long = {
     var delay = -1L
-    val x = maximumDelayMilliseconds / 2
+
     while (delay < 0 || delay > maximumDelayMilliseconds) {
-      delay = (rand.nextGaussian * x).toLong + x
+      delay = (rand.nextGaussian * standardDeviation + mean).toLong
     }
     delay
   }
