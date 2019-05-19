@@ -15,6 +15,7 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
   @transient private var lateEventCounter: Counter = _
   @transient private var watermarkAdvancedCounter: Counter = _
   @transient private var watermarkAdvancedPerSecond: Meter = _
+  // TODO histogram metrics for per-element behindness/lateness?
 
   // state (not checkpointed, as this function is debug-only and does not need to be fault-tolerant)
   @transient private var maxTimestamp: Long = _
