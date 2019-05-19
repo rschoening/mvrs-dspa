@@ -3,12 +3,16 @@ package org.mvrs.dspa.utils
 import java.util.concurrent.TimeUnit
 import java.util.{Optional, Properties}
 
+import com.codahale.metrics.SlidingWindowReservoir
+import javax.annotation.Nonnegative
 import org.apache.flink.api.common.serialization.{DeserializationSchema, SerializationSchema, TypeInformationSerializationSchema}
 import org.apache.flink.api.common.state.ListState
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.scala._
 import org.apache.flink.configuration.{ConfigConstants, Configuration, WebOptions}
+import org.apache.flink.dropwizard.metrics.DropwizardHistogramWrapper
+import org.apache.flink.metrics.MetricGroup
 import org.apache.flink.streaming.api.datastream.{AsyncDataStream, DataStreamSink}
 import org.apache.flink.streaming.api.functions.AssignerWithPeriodicWatermarks
 import org.apache.flink.streaming.api.functions.async.AsyncFunction
@@ -115,7 +119,9 @@ object FlinkUtils {
       kafkaProducerPoolSize
     )
 
-    // NOTE: EXACTLY_ONCE requires a larger-than-default value for transaction.max.timeout.ms (--> 1h, 3600000)
+    // NOTE: EXACTLY_ONCE requires a larger-than-default value for transaction.max.timeout.ms (-> 1h, 3600000)
+    //       (set in docker-compose.yaml)
+
     producer.setWriteTimestampToKafka(writeTimestampToKafka)
 
     producer
@@ -164,4 +170,19 @@ object FlinkUtils {
     }
     delay
   }
+
+  /**
+    * Creates a histogram metric
+    *
+    * @param name                   metric name
+    * @param group                  metric group
+    * @param slidingWindowReservoir the number of measurements to store
+    * @return the histogram metric
+    */
+  def histogramMetric(name: String,
+                      group: MetricGroup,
+                      slidingWindowReservoir: Int = 500): DropwizardHistogramWrapper =
+    group.histogram(name, new DropwizardHistogramWrapper(new com.codahale.metrics.Histogram(new SlidingWindowReservoir(slidingWindowReservoir))))
+
+
 }
