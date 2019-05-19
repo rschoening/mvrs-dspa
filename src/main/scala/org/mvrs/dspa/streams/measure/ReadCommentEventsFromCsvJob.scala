@@ -6,7 +6,7 @@ import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.model.CommentEvent
 import org.mvrs.dspa.streams
 
-object ReadCommentEventsFromCsv extends FlinkStreamingJob(parallelism = 1, checkpointIntervalOverride = Some(0)) {
+object ReadCommentEventsFromCsvJob extends FlinkStreamingJob(parallelism = 1, checkpointIntervalOverride = Some(0)) {
   def execute(): Unit = {
     streams.comments()
       .process(new ProgressMonitorFunction[CommentEvent])

@@ -23,6 +23,8 @@
     <buffered bufClass="jobs.clustering.ClusteringParameterTestSuite" />
     <buffered bufClass="jobs.clustering.KMeansClusteringTestSuite" />
     <buffered bufClass="jobs.clustering.KMeansClusteringTestSuite" />
+    <buffered bufClass="jobs.recommendations.FilterToActivePersonsFunctionTestSuite" />
+    <buffered bufClass="jobs.recommendations.FilterToActivePersonsFunctionTestSuite" />
     <buffered bufClass="jobs.recommendations.RecommendationUtilsTestSuite" />
     <buffered bufClass="jobs.recommendations.RecommendationUtilsTestSuite" />
     <buffered bufClass="streams.BuildReplyTreeProcessFunctionTestSuite" />

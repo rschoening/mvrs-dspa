@@ -4,7 +4,7 @@ import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.streams
 import org.mvrs.dspa.streams.KafkaTopics
 
-object LoadPostEventsJob extends FlinkStreamingJob {
+object WritePostEventsToKafkaJob extends FlinkStreamingJob {
   def execute(): Unit = {
     KafkaTopics.posts.create(3, 1, overwrite = true)
 
