@@ -22,7 +22,9 @@ object KMeansClustering {
     * @param random random number generator
     * @return k random centroids
     */
-  def createRandomCentroids(points: Iterable[Point], k: Int, random: Random = new Random()): Seq[Point] = {
+  def createRandomCentroids(points: Iterable[Point],
+                            k: Int,
+                            random: Random = new Random()): Seq[Point] = {
 
     val uniquePoints = points.toSet
     val resultSet = mutable.Set[Point]()
@@ -60,7 +62,8 @@ object KMeansClustering {
     * @param random random number generator
     * @return the cluster centroids with weight based on the assigned points
     */
-  def buildClusters(points: Seq[Point], k: Int)(implicit random: Random): Map[Point, (Int, Double)] =
+  def buildClusters(points: Seq[Point], k: Int)
+                   (implicit random: Random): Map[Point, (Int, Double)] =
     buildClusters(points, createRandomCentroids(points, k, random).zipWithIndex.map(t => (t._1, (t._2, 0.0))), k)
 
   /**
@@ -70,7 +73,10 @@ object KMeansClustering {
     * @param initialCentroids the initial centroids for clustering
     * @return the cluster centroids with weight based on the assigned points
     */
-  def buildClusters(points: Seq[Point], initialCentroids: Seq[(Point, (Int, Double))], k: Int)(implicit random: Random): Map[Point, (Int, Double)] =
+  def buildClusters(points: Seq[Point],
+                    initialCentroids: Seq[(Point, (Int, Double))],
+                    k: Int)
+                   (implicit random: Random): Map[Point, (Int, Double)] =
     updateClusters(
       points,
       initialCentroids.toMap, // NOTE duplicates eliminated here -> k can shrink -> handled in updateClusters

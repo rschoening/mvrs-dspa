@@ -62,7 +62,8 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     val controlParameterLines: DataStream[String] = readControlParameters(clusterParameterFilePath)
 
     // parse into valid parameters and parse error streams
-    val (controlParameters, controlParameterParseErrors) = parseControlParameters(controlParameterLines)
+    val (controlParameters: DataStream[ClusteringParameter], controlParameterParseErrors: DataStream[String]) =
+      parseControlParameters(controlParameterLines)
 
     // get featurized comments and posts in a unioned stream
     val eventFeaturesStream: DataStream[FeaturizedEvent] = getEventFeatures(comments, posts)
