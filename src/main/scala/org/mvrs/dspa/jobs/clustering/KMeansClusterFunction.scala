@@ -51,9 +51,9 @@ class KMeansClusterFunction(@Nonnegative k: Int, @Nonnegative decay: Double = 0.
   require(decay >= 0 && decay <= 1, s"invalid decay: $decay (must be between 0 and 1)")
 
   // metrics
-  @transient private var earlyElementCounter: Counter = _
+  @transient private var aheadOfWindowElementCounter: Counter = _
   @transient private var withinWindowElementCounter: Counter = _
-  @transient private var lateElementCounter: Counter = _
+  @transient private var behindWindowElementCounter: Counter = _
 
   @transient private var earlyFiringCounter: Counter = _
   @transient private var delayedFiringCounter: Counter = _
@@ -89,9 +89,9 @@ class KMeansClusterFunction(@Nonnegative k: Int, @Nonnegative decay: Double = 0.
 
     val group = getRuntimeContext.getMetricGroup
 
-    earlyElementCounter = group.counter("earlyElementCounter")
+    aheadOfWindowElementCounter = group.counter("aheadOfWindowElementCounter")
     withinWindowElementCounter = group.counter("withinWindowElementCounter")
-    lateElementCounter = group.counter("lateElementCounter")
+    behindWindowElementCounter = group.counter("behindWindowElementCounter")
 
     earlyFiringCounter = group.counter("earlyFiringCounter")
     delayedFiringCounter = group.counter("delayedFiringCounter")
@@ -119,18 +119,18 @@ class KMeansClusterFunction(@Nonnegative k: Int, @Nonnegative decay: Double = 0.
       // (the timer fires only after watermark for its timestamp has passed, so there can be "early" elements
       // belonging to the next window)
       nextElementsListState.add(value)
-      earlyElementCounter.inc()
+      aheadOfWindowElementCounter.inc()
     }
     else if (elementTimestamp < windowStartTime) {
       // late element, event time prior to start of current window.
       if (includeLateElementsInWindow) assignToWindow(value) // include anyway in list state
 
-      debug(
-        s"Late event ($value): ${DateTimeUtils.formatTimestamp(elementTimestamp)}, received in window starting at " +
+      warn(
+        s"Late event ($value): ${DateTimeUtils.formatTimestamp(elementTimestamp)} before window, received in window starting at " +
           s"${DateTimeUtils.formatTimestamp(windowStartTime)} (late by " +
           s"${DateTimeUtils.formatDuration(windowStartTime - elementTimestamp)})")
 
-      lateElementCounter.inc()
+      behindWindowElementCounter.inc()
     }
     else {
       // regular element, add to list state
@@ -277,6 +277,8 @@ class KMeansClusterFunction(@Nonnegative k: Int, @Nonnegative decay: Double = 0.
     nextTimerState.update(nextTimer)
     windowExtendedState.update(false)
   }
+
+  private def warn(msg: => String): Unit = if (LOG.isWarnEnabled()) LOG.warn(msg)
 
   private def debug(msg: => String): Unit = if (LOG.isDebugEnabled) LOG.debug(msg)
 }
