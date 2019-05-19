@@ -19,6 +19,31 @@ package object streams {
     * @param env                   the implicit stream execution environment
     * @return stream of comments with assigned post ids, i.e. after reply tree reconstruction
     */
+  def rawComments(kafkaConsumerGroup: Option[String] = None, speedupFactorOverride: Option[Double] = None)
+                 (implicit env: StreamExecutionEnvironment): DataStream[RawCommentEvent] =
+    kafkaConsumerGroup.map(
+      rawCommentsFromKafka(
+        _,
+        getSpeedupFactor(speedupFactorOverride),
+        getMaxOutOfOrderness
+      )
+    ).getOrElse(
+      rawCommentsFromCsv(
+        Settings.config.getString("data.comments-csv-path"),
+        getSpeedupFactor(speedupFactorOverride),
+        getRandomDelay,
+        csvWatermarkInterval,
+      )
+    )
+
+  /**
+    * Gets the stream of comments (with assigned post ids), either from kafka or from csv file
+    *
+    * @param kafkaConsumerGroup    if specified, the stream is consumed from kafka. Otherwise (None), from csv file
+    * @param speedupFactorOverride optional override of the speedup factor defined in the settings
+    * @param env                   the implicit stream execution environment
+    * @return stream of comments with assigned post ids, i.e. after reply tree reconstruction
+    */
   def comments(kafkaConsumerGroup: Option[String] = None, speedupFactorOverride: Option[Double] = None)
               (implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] =
     kafkaConsumerGroup.map(
@@ -165,11 +190,17 @@ package object streams {
     ).name(s"$filePath (speedup: x $speedupFactor; randomDelay: $randomDelay)")
   }
 
+  def rawCommentsFromKafka(consumerGroup: String,
+                           speedupFactor: Double = 0,
+                           maxOutOfOrderness: Time = Time.milliseconds(0))
+                          (implicit env: StreamExecutionEnvironment): DataStream[RawCommentEvent] =
+    fromKafka(KafkaTopics.comments, consumerGroup, _.timestamp, speedupFactor, maxOutOfOrderness)
+
   def commentsFromKafka(consumerGroup: String,
                         speedupFactor: Double = 0,
                         maxOutOfOrderness: Time = Time.milliseconds(0))
                        (implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] =
-    fromKafka(KafkaTopics.comments, consumerGroup, _.timestamp, speedupFactor, maxOutOfOrderness)
+    resolveReplyTree(fromKafka(KafkaTopics.comments, consumerGroup, _.timestamp, speedupFactor, maxOutOfOrderness))
 
   def postStatisticsFromKafka(consumerGroup: String,
                               speedupFactor: Double = 0,
@@ -192,6 +223,19 @@ package object streams {
   def resolveReplyTree(rawComments: DataStream[RawCommentEvent]): DataStream[CommentEvent] =
     resolveReplyTree(rawComments, droppedRepliesStream = false)._1
 
+  /**
+    * Transforms the stream of raw comments into comments with resolved reference to the post
+    *
+    * @param rawComments          the stream of raw comments consisting of first-level comments to posts, and replies to
+    *                             either first-level comments or other replies. Replies don't have a direct reference to
+    *                             the parent post.
+    * @param droppedRepliesStream indicates that the dropped replies should be emitted on a side output stream. This is
+    *                             useful to investigate the behavior on a single worker - with multiple workers, all
+    *                             replies are dropped on all but one worker, which makes interpretation of this stream
+    *                             more difficult.
+    * @return the pair of comment stream, dropped reply stream (which may not emit elements depending on the value of
+    *         { @code droppedRepliesStream}
+    */
   def resolveReplyTree(rawComments: DataStream[RawCommentEvent],
                        droppedRepliesStream: Boolean): (DataStream[CommentEvent], DataStream[RawCommentEvent]) = {
     val firstLevelComments =
