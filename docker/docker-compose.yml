@@ -4,7 +4,14 @@ services:
     image: wurstmeister/zookeeper
     ports:
       - "2181:2181"
-
+#    volumes:
+#     - type: volume
+#       source: zk_data
+#       target: /opt/zookeeper-3.4.13/data
+#     - type: volume
+#       source: zk_conf
+#       target: /opt/zookeeper-3.4.13/conf
+       
   kafka:
     image: wurstmeister/kafka:latest
     depends_on:
@@ -24,6 +31,10 @@ services:
     # NOTE kafka starts up with no topics - topics are created by flink jobs
     # this could be changed by specifying persistent volume (NOTE: this is also required for zookeeper,
     # otherwise topics are effectively gone even if the log files still exist!)
+#    volumes:
+#      - type: volume
+#        source: kafka_data
+#        target: /kafka
 
   jobmanager:
     image: flink:1.7.2-scala_2.12
@@ -132,3 +143,6 @@ volumes:
   esdata1:
   logs:
   grafana_data:
+#  zk_data:
+#  zk_conf:
+#  kafka_data:
