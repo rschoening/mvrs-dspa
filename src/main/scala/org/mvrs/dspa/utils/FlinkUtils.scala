@@ -10,6 +10,7 @@ import org.apache.flink.api.common.state.ListState
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.scala._
+import org.apache.flink.api.scala.metrics.ScalaGauge
 import org.apache.flink.configuration.{ConfigConstants, Configuration, WebOptions}
 import org.apache.flink.dropwizard.metrics.DropwizardHistogramWrapper
 import org.apache.flink.metrics.MetricGroup
@@ -153,10 +154,10 @@ object FlinkUtils {
     * Generates random delay values, with a given mean and standard deviation, and not exceeding a given maximum value.
     * Default values are chosen for a not too unrealistic skewed delay distribution (maximum value = mean + 1.5 stdev)
     *
-    * @param rand the random number generator
+    * @param rand                     the random number generator
     * @param maximumDelayMilliseconds the maximum delay value.
-    * @param mean the mean delay value
-    * @param standardDeviation the standard deviation
+    * @param mean                     the mean delay value
+    * @param standardDeviation        the standard deviation
     * @return
     */
   def getNormalDelayMillis(rand: scala.util.Random,
@@ -184,5 +185,17 @@ object FlinkUtils {
                       slidingWindowReservoir: Int = 500): DropwizardHistogramWrapper =
     group.histogram(name, new DropwizardHistogramWrapper(new com.codahale.metrics.Histogram(new SlidingWindowReservoir(slidingWindowReservoir))))
 
-
+  /**
+    * Creates a gauge metric
+    *
+    * @param name     metric name
+    * @param group    metric group
+    * @param getValue the function to get the gauge value
+    * @tparam T type of gauge value
+    * @return gauge metric
+    */
+  def gaugeMetric[T](name: String,
+                     group: MetricGroup,
+                     getValue: () => T): ScalaGauge[T] =
+    group.gauge[T, ScalaGauge[T]](name, ScalaGauge[T](() => getValue()))
 }

@@ -1,7 +1,6 @@
 package org.mvrs.dspa.streams
 
 import org.apache.flink.api.common.state.{ListState, ListStateDescriptor}
-import org.apache.flink.api.scala.metrics.ScalaGauge
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.metrics.{Counter, Gauge}
 import org.apache.flink.runtime.state.{FunctionInitializationContext, FunctionSnapshotContext}
@@ -11,6 +10,7 @@ import org.apache.flink.streaming.api.scala.{OutputTag, createTypeInformation}
 import org.apache.flink.util.Collector
 import org.mvrs.dspa.model.{CommentEvent, RawCommentEvent}
 import org.mvrs.dspa.streams.BuildReplyTreeProcessFunction._
+import org.mvrs.dspa.utils.FlinkUtils
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
@@ -56,8 +56,9 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
 
     resolvedReplyCount = group.counter("resolvedReplyCount")
     droppedReplyCount = group.counter("droppedReplyCount")
-    danglingRepliesCount = group.gauge[Int, ScalaGauge[Int]]("danglingRepliesCount", ScalaGauge[Int](() => danglingReplies.size))
-    cacheProcessingTime = group.gauge[Long, ScalaGauge[Long]]("cacheProcessingTime", ScalaGauge[Long](() => lastCacheProcessingTime))
+    danglingRepliesCount = FlinkUtils.gaugeMetric("danglingRepliesCount", group, () => danglingReplies.size)
+    cacheProcessingTime = FlinkUtils.gaugeMetric("cacheProcessingTime", group, () => lastCacheProcessingTime)
+    // TODO consider histograms
     cacheProcessingCount = group.counter("cacheProcessingCount")
   }
 
