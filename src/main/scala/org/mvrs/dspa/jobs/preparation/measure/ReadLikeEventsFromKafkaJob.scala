@@ -12,16 +12,16 @@ object ReadLikeEventsFromKafkaJob extends FlinkStreamingJob(enableGenericTypes =
   def execute(): Unit = {
     env.setParallelism(4)
 
-    env.getConfig.setAutoWatermarkInterval(100L)
+    env.getConfig.setAutoWatermarkInterval(1L)
 
     streams
-      .likesFromKafka("testConsumer", 0, Time.minutes(10)).startNewChain()
+      .likesFromKafka("testConsumer", 0, Time.minutes(30)).startNewChain()
       .process(new ProgressMonitorFunction[LikeEvent]())
       .map(_._2)
 //      .filter(p => p.totalCountSoFar % 10000 == 0)
       // .filter(_.subtask == 1)
       //.filter(p => p.watermarkAdvanced || p.isLate || p.isBehindNewest)
-      //.filter(p => p.isLate || p.totalCountSoFar % 100000 == 0) //  || p.isBehindNewest || p.totalCountSoFar % 10000 == 0)
+      .filter(p => p.isLate || p.totalCountSoFar % 100000 == 0) //  || p.isBehindNewest || p.totalCountSoFar % 10000 == 0)
       .map(_.toString)
       .print
 
