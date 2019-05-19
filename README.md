@@ -19,3 +19,6 @@ TODO
 * screenshots for import options
 * docker not yet working in VM, can't test
 * where to put data/set env variable
+
+NOTE
+* if bind address error occurs when starting job that starts the web UI, then check if the flink dashboard is still open in a browser window. The client keeps the port open. 
