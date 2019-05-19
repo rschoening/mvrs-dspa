@@ -48,4 +48,7 @@ final case class ClusterMetadata(timestamp: Long,
                                  clusters: Vector[(Cluster, Vector[Double], Double, Double)],
                                  averageVectorDistance: Double,
                                  averageWeightDifference: Double,
-                                 kDifference: Int)
+                                 kDifference: Int) {
+  require(! averageVectorDistance.isNaN, "average vector distance is NaN")
+  require(! averageWeightDifference.isNaN, "average weight difference is NaN")
+}
