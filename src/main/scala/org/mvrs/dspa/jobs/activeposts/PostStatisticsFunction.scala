@@ -4,6 +4,7 @@ import org.apache.flink.api.common.state.{MapStateDescriptor, StateTtlConfig, Va
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.api.scala._
 import org.apache.flink.configuration.Configuration
+import org.apache.flink.metrics.Counter
 import org.apache.flink.streaming.api.TimerService
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction
 import org.apache.flink.util.Collector
@@ -20,11 +21,18 @@ import scala.collection.mutable
   *
   * @param windowSize      the window size
   * @param slide           the window slide
-  * @param stateTtl        the time-to-live for buckets (in processing time, i.e. taking into account any
+  * @param stateTtl        the time-to-live for buckets (in processing time, i.e. has to take into account speedup to
+  *                        ensure that in-use state is not evicted early)
   * @param countPostAuthor indicates if the original post author should be counted as one of the involved users
   */
 class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, countPostAuthor: Boolean = true)
   extends KeyedProcessFunction[Long, Event, PostStatistics] {
+
+  // metrics
+  @transient private var earlyElementCounter: Counter = _
+  @transient private var currentBucketElementCounter: Counter = _
+  @transient private var olderBucketElementCounter: Counter = _
+  @transient private var beforeWindowElementCounter: Counter = _
 
   // state
   @transient private lazy val lastActivityState = getRuntimeContext.getState(lastActivityDescriptor)
@@ -50,6 +58,13 @@ class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, coun
     bucketMapDescriptor.enableTimeToLive(ttlConfig)
     lastActivityDescriptor.enableTimeToLive(ttlConfig)
     windowEndDescriptor.enableTimeToLive(ttlConfig)
+
+    val group = getRuntimeContext.getMetricGroup
+
+    earlyElementCounter = group.counter("earlyElementCounter")
+    currentBucketElementCounter = group.counter("currentBucketElementCounter")
+    olderBucketElementCounter = group.counter("olderBucketElementCounter")
+    beforeWindowElementCounter = group.counter("beforeWindowElementCounter")
   }
 
   override def onTimer(windowExclusiveUpperBound: Long,
@@ -153,22 +168,41 @@ class PostStatisticsFunction(windowSize: Time, slide: Time, stateTtl: Time, coun
     lastActivityState.update(value.timestamp)
 
     val windowEnd = windowEndState.value
+
+    val windowInclusiveStartTime = windowEnd - windowSize.toMilliseconds
+
     val bucketTimestamp = getBucketForTimestamp(value.timestamp, windowEnd, slide.toMilliseconds)
 
-    value.eventType match {
-      case EventType.Comment => updateBucket(bucketTimestamp, _.addComment(value.personId))
-      case EventType.Reply => updateBucket(bucketTimestamp, _.addReply(value.personId))
-      case EventType.Like => updateBucket(bucketTimestamp, _.addLike(value.personId))
-      case EventType.Post => updateBucket(bucketTimestamp, _.registerPost(value.personId))
-    }
+    if (value.timestamp >= windowInclusiveStartTime) {
+      value.eventType match {
+        case EventType.Comment => updateBucket(bucketTimestamp, _.addComment(value.personId))
+        case EventType.Reply => updateBucket(bucketTimestamp, _.addReply(value.personId))
+        case EventType.Like => updateBucket(bucketTimestamp, _.addLike(value.personId))
+        case EventType.Post => updateBucket(bucketTimestamp, _.registerPost(value.personId))
+      }
 
+      logBucketAssignment(value, windowEnd, bucketTimestamp)
+    }
+    else {
+      debug(s"Late event outside window, discarded: $value")
+
+      beforeWindowElementCounter.inc()
+    }
+  }
+
+  private def logBucketAssignment(value: Event, windowEnd: Long, bucketTimestamp: Long): Unit = {
     if (value.timestamp > windowEnd) {
-      debug(s"Event to future bucket: $value (current window: $windowEnd)")
+      debug(s"Event to future bucket: $value (current window: $windowEnd; bucket: $bucketTimestamp)")
+      earlyElementCounter.inc()
     }
     else if (value.timestamp < windowEnd - windowSize.toMilliseconds) {
       debug(s"Event to past bucket: $value (current window: $windowEnd)")
+      olderBucketElementCounter.inc()
     }
-    else debug(s"Event to current bucket: $value")
+    else {
+      debug(s"Event to current bucket: $value (current window: $windowEnd; bucket: $bucketTimestamp)")
+      currentBucketElementCounter.inc()
+    }
   }
 
   private def debug(msg: => String): Unit = if (LOG.isDebugEnabled) LOG.debug(msg)
