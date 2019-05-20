@@ -220,7 +220,7 @@ object ProgressMonitorFunction {
       s"| max: ${if (maximumWatermarkIncrement == 0) '-' else DateTimeUtils.formatDuration(maximumWatermarkIncrement, shortFormat = true)}".padTo(18, ' ') +
       s"| +ct: $watermarkAdvancedCount ".padTo(12, ' ') +
       s"| +/s: ${math.round(avgWatermarksPerSecond)} ".padTo(13, ' ') +
-      s"| nwm: $noWatermarkCount " +
+      s"| nwm: $noWatermarkCount ".padTo(12, ' ') +
       s"| elw: $elementsSinceWatermarkAdvanced ".padTo(14, ' ') +
       s"| max: $maxElementsSinceWatermarkAdvanced ".padTo(14, ' ') +
       s"|| rt: ${DateTimeUtils.formatDuration(nanosSinceStart / 1000 / 1000, shortFormat = false)} "
