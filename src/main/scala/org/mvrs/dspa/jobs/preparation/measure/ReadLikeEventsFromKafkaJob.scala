@@ -15,15 +15,33 @@ object ReadLikeEventsFromKafkaJob extends FlinkStreamingJob(enableGenericTypes =
     env.getConfig.setAutoWatermarkInterval(1L)
 
     streams
-      .likesFromKafka("testConsumer", 0, Time.minutes(30)).startNewChain()
+      .likesFromKafka("testConsumer", 0, Time.minutes(0)).startNewChain()
       .process(new ProgressMonitorFunction[LikeEvent]())
       .map(_._2)
-//      .filter(p => p.totalCountSoFar % 10000 == 0)
-      // .filter(_.subtask == 1)
-      //.filter(p => p.watermarkAdvanced || p.isLate || p.isBehindNewest)
-      .filter(p => p.isLate || p.elementCount % 100000 == 0) //  || p.isBehindNewest || p.totalCountSoFar % 10000 == 0)
+      .filter(p => p.isLate || p.watermarkIncrement > 3600 * 1000)
       .map(_.toString)
       .print
+
+    // event count in 1k file: 662890
+    // start date: 2012-02-02T01:09:00.000Z
+    // end date:   2013-02-19T06:32:17.000Z
+    // -> ~ 550000 minutes
+
+    // no speedup definition, 4 workers:
+    // - duration: 3 seconds (corresponds to a speedup factor of ~11'000'000)
+    // - 240K events per second (1 broker, one worker, one partition)
+
+    // no speedup definition, 1 worker:
+    // - duration: 3 seconds
+
+    // with speedup factor 100000, 4 workers
+    // - duration: 5 min 19 seconds (expected: ~5.5 minutes) --> OK
+
+    // with speedup factor 200000, 4 workers
+    // - duration: 2 min 40 seconds (expected: ~2.75 minutes) --> OK
+
+
+    // TODO move this somewhere else:
 
     // PROBLEM 1: unordered / late events
     // ----------------------------------
@@ -35,6 +53,7 @@ object ReadLikeEventsFromKafkaJob extends FlinkStreamingJob(enableGenericTypes =
     // 2) single partition, 4 writer tasks, max-out-of-orderness = 0
     //    - late events:       18298 late events, max lateness: 57 days
     //    - unordered events: 488640 events, max behindness: 235 days (diff. to current max. timestamp seen by worker)
+    //    - NOTE minimum watermark interval in these tests was 1 sec!!
 
     // 3) three partitions, 1 writer task
     //    - late events:        NONE
@@ -47,6 +66,7 @@ object ReadLikeEventsFromKafkaJob extends FlinkStreamingJob(enableGenericTypes =
     // - loading into Kafka should either be done under realistic insert rates (low speedup values)
     //   OR by a SINGLE worker
 
+
     // PROBLEM 2: watermark emission
     // -----------------------------
     // first watermark is generated at 2012-02-13 (13 event time days after start) for interval = 10 ms
@@ -57,10 +77,6 @@ object ReadLikeEventsFromKafkaJob extends FlinkStreamingJob(enableGenericTypes =
     // 1ms   -> 2012-02-07 / 08
     // 10ms  -> 2012-02-08
     // 100ms -> 2012-02-13
-
-    // INCORRECT: NOTE when specifying a speedupfactor > 0 then there are NO watermarks issued (when extracting watermarks PER PARTITION) when doing it AFTERWARDS
-    // - after the SimpleScaledReplay map function: watermarks are issued normally
-
 
     env.execute("Read likes from Kafka")
   }
