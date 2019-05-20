@@ -24,7 +24,7 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
   @transient private var maximumTimestamp: Long = _
   @transient private var maximumLateness: Long = _
   @transient private var maximumBehindNewest: Long = _
-  @transient private var maximumWatermarkIncrement : Long= _
+  @transient private var maximumWatermarkIncrement: Long = _
   @transient private var previousWatermark: Long = _
 
   @transient private var startTimeNanos: Long = _
@@ -34,7 +34,7 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
   @transient private var sumOfProcTimeBetweenEventsMillis: Double = 0.0
   @transient private var sumOfProcTimeBetweenWatermarksMillis: Double = 0.0
 
-  @transient private lazy val nanosPerMilli: Double = 1000.0 * 1000.0
+  @transient private lazy val nanosPerMilli: Double = 1000.0 * 1000.0 // constant to convert to milliseconds
 
   override def open(parameters: Configuration): Unit = {
     val group = getRuntimeContext.getMetricGroup
@@ -69,7 +69,7 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
     val watermarkAdvanced = watermark > previousWatermark
     val hasPreviousWatermark = previousWatermark != Long.MinValue
     val watermarkIncrement = if (watermarkAdvanced && hasPreviousWatermark) watermark - previousWatermark else 0L
-    val lateness = math.max(watermark - elementTimestamp, 0)
+    val lateness = if (watermark == Long.MinValue) 0 else math.max(watermark - elementTimestamp, 0)
     val behindNewest = maximumTimestamp - elementTimestamp
 
     maximumBehindNewest = math.max(maximumBehindNewest, behindNewest)
@@ -83,6 +83,8 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
     if (watermark == Long.MinValue) noWatermarkCounter.inc()
     if (watermarkAdvanced) watermarkAdvancedPerSecond.markEvent()
     if (watermarkAdvanced) watermarkAdvancedCounter.inc()
+    if (watermarkAdvanced && hasPreviousWatermark) watermarkIncrementHistogram.update(watermarkIncrement)
+
     latenessHistogram.update(lateness)
     behindNewestHistogram.update(behindNewest)
 
@@ -97,8 +99,6 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
 
     if (watermarkAdvanced) {
       if (hasPreviousWatermark) {
-        watermarkIncrementHistogram.update(watermarkIncrement)
-
         val nanosSincePreviousWatermark = nowNanos - previousWatermarkEmitTimeNanos
         sumOfProcTimeBetweenWatermarksMillis = sumOfProcTimeBetweenWatermarksMillis + nanosSincePreviousWatermark / nanosPerMilli
       }
@@ -114,13 +114,13 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
       if (sumOfProcTimeBetweenWatermarksMillis == 0)
         Double.NaN
       else
-        watermarkCount.toDouble / (sumOfProcTimeBetweenWatermarksMillis / 1000) // incorrect after restore from checkpoint
+        watermarkCount.toDouble / (sumOfProcTimeBetweenWatermarksMillis / 1000) // incorrect after restore from checkpoint (metric is checkpointed, sum is not)
 
     val avgEventsPerSecond =
       if (sumOfProcTimeBetweenEventsMillis == 0)
         Double.NaN
       else
-        elementCount.toDouble / (sumOfProcTimeBetweenEventsMillis / 1000) // incorrect after restore from checkpoint
+        elementCount.toDouble / (sumOfProcTimeBetweenEventsMillis / 1000) // incorrect after restore from checkpoint (metric is checkpointed, sum is not)
 
     out.collect(
       (
@@ -153,7 +153,7 @@ case class ProgressInfo(subtask: Int,
                         timestamp: Long,
                         watermark: Long,
                         watermarkAdvanced: Boolean,
-                        watermarkEventTimeIncrement: Long,
+                        watermarkIncrement: Long,
                         maximumTimestamp: Long,
                         elementCount: Long,
                         lateElementsCount: Long,
@@ -183,7 +183,7 @@ case class ProgressInfo(subtask: Int,
     (if (isBehindNewest)
       s"| bn: ${DateTimeUtils.formatDuration(millisBehindNewest, shortFormat = true)} "
     else
-      "|   * latest *").padTo(16, ' ') +
+      "|  * latest *").padTo(16, ' ') +
     (if (isLate)
       s"| lt: ${DateTimeUtils.formatDuration(millisBehindWatermark, shortFormat = true)} "
     else
@@ -193,15 +193,16 @@ case class ProgressInfo(subtask: Int,
     else
       s"| wm: ${DateTimeUtils.formatTimestamp(watermark, shortFormat = true)} ").padTo(26, ' ') +
     (if (watermarkAdvanced) "+ " else "= ") +
+    s"| wm+: ${if (watermarkIncrement == 0) '-' else DateTimeUtils.formatDuration(watermarkIncrement, shortFormat = true)}".padTo(18, ' ') +
     s"| elc: $elementCount ".padTo(14, ' ') +
     s"| ltc: $lateElementsCount ".padTo(13, ' ') +
     s"| bnc: $elementsBehindNewestCount ".padTo(14, ' ') +
     s"| nwm: $noWatermarkCount " +
-    s"| wm+: $watermarkAdvancedCount ".padTo(11, ' ') +
+    s"| wm+: $watermarkAdvancedCount ".padTo(12, ' ') +
     s"| mlt: ${if (maximumLateness == 0) '-' else DateTimeUtils.formatDuration(maximumLateness, shortFormat = true)}".padTo(18, ' ') +
     s"| mbn: ${if (maximumBehindNewest == 0) '-' else DateTimeUtils.formatDuration(maximumBehindNewest, shortFormat = true)}".padTo(18, ' ') +
     s"| mwi: ${if (maximumWatermarkIncrement == 0) '-' else DateTimeUtils.formatDuration(maximumWatermarkIncrement, shortFormat = true)}".padTo(18, ' ') +
-    s"| wm+/s: ${math.round(avgWatermarksPerSecond * 10) / 10.0} ".padTo(15, ' ') +
-    s"| elm/s: ${math.round(avgEventsPerSecond * 10) / 10.0} " +
+    s"| wm+/s: ${math.round(avgWatermarksPerSecond)} ".padTo(13, ' ') +
+    s"| elm/s: ${math.round(avgEventsPerSecond)} ".padTo(14, ' ') +
     s"| rt: ${DateTimeUtils.formatDuration(nanosSinceStart / 1000 / 1000, shortFormat = true)} "
 }
