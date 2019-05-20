@@ -26,6 +26,7 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
   @transient private var maximumLateness: Long = _
   @transient private var maximumBehindNewest: Long = _
   @transient private var maximumWatermarkIncrement: Long = _
+  @transient private var maxElementsSinceWatermarkAdvanced: Long = _
   @transient private var previousWatermark: Long = _
   @transient private var elementsSinceWatermarkAdvanced: Long = 0
 
@@ -81,6 +82,7 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
     maximumLateness = math.max(maximumLateness, lateness)
     maximumTimestamp = math.max(elementTimestamp, maximumTimestamp)
     maximumWatermarkIncrement = math.max(watermarkIncrement, maximumWatermarkIncrement)
+    maxElementsSinceWatermarkAdvanced = math.max(elementsSinceWatermarkAdvanced, maxElementsSinceWatermarkAdvanced)
 
     // metrics
     elementCounter.inc()
@@ -139,6 +141,7 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
           watermarkAdvanced,
           watermarkIncrement,
           elementsSinceWatermarkAdvanced,
+          maxElementsSinceWatermarkAdvanced,
           maximumTimestamp,
           elementCount,
           lateElementsCounter.getCount,
@@ -168,6 +171,7 @@ object ProgressMonitorFunction {
                           watermarkAdvanced: Boolean,
                           watermarkIncrement: Long,
                           elementsSinceWatermarkAdvanced: Long,
+                          maxElementsSinceWatermarkAdvanced: Long,
                           maximumTimestamp: Long,
                           elementCount: Long,
                           lateElementsCount: Long,
@@ -212,13 +216,14 @@ object ProgressMonitorFunction {
         "|| wn: NO watermark"
       else
         s"|| wm: ${DateTimeUtils.formatTimestamp(watermark, shortFormat = true)} ").padTo(27, ' ') +
-      s"| wm+: ${if (watermarkIncrement == 0) '-' else DateTimeUtils.formatDuration(watermarkIncrement, shortFormat = true)}".padTo(18, ' ') +
+      s"| +: ${if (watermarkIncrement == 0) '-' else DateTimeUtils.formatDuration(watermarkIncrement, shortFormat = true)}".padTo(16, ' ') +
       s"| max: ${if (maximumWatermarkIncrement == 0) '-' else DateTimeUtils.formatDuration(maximumWatermarkIncrement, shortFormat = true)}".padTo(18, ' ') +
-      s"| elw: $elementsSinceWatermarkAdvanced ".padTo(14, ' ') +
-      s"| nwm: $noWatermarkCount " +
       s"| +ct: $watermarkAdvancedCount ".padTo(12, ' ') +
       s"| +/s: ${math.round(avgWatermarksPerSecond)} ".padTo(13, ' ') +
-      s"|| rt: ${DateTimeUtils.formatDuration(nanosSinceStart / 1000 / 1000, shortFormat = true)} "
+      s"| nwm: $noWatermarkCount " +
+      s"| elw: $elementsSinceWatermarkAdvanced ".padTo(14, ' ') +
+      s"| max: $maxElementsSinceWatermarkAdvanced ".padTo(14, ' ') +
+      s"|| rt: ${DateTimeUtils.formatDuration(nanosSinceStart / 1000 / 1000, shortFormat = false)} "
   }
 
 }
