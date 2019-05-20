@@ -2,15 +2,18 @@ package org.mvrs.dspa.streams
 
 import org.apache.flink.api.common.state.{ListState, ListStateDescriptor}
 import org.apache.flink.configuration.Configuration
+import org.apache.flink.dropwizard.metrics.DropwizardHistogramWrapper
 import org.apache.flink.metrics.{Counter, Gauge}
 import org.apache.flink.runtime.state.{FunctionInitializationContext, FunctionSnapshotContext}
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction
 import org.apache.flink.streaming.api.functions.co.KeyedBroadcastProcessFunction
 import org.apache.flink.streaming.api.scala.{OutputTag, createTypeInformation}
 import org.apache.flink.util.Collector
+import org.mvrs.dspa.jobs.clustering.KMeansClusterFunction
 import org.mvrs.dspa.model.{CommentEvent, RawCommentEvent}
 import org.mvrs.dspa.streams.BuildReplyTreeProcessFunction._
 import org.mvrs.dspa.utils.FlinkUtils
+import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
@@ -39,11 +42,16 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   @transient private var cacheProcessingTime: Gauge[Long] = _
   @transient private var cacheProcessingCount: Counter = _
 
+  @transient private var danglingRepliesHistogram: DropwizardHistogramWrapper = _
+  @transient private var cacheProcessingTimeHistogram: DropwizardHistogramWrapper = _
+
   @transient private var lastCacheProcessingTime = 0L
 
   @transient private var currentCommentWatermark: Long = _
   @transient private var currentBroadcastWatermark: Long = _
   @transient private var currentMinimumWatermark: Long = _
+
+  @transient private lazy val LOG = LoggerFactory.getLogger(classOf[KMeansClusterFunction])
 
   override def open(parameters: Configuration): Unit = {
     // initialize transient variables
@@ -56,21 +64,24 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
 
     resolvedReplyCount = group.counter("resolvedReplyCount")
     droppedReplyCount = group.counter("droppedReplyCount")
+    cacheProcessingCount = group.counter("cacheProcessingCount")
+
     danglingRepliesCount = FlinkUtils.gaugeMetric("danglingRepliesCount", group, () => danglingReplies.size)
     cacheProcessingTime = FlinkUtils.gaugeMetric("cacheProcessingTime", group, () => lastCacheProcessingTime)
-    // TODO consider histograms
-    cacheProcessingCount = group.counter("cacheProcessingCount")
+
+    danglingRepliesHistogram = FlinkUtils.histogramMetric("danglingRepliesHistogram", group)
+    cacheProcessingTimeHistogram = FlinkUtils.histogramMetric("cacheProcessingTimeHistogram", group)
   }
 
   override def processElement(firstLevelComment: CommentEvent,
                               ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, RawCommentEvent, CommentEvent]#ReadOnlyContext,
                               out: Collector[CommentEvent]): Unit = {
-    // println(s"processElement(${firstLevelComment.commentId})")
-
-    // there should be no events with timestamps older or equal to the watermark
-    assert(firstLevelComment.timestamp > ctx.currentWatermark())
     assert(ctx.timerService().currentWatermark() == ctx.currentWatermark())
     assert(ctx.currentWatermark() >= currentCommentWatermark)
+
+    if (firstLevelComment.timestamp <= ctx.currentWatermark()) {
+      debug(s"Late element on comment stream: ${firstLevelComment.timestamp} <= ${ctx.currentWatermark()} ($firstLevelComment)")
+    }
 
     val postId = firstLevelComment.postId
 
@@ -114,7 +125,9 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     // verified: element count on broadcast stream is deterministic (no elements lost at end, apparently)
 
     // there should be no events with timestamps older or equal to the watermark
-    assert(reply.timestamp > ctx.currentWatermark())
+    if (reply.timestamp <= ctx.currentWatermark()) {
+      warn(s"Late element on broadcast stream: ${reply.timestamp} <= ${ctx.currentWatermark()} ($reply)")
+    }
     assert(ctx.currentWatermark() >= currentBroadcastWatermark)
     assert(reply.replyToPostId.isEmpty)
     assert(reply.replyToCommentId.isDefined)
@@ -282,6 +295,9 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
 
     // metrics
     lastCacheProcessingTime = System.currentTimeMillis() - startTime
+
+    cacheProcessingTimeHistogram.update(lastCacheProcessingTime)
+
     cacheProcessingCount.inc()
   }
 
@@ -295,7 +311,13 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
       case Some(replies) => replies += reply // mutable, updated in place
       case None => danglingReplies.put(parentCommentId, mutable.Set(reply))
     }
+
+    danglingRepliesHistogram.update(danglingReplies.size)
   }
+
+  private def warn(msg: => String): Unit = if (LOG.isWarnEnabled()) LOG.warn(msg)
+
+  private def debug(msg: => String): Unit = if (LOG.isDebugEnabled) LOG.debug(msg)
 }
 
 object BuildReplyTreeProcessFunction {
