@@ -6,7 +6,7 @@ import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.utils.DateTimeUtils
 import org.mvrs.dspa.{Settings, streams}
 
-object ReadLikeEventsMeasurementJob extends FlinkStreamingJob {
+object ReadLikeEventsFromCsvJob extends FlinkStreamingJob {
   def execute(): Unit = {
     streams
       .likesFromCsv(Settings.config.getString("data.likes-csv-path"), speedupFactor = 100000)
