@@ -125,7 +125,9 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     // verified: element count on broadcast stream is deterministic (no elements lost at end, apparently)
 
     // there should be no events with timestamps older or equal to the watermark
-    if (reply.timestamp <= ctx.currentWatermark()) {
+    if (reply.timestamp < ctx.currentWatermark()) {
+      // NOTE on broadcast stream, elements with timestamp == ctx.currentWatermark() are delivered even if there are no
+      //      actual late events
       warn(s"Late element on broadcast stream: ${reply.timestamp} <= ${ctx.currentWatermark()} ($reply)")
     }
     assert(ctx.currentWatermark() >= currentBroadcastWatermark)
