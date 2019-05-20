@@ -31,6 +31,8 @@ services:
     # NOTE kafka starts up with no topics - topics are created by flink jobs
     # this could be changed by specifying persistent volume (NOTE: this is also required for zookeeper,
     # otherwise topics are effectively gone even if the log files still exist!)
+# FAILED ATTEMPT: volumes are persisted, however the topic-specific files in /kafka are deleted on container startup
+#                 However the topics are still registered, such that creating them again failes with 'topic exists'
 #    volumes:
 #      - type: volume
 #        source: kafka_data
@@ -102,7 +104,11 @@ services:
   #    - "9200"
     ports:
       - "9201:9200" # rest api
-  #    - "9301:9300" # transport client api
+  #   - "9301:9300" # transport client, not needed
+  #
+  # NOTE on VM, increasing vm.max_map_count was required. As root: 
+  # 
+  #   sysctl -w vm.max_map_count=262144
 
   kibana:
     image: docker.elastic.co/kibana/kibana:6.7.2
@@ -137,7 +143,6 @@ services:
       - grafana_data:/var/lib/grafana                           # to keep dashboards etc.
       - ./grafana/custom.ini:/usr/share/grafana/conf/custom.ini # TODO verify that this is loaded (see note on https://grafana.com/docs/installation/configuration/)
       - ./grafana/provisioning/:/etc/grafana/provisioning/      # NOTE not sure what this will be useful for...
-  # uid/pwd?
 
 volumes:
   esdata1:
