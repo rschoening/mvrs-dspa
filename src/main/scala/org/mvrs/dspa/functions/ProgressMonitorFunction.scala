@@ -165,6 +165,39 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
   */
 object ProgressMonitorFunction {
 
+  /**
+    * Progress information for an element
+    *
+    * @param subtask                           the subtask (worker) index
+    * @param timestamp                         the timestamp of the element
+    * @param watermark                         the current watermark at the operator
+    * @param watermarkAdvanced                 indicates if the watermark has advanced between the previous element
+    *                                          and this element
+    * @param watermarkIncrement                the event time difference between the current watermark and the
+    *                                          watermark of the previous element
+    * @param elementsSinceWatermarkAdvanced    the number of elements observed at the worker since the previous
+    *                                          advancement of the watermark
+    * @param maxElementsSinceWatermarkAdvanced the maximum number of elements between two subsequent watermarks
+    *                                          observed so far at the worker
+    * @param maximumTimestamp                  the maximum element timestamp (i.e. the timestamp of the most recent
+    *                                          - in event time - element) observed so far at the worker
+    * @param elementCount                      the number of total elements observed so far at the worker.
+    * @param lateElementsCount                 the number of elements with timestamps that were lower than the watermark
+    *                                          timestamp at the operator when the element was received
+    * @param elementsBehindNewestCount         the number of elements with a timestamp lower than the maximum timestamp
+    * @param noWatermarkCount                  the number of elements received before the arrival of the first watermark
+    * @param watermarkAdvancedCount            the number of times that the watermark timestamp has advanced prior to
+    *                                          the element
+    * @param maximumLateness                   the maximum duration (milliseconds) that an element timestamp was earlier
+    *                                          than the watermark timestamp
+    * @param maximumBehindNewest               the maximum duration (milliseconds) that an element timestamp was earlier
+    *                                          than the maximum timestamp of any element received up to that point
+    * @param maximumWatermarkIncrement         the maximum event time difference between two subsequent watermark
+    *                                          advancements
+    * @param nanosSinceStart                   the time (in nanoseconds) since the (re)start of the task
+    * @param avgWatermarksPerSecond            the average number of watermark advancements per second observed so far
+    * @param avgElementsPerSecond              the average number of elements per second observed so far
+    */
   case class ProgressInfo(subtask: Int,
                           timestamp: Long,
                           watermark: Long,
@@ -183,47 +216,69 @@ object ProgressMonitorFunction {
                           maximumWatermarkIncrement: Long,
                           nanosSinceStart: Long,
                           avgWatermarksPerSecond: Double,
-                          avgEventsPerSecond: Double) {
-    // NOTE: timestamp == watermark would also be considered late (watermark indicates that no events with t_event <= t_watermark will be observed)
-    // however it seems that the Kafka consumer issues the watermarks such that this can occur even on ordered topics
-    def isLate: Boolean = timestamp < watermark
+                          avgElementsPerSecond: Double) {
+    /**
+      * Incidates if the element is late (i.e. has a lower timestamp than the current watermark)
+      *
+      * @note timestamp == watermark would also be considered late (watermark indicates that no events
+      *       with t_event <= t_watermark will be observed) however it seems that the Kafka consumer issues the
+      *       watermarks such that this can occur even on ordered topics
+      */
+    val isLate: Boolean = timestamp < watermark
 
-    def hasWatermark: Boolean = watermark != Long.MinValue
+    /**
+      * Indicates if a watermark has been received prior to the element
+      */
+    val hasWatermark: Boolean = watermark != Long.MinValue
 
-    def millisBehindWatermark: Long = watermark - timestamp
+    /**
+      * The number of milliseconds the element timestamp is behind the watermark (0 for non-late elements)
+      */
+    val millisBehindWatermark: Long = math.max(watermark - timestamp, 0)
 
-    def isBehindNewest: Boolean = timestamp < maximumTimestamp
+    /**
+      * Indicates if the element has a timestamp that is lower than the maximum element of all previously received
+      * elements
+      */
+    val isBehindNewest: Boolean = timestamp < maximumTimestamp
 
-    def millisBehindNewest: Long = maximumTimestamp - timestamp
+    /**
+      * The number of milliseconds that the timestamp of this element is behind the maximum element of all
+      * previously received elements
+      */
+    val millisBehindNewest: Long = maximumTimestamp - timestamp
+
+    /**
+      * The number of milliseconds since the (re)start of the task
+      */
+    val millisSinceStart: Long = nanosSinceStart / 1000 / 1000
 
     override def toString: String = s"[$subtask] " +
-      s"ts: ${DateTimeUtils.formatTimestamp(timestamp, shortFormat = true)} " +
-      s"| elc: $elementCount ".padTo(14, ' ') +
-      s"| el/s: ${math.round(avgEventsPerSecond)} ".padTo(15, ' ') +
-      (if (isBehindNewest)
-        s"|| bn: ${DateTimeUtils.formatDuration(millisBehindNewest, shortFormat = true)} "
-      else
-        "|| bn: latest").padTo(17, ' ') +
-      s"| max: ${if (maximumBehindNewest == 0) '-' else DateTimeUtils.formatDuration(maximumBehindNewest, shortFormat = true)}".padTo(18, ' ') +
-      s"| bnc: $elementsBehindNewestCount ".padTo(14, ' ') +
-      (if (isLate)
-        s"|| lt: ${DateTimeUtils.formatDuration(millisBehindWatermark, shortFormat = true)} "
-      else
-        "|| lt: on time").padTo(17, ' ') +
-      s"| ltc: $lateElementsCount ".padTo(13, ' ') +
-      s"| max: ${if (maximumLateness == 0) '-' else DateTimeUtils.formatDuration(maximumLateness, shortFormat = true)}".padTo(18, ' ') +
-      (if (!hasWatermark)
-        "|| wn: NO watermark"
-      else
-        s"|| wm: ${DateTimeUtils.formatTimestamp(watermark, shortFormat = true)} ").padTo(27, ' ') +
-      s"| +: ${if (watermarkIncrement == 0) '-' else DateTimeUtils.formatDuration(watermarkIncrement, shortFormat = true)}".padTo(16, ' ') +
-      s"| max: ${if (maximumWatermarkIncrement == 0) '-' else DateTimeUtils.formatDuration(maximumWatermarkIncrement, shortFormat = true)}".padTo(18, ' ') +
-      s"| +ct: $watermarkAdvancedCount ".padTo(12, ' ') +
-      s"| +/s: ${math.round(avgWatermarksPerSecond)} ".padTo(13, ' ') +
-      s"| nwm: $noWatermarkCount ".padTo(12, ' ') +
-      s"| elw: $elementsSinceWatermarkAdvanced ".padTo(14, ' ') +
-      s"| max: $maxElementsSinceWatermarkAdvanced ".padTo(14, ' ') +
-      s"|| rt: ${DateTimeUtils.formatDuration(nanosSinceStart / 1000 / 1000, shortFormat = false)} "
+      s"ts: ${shortDateTime(timestamp)} " +
+      pad(s"| elc: $elementCount", 14) +
+      pad(s"| el/s: ${math.round(avgElementsPerSecond)}", 15) +
+      pad(s"|| bn: ${if (isBehindNewest) shortDuration(millisBehindNewest) else "latest"}", 17) +
+      pad(s"| max: ${if (maximumBehindNewest == 0) "-" else shortDuration(maximumBehindNewest)}", 18) +
+      pad(s"| bnc: $elementsBehindNewestCount", 14) +
+      pad(s"|| lt: ${if (isLate) shortDuration(millisBehindWatermark) else "on time"}", 17) +
+      pad(s"| ltc: $lateElementsCount", 13) +
+      pad(s"| max: ${if (maximumLateness == 0) "-" else shortDuration(maximumLateness)}", 18) +
+      pad(s"|| wn: ${if (!hasWatermark) "NO watermark" else shortDateTime(watermark)}", 27) +
+      pad(s"${if (watermarkIncrement == 0) "=" else "+" + shortDuration(watermarkIncrement)}", 11) +
+      pad(s"| max: ${if (maximumWatermarkIncrement == 0) "-" else shortDuration(maximumWatermarkIncrement)}", 18) +
+      pad(s"| +ct: $watermarkAdvancedCount", 12) +
+      pad(s"| +/s: ${math.round(avgWatermarksPerSecond)}", 13) +
+      pad(s"| nwm: $noWatermarkCount", 12) +
+      pad(s"| elw: $elementsSinceWatermarkAdvanced", 14) +
+      pad(s"| max: $maxElementsSinceWatermarkAdvanced", 14) +
+      s"|| rt: ${longDuration(millisSinceStart)}"
   }
 
+  private def pad(str: String, chars: Int): String = str.padTo(chars, ' ')
+
+  private def shortDateTime(millis: Long): String = DateTimeUtils.formatTimestamp(millis, shortFormat = true)
+
+  private def shortDuration(millis: Long): String = DateTimeUtils.formatDuration(millis, shortFormat = true)
+
+  private def longDuration(millis: Long): String = DateTimeUtils.formatDuration(millis)
 }

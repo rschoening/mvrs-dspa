@@ -19,6 +19,12 @@ import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
+/**
+  * Process function to reconstruct the reply tree based on first-level comments (having a post reference) and
+  * replies (not having a post reference).
+  *
+  * @param outputTagDroppedReplies optional output tag for dropped replies
+  */
 class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[RawCommentEvent]])
   extends KeyedBroadcastProcessFunction[Long, CommentEvent, RawCommentEvent, CommentEvent]
     with CheckpointedFunction {
