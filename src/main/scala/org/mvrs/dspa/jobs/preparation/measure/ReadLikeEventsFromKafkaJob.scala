@@ -21,7 +21,7 @@ object ReadLikeEventsFromKafkaJob extends FlinkStreamingJob(enableGenericTypes =
 //      .filter(p => p.totalCountSoFar % 10000 == 0)
       // .filter(_.subtask == 1)
       //.filter(p => p.watermarkAdvanced || p.isLate || p.isBehindNewest)
-      .filter(p => p.isLate || p.totalCountSoFar % 100000 == 0) //  || p.isBehindNewest || p.totalCountSoFar % 10000 == 0)
+      .filter(p => p.isLate || p.elementCount % 100000 == 0) //  || p.isBehindNewest || p.totalCountSoFar % 10000 == 0)
       .map(_.toString)
       .print
 
