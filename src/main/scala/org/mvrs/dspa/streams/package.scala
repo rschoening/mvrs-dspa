@@ -139,7 +139,8 @@ package object streams {
         extractEventTime = _.timestamp,
         speedupFactor, // 0 -> unchanged read speed
         randomDelay.toMilliseconds,
-        watermarkInterval
+        watermarkInterval,
+        minimumWatermarkEmitIntervalMillis = 1
       )
     ).name(s"$filePath")
   }
@@ -166,7 +167,8 @@ package object streams {
         extractEventTime = _.timestamp,
         speedupFactor, // 0 -> unchanged read speed
         randomDelay.toMilliseconds,
-        watermarkInterval
+        watermarkInterval,
+        minimumWatermarkEmitIntervalMillis = 1
       )
     ).name(s"$filePath")
   }
@@ -185,7 +187,8 @@ package object streams {
         extractEventTime = _.timestamp,
         speedupFactor, // 0 -> unchanged read speed
         randomDelay.toMilliseconds,
-        watermarkInterval
+        watermarkInterval,
+        minimumWatermarkEmitIntervalMillis = 1
       )
     ).name(s"$filePath (speedup: x $speedupFactor; randomDelay: $randomDelay)")
   }
