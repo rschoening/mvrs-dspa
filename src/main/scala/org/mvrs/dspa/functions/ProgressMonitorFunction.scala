@@ -1,26 +1,30 @@
 package org.mvrs.dspa.functions
 
 import org.apache.flink.configuration.Configuration
-import org.apache.flink.dropwizard.metrics.DropwizardMeterWrapper
+import org.apache.flink.dropwizard.metrics.{DropwizardHistogramWrapper, DropwizardMeterWrapper}
 import org.apache.flink.metrics.{Counter, Meter}
 import org.apache.flink.streaming.api.functions.ProcessFunction
 import org.apache.flink.util.Collector
-import org.mvrs.dspa.utils.DateTimeUtils
+import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
 
 class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)] {
   // metrics
-  @transient private var counter: Counter = _
+  @transient private var elementCounter: Counter = _
   @transient private var noWatermarkCounter: Counter = _
   @transient private var behindNewestCounter: Counter = _
-  @transient private var lateEventCounter: Counter = _
+  @transient private var lateElementsCounter: Counter = _
   @transient private var watermarkAdvancedCounter: Counter = _
   @transient private var watermarkAdvancedPerSecond: Meter = _
-  // TODO histogram metrics for per-element behindness/lateness?
+  @transient private var watermarkIncrementHistogram: DropwizardHistogramWrapper = _
+  @transient private var latenessHistogram: DropwizardHistogramWrapper = _
+  @transient private var behindNewestHistogram: DropwizardHistogramWrapper = _
 
-  // state (not checkpointed, as this function is debug-only and does not need to be fault-tolerant)
-  @transient private var maxTimestamp: Long = _
+  // State (not checkpointed, as this function is currently debug-only and does not need to be fault-tolerant).
+  // Maximum values represent values since last restore. Checkpointing can be easily added if ever needed.
+  @transient private var maximumTimestamp: Long = _
   @transient private var maximumLateness: Long = _
-  @transient private var maximumBehindness: Long = _
+  @transient private var maximumBehindNewest: Long = _
+  @transient private var maximumWatermarkIncrement : Long= _
   @transient private var previousWatermark: Long = _
 
   @transient private var startTimeNanos: Long = _
@@ -35,13 +39,18 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
   override def open(parameters: Configuration): Unit = {
     val group = getRuntimeContext.getMetricGroup
 
-    counter = group.counter("elementCounter") // equal to standard counter
+    elementCounter = group.counter("elementCounter") // equal to standard counter
     noWatermarkCounter = group.counter("noWatermarkCounter")
     behindNewestCounter = group.counter("behindNewestCounter")
-    lateEventCounter = group.counter("lateEventCounter")
+    lateElementsCounter = group.counter("lateEventCounter")
     watermarkAdvancedCounter = group.counter("watermarkAdvancedCounter")
+
     watermarkAdvancedPerSecond = group.meter("watermarkAdvancedPerSecond",
       new DropwizardMeterWrapper(new com.codahale.metrics.Meter()))
+
+    watermarkIncrementHistogram = FlinkUtils.histogramMetric("watermarkIncrementHistogram", group)
+    latenessHistogram = FlinkUtils.histogramMetric("latenessHistogram", group)
+    behindNewestHistogram = FlinkUtils.histogramMetric("behindNewestHistogram", group)
 
     previousWatermarkEmitTimeNanos = Long.MinValue
     previousEventEmitTimeNanos = Long.MinValue
@@ -52,20 +61,32 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
   override def processElement(value: I,
                               ctx: ProcessFunction[I, (I, ProgressInfo)]#Context,
                               out: Collector[(I, ProgressInfo)]): Unit = {
-    val timestamp = ctx.timestamp()
+    val elementTimestamp = ctx.timestamp()
     val watermark = ctx.timerService().currentWatermark()
 
-    val isLate = timestamp < watermark // actually, <=
-    counter.inc()
+    val isLate = elementTimestamp < watermark // actually, <=
+    val isBehindNewest = elementTimestamp < maximumTimestamp
+    val watermarkAdvanced = watermark > previousWatermark
+    val hasPreviousWatermark = previousWatermark != Long.MinValue
+    val watermarkIncrement = if (watermarkAdvanced && hasPreviousWatermark) watermark - previousWatermark else 0L
+    val lateness = math.max(watermark - elementTimestamp, 0)
+    val behindNewest = maximumTimestamp - elementTimestamp
 
-    if (timestamp < maxTimestamp) behindNewestCounter.inc()
-    if (isLate) lateEventCounter.inc()
+    maximumBehindNewest = math.max(maximumBehindNewest, behindNewest)
+    maximumLateness = math.max(maximumLateness, lateness)
+    maximumTimestamp = math.max(elementTimestamp, maximumTimestamp)
+    maximumWatermarkIncrement = math.max(watermarkIncrement, maximumWatermarkIncrement)
+    // metrics
+    elementCounter.inc()
+    if (isBehindNewest) behindNewestCounter.inc()
+    if (isLate) lateElementsCounter.inc()
     if (watermark == Long.MinValue) noWatermarkCounter.inc()
+    if (watermarkAdvanced) watermarkAdvancedPerSecond.markEvent()
+    if (watermarkAdvanced) watermarkAdvancedCounter.inc()
+    latenessHistogram.update(lateness)
+    behindNewestHistogram.update(behindNewest)
 
-    maximumBehindness = math.max(maximumBehindness, maxTimestamp - timestamp)
-    if (isLate) maximumLateness = math.max(maximumLateness, watermark - timestamp)
-    maxTimestamp = math.max(timestamp, maxTimestamp)
-
+    // emit time differences
     val nowNanos = System.nanoTime()
 
     if (previousEventEmitTimeNanos != Long.MinValue) {
@@ -74,50 +95,51 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
     }
     previousEventEmitTimeNanos = nowNanos
 
-    val watermarkAdvanced = watermark > previousWatermark
     if (watermarkAdvanced) {
-      if (previousWatermark != Long.MinValue) {
+      if (hasPreviousWatermark) {
+        watermarkIncrementHistogram.update(watermarkIncrement)
+
         val nanosSincePreviousWatermark = nowNanos - previousWatermarkEmitTimeNanos
         sumOfProcTimeBetweenWatermarksMillis = sumOfProcTimeBetweenWatermarksMillis + nanosSincePreviousWatermark / nanosPerMilli
       }
 
       previousWatermark = watermark
       previousWatermarkEmitTimeNanos = nowNanos
-      watermarkAdvancedPerSecond.markEvent()
-      watermarkAdvancedCounter.inc()
     }
 
     val watermarkCount = watermarkAdvancedCounter.getCount
-    val eventCount = counter.getCount
+    val elementCount = elementCounter.getCount
 
     val avgWatermarksPerSecond =
       if (sumOfProcTimeBetweenWatermarksMillis == 0)
         Double.NaN
       else
-        watermarkCount.toDouble / (sumOfProcTimeBetweenWatermarksMillis / 1000)
+        watermarkCount.toDouble / (sumOfProcTimeBetweenWatermarksMillis / 1000) // incorrect after restore from checkpoint
 
     val avgEventsPerSecond =
       if (sumOfProcTimeBetweenEventsMillis == 0)
         Double.NaN
       else
-        eventCount.toDouble / (sumOfProcTimeBetweenEventsMillis / 1000)
+        elementCount.toDouble / (sumOfProcTimeBetweenEventsMillis / 1000) // incorrect after restore from checkpoint
 
     out.collect(
       (
         value,
         ProgressInfo(
           getRuntimeContext.getIndexOfThisSubtask,
-          timestamp,
+          elementTimestamp,
           watermark,
           watermarkAdvanced,
-          maxTimestamp,
-          eventCount,
-          lateEventCounter.getCount,
+          watermarkIncrement,
+          maximumTimestamp,
+          elementCount,
+          lateElementsCounter.getCount,
           behindNewestCounter.getCount,
           noWatermarkCounter.getCount,
           watermarkCount,
           maximumLateness,
-          maximumBehindness,
+          maximumBehindNewest,
+          maximumWatermarkIncrement,
           nowNanos - startTimeNanos,
           avgWatermarksPerSecond,
           avgEventsPerSecond
@@ -131,14 +153,16 @@ case class ProgressInfo(subtask: Int,
                         timestamp: Long,
                         watermark: Long,
                         watermarkAdvanced: Boolean,
+                        watermarkEventTimeIncrement: Long,
                         maximumTimestamp: Long,
-                        totalCountSoFar: Long,
-                        lateCountSoFar: Long,
-                        behindNewestCountSoFar: Long,
-                        noWatermarkCountSoFar: Long,
+                        elementCount: Long,
+                        lateElementsCount: Long,
+                        elementsBehindNewestCount: Long,
+                        noWatermarkCount: Long,
                         watermarkAdvancedCount: Long,
-                        maximumLatenessSoFar: Long,
-                        maximumBehindnessSoFar: Long,
+                        maximumLateness: Long,
+                        maximumBehindNewest: Long,
+                        maximumWatermarkIncrement: Long,
                         nanosSinceStart: Long,
                         avgWatermarksPerSecond: Double,
                         avgEventsPerSecond: Double) {
@@ -157,26 +181,27 @@ case class ProgressInfo(subtask: Int,
   override def toString: String = s"[$subtask] " +
     s"ts: ${DateTimeUtils.formatTimestamp(timestamp, shortFormat = true)} " +
     (if (isBehindNewest)
-      s"| behind by: ${DateTimeUtils.formatDuration(millisBehindNewest, shortFormat = true)} "
+      s"| bn: ${DateTimeUtils.formatDuration(millisBehindNewest, shortFormat = true)} "
     else
-      "|     * latest *").padTo(22, ' ') +
+      "|   * latest *").padTo(16, ' ') +
     (if (isLate)
-      s"| late by: ${DateTimeUtils.formatDuration(millisBehindWatermark, shortFormat = true)} "
+      s"| lt: ${DateTimeUtils.formatDuration(millisBehindWatermark, shortFormat = true)} "
     else
-      "|     * on time *").padTo(21, ' ') +
+      "|  * on time *").padTo(16, ' ') +
     (if (!hasWatermark)
-      "|   * NO watermark *"
+      "| * NO watermark *"
     else
       s"| wm: ${DateTimeUtils.formatTimestamp(watermark, shortFormat = true)} ").padTo(26, ' ') +
     (if (watermarkAdvanced) "+ " else "= ") +
-    s"| late: $lateCountSoFar ".padTo(14, ' ') +
-    s"| behind: $behindNewestCountSoFar ".padTo(17, ' ') +
-    s"| total: $totalCountSoFar ".padTo(15, ' ') +
-    s"| no wm: $noWatermarkCountSoFar " +
+    s"| elc: $elementCount ".padTo(14, ' ') +
+    s"| ltc: $lateElementsCount ".padTo(13, ' ') +
+    s"| bnc: $elementsBehindNewestCount ".padTo(14, ' ') +
+    s"| nwm: $noWatermarkCount " +
     s"| wm+: $watermarkAdvancedCount ".padTo(11, ' ') +
-    s"| max. late: ${if (maximumLatenessSoFar == 0) '-' else DateTimeUtils.formatDuration(maximumLatenessSoFar, shortFormat = true)} " +
-    s"| max. behind: ${if (maximumBehindnessSoFar == 0) '-' else DateTimeUtils.formatDuration(maximumBehindnessSoFar, shortFormat = true)} " +
-    s"| wm+/sec: ${math.round(avgWatermarksPerSecond * 10) / 10.0} ".padTo(17, ' ') +
-    s"| e/sec: ${math.round(avgEventsPerSecond * 10) / 10.0} " +
-    s"| runtime: ${DateTimeUtils.formatDuration(nanosSinceStart / 1000 / 1000, shortFormat = true)} "
+    s"| mlt: ${if (maximumLateness == 0) '-' else DateTimeUtils.formatDuration(maximumLateness, shortFormat = true)}".padTo(18, ' ') +
+    s"| mbn: ${if (maximumBehindNewest == 0) '-' else DateTimeUtils.formatDuration(maximumBehindNewest, shortFormat = true)}".padTo(18, ' ') +
+    s"| mwi: ${if (maximumWatermarkIncrement == 0) '-' else DateTimeUtils.formatDuration(maximumWatermarkIncrement, shortFormat = true)}".padTo(18, ' ') +
+    s"| wm+/s: ${math.round(avgWatermarksPerSecond * 10) / 10.0} ".padTo(15, ' ') +
+    s"| elm/s: ${math.round(avgEventsPerSecond * 10) / 10.0} " +
+    s"| rt: ${DateTimeUtils.formatDuration(nanosSinceStart / 1000 / 1000, shortFormat = true)} "
 }
