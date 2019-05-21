@@ -117,6 +117,28 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
   }
 
   @Test
+  def test_Parent_Grandchild_Child_unordered(): Unit = for (_ <- 0 until repetitions) {
+    val (rooted, dropped) = buildReplyTree(
+      Seq(
+        createComment(commentId = 111, 2000, postId),
+        createReplyTo(commentId = 113, 3000, 112), // to evicted parent -> drop also
+        createReplyTo(commentId = 112, 1000, 111), // to later post -> drop
+      )
+    )
+
+    // execution:
+    // 1. processElement(111)
+    // 2. processBroadcastElement(113) (ts 3000, referring to past parent not yet received)
+    // 3. processBroadcastElement(112)
+
+    // 113 is rooted also! should be dropped as its parent is dropped
+
+    assert(rooted.forall(_.postId == postId))
+    assertResult(Set(111))(rooted.map(_.commentId).toSet)
+    assertResult(Set(112, 113))(dropped.map(_.commentId).toSet)
+  }
+
+  @Test
   def test_Child_Parent_Grandchild(): Unit = for (_ <- 0 until repetitions) {
     val (rooted, dropped) = buildReplyTree(
       List(
