@@ -198,4 +198,11 @@ object FlinkUtils {
                      group: MetricGroup,
                      getValue: () => T): ScalaGauge[T] =
     group.gauge[T, ScalaGauge[T]](name, ScalaGauge[T](() => getValue()))
+
+  def printExecutionPlan()(implicit env: StreamExecutionEnvironment): Unit = {
+    println("\nexecution plan:")
+    println(env.getExecutionPlan)
+    println()
+  }
+
 }
