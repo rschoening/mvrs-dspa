@@ -194,9 +194,6 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     println(result)
 
-    // NOTE result is NOT deterministic
-    // TODO compare sets of two runs (dropped, rooted) - maybe this gives a clue
-
     println(s"duration: ${DateTimeUtils.formatDuration(System.currentTimeMillis() - startTime)}")
   }
 
@@ -240,12 +237,85 @@ class InputStreamsITSuite extends AbstractTestBase {
    -> | 236590 | 642 | 2012-03-18T07:38:42Z |   -   | 236570  | (4)  child            (line 9494, + 2h 42 minutes)
    ** | 236650 | 102 | 2012-03-19T02:14:21Z |   -   | 236620  | (2)  great-grandchild (line 9749)
       ---------------------------------------------------------
+    children of 236590: 236640, 236620
 
-     children of 236590: 236640, 236620
 
-     result size 1: 107216 - 2: 107226
-      1 - 2: Set(260610, 5848580, 1788050, 2477070, 110110, 260620)
-      2 - 1: Set(3982270, 2554680, 850740, 5506350, 3571870, 3113890, 2554600, 2347400, 3571880, 850680, 3571850, 2347390, 2554640, 3571910, 3571900, 2554660)
+    after updates to eviction logic:
+    --------------------------------
+
+    result size 1: 107167 - 2: 107171
+    1 - 2: Set(151790, 3109980, 2922510, 151810, 5965010, 2360240, 151800, 151760, 1390200, 621890, 3571910, 621870, 151740, 151820, 3644180, 1157800, 3402140)
+    2 - 1: Set(1908210, 875970, 875930, 876010, 875910, 1908110, 3517230, 1045560, 110110, 1908130, 3429410, 1366870, 1908190, 1366890, 4650940, 1439290, 3429340, 3517110, 5034250, 3517210, 1908170)
+
+    result size 1: 107152 - 2: 107172
+    1 - 2: Set(5832060, 5965010, 3571490, 3571500, 3571510, 1157800, 3402140, 3571530)
+    2 - 1: Set(1908210, 875970, 875930, 424150, 876010, 875910, 1908110, 3517230, 1045560, 110110, 1908130, 3429410, 3571870, 1366870, 1908190, 1366890, 4650940, 1439290, 3429340, 3571880, 1908100, 3517110, 5970120, 5034250, 3571900, 423400, 3517210, 1908170)
+
+    result size 1: 107163 - 2: 107170
+    1 - 2: Set(3109980, 2360240, 1157800)
+    2 - 1: Set(875970, 875930, 876010, 875910, 1045560, 110110, 3571870, 4650940, 3571880, 3571900)
+
+     element: 875910
+
+     875910|377|2012-02-27T08:28:22Z|110.5.96.18|Internet Explorer|About Jacques Chirac, his method. Then, his economic policies, based on dirigisme,. About Amitabh Bachchan, both the Padma Shri and the Padma Bhushan civilian awards.||875890|39
+     875890|232|2012-02-27T00:24:04Z|27.124.0.17|Internet Explorer|About Jacques Chirac, (two full terms, the first of seven years and the second of five years), after Fran�ois Mitterrand. As. About Amitabh Bachchan, first gained popularity in the early 1970s as the angry young man of Hindi cinema, and has since appeared in.||875870|38
+     875930|870|2012-02-28T00:31:07Z|77.95.0.9|Chrome|About Jacques Chirac, the second of five years), after Fran�ois Mitterrand. As. About Amitabh Bachchan, Harivansh Bachchan on 11 October 1942) is an Indian film.||875910|97
+     875970|410|2012-02-29T01:23:17Z|46.245.0.1|Firefox|About Jacques Chirac, the French L�gion d'honneur. On 15 December 2011, the Paris court. About Amitabh Bachchan, on 11 October 1942) is an Indian film actor. He first gained.||875930|40
+     876010|702|2012-03-01T00:28:28Z|14.144.0.10|Firefox|About Jacques Chirac, the laissez-faire policies of the United Kingdom, which Chirac. About Amitabh Bachchan, as the angry young man of Hindi cinema, and has since appeared.||875970|73
+     875870|365|2012-02-27T00:44:50Z|103.4.52.6|Chrome|About Jacques Chirac, of healing the social rift (fracture sociale). About Amitabh Bachchan, 1980s. He has received both the Padma Shri and the.|200600||39
+
+      ------------------------------------------------------------
+      | id     | uid | creation date        | post   | parent    |
+      ------------------------------------------------------------
+      | 875890 |     | 2012-02-27T00:24:04Z |        | 875870  v | reference to later - must ALWAYS be discarded - and apparently IS
+      | 875870 |     | 2012-02-27T00:44:50Z | 200600 |           | single child
+   ** | 875910 |     | 2012-02-27T08:28:22Z |        | 875890  ^ | reference to discarded reply - sometimes not discarded
+   ** | 875930 |     | 2012-02-28T00:31:07Z |        | 875910  ^ |
+   ** | 875970 |     | 2012-02-29T01:23:17Z |        | 875930  ^ |
+   ** | 876010 |     | 2012-03-01T00:28:28Z |        | 875970  ^ | 876010 is leaf
+      ------------------------------------------------------------
+
+      Set(875890, 875870, 875910, 875930, 875970, 876010)
+
+observed executions:
+
+processBroadcastElement(875890)
+processElement(875870)
+processBroadcastElement(875910)
+processBroadcastElement(875930)
+processBroadcastElement(875970)
+processBroadcastElement(876010)
+
+processBroadcastElement(875890)
+processBroadcastElement(875910)
+processBroadcastElement(875930)
+processElement(875870)
+processBroadcastElement(875970)
+processBroadcastElement(876010)
+
+Differences:
+result size 1: 107163 - 2: 107164
+1 - 2: Set(3429410, 1366870, 1366890, 3429340, 1885810, 5034250, 1157800)
+2 - 1: Set(875970, 875930, 876010, 875910, 1045560, 3571870, 3571880, 3571900)
+
+processBroadcastElement(875890)
+processElement(875870)
+processBroadcastElement(875910)
+processBroadcastElement(875930)
+processBroadcastElement(875970)
+processBroadcastElement(876010)
+
+processElement(875870)
+processBroadcastElement(875890)
+processBroadcastElement(875910)
+processBroadcastElement(875930)
+processBroadcastElement(875970)
+processBroadcastElement(876010)
+
+result size 1: 107145 - 2: 107145
+1 - 2: Set(110110, 423400)
+2 - 1: Set(1885810, 1157800)
+
    */
 
   }
@@ -258,7 +328,7 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     CollectionSink.values.clear()
     streams
-      .commentsFromCsv(TestUtils.getResourceURIPath("/streams/comments.csv"))
+      .commentsFromCsv(TestUtils.getResourceURIPath("/streams/comments.csv"), watermarkInterval = 100)
       .map(e => (e.commentId, 1))
       .addSink(new CollectionSink())
 

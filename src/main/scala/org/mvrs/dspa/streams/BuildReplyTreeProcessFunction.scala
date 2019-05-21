@@ -59,7 +59,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
 
   @transient private lazy val LOG = LoggerFactory.getLogger(classOf[KMeansClusterFunction])
 
-  private lazy val ids =       Set(875890L, 875870L, 875910L, 875930L, 875970L, 876010L)
+  private lazy val ids = Set(875890L, 875870L, 875910L, 875930L, 875970L, 876010L)
 
 
   override def open(parameters: Configuration): Unit = {
@@ -262,12 +262,11 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     droppedReplyCount.inc()
   }
 
-  private def getTimestamp(rawCommentEvent: RawCommentEvent) : Long =
+  private def getTimestamp(rawCommentEvent: RawCommentEvent): Long =
     postForComment
       .get(rawCommentEvent.commentId)
       .map(p => math.max(p.commentTimestamp, rawCommentEvent.timestamp))
       .getOrElse(rawCommentEvent.timestamp)
-
 
   private def processWaitingChildren(commentId: Long, timestamp: Long, postId: Long,
                                      collector: Collector[CommentEvent],
@@ -278,9 +277,9 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
         getWithChildrenAndMaxTimestamp(replies, timestamp, getWaitingReplies, getTimestamp)
           .groupBy { case (child, parentTimestamp) => child.timestamp < parentTimestamp } // true for early children that are to be dropped
           .foreach {
-            case (true, earlyChildren) => earlyChildren.map(_._1).foreach(drop(_, reportDropped))
-            case (false, normalChildren) => normalChildren.map(_._1).map(createComment(_, postId)).foreach(emit(_, collector))
-          }
+          case (true, earlyChildren) => earlyChildren.map(_._1).foreach(drop(_, reportDropped))
+          case (false, normalChildren) => normalChildren.map(_._1).map(createComment(_, postId)).foreach(emit(_, collector))
+        }
 
         danglingReplies.remove(commentId)
 
