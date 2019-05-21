@@ -2,12 +2,13 @@ package streams
 
 import org.mvrs.dspa.model.RawCommentEvent
 import org.mvrs.dspa.streams.BuildReplyTreeProcessFunction
+import org.mvrs.dspa.streams.BuildReplyTreeProcessFunction.{Leaf, Node}
 import org.mvrs.dspa.utils.DateTimeUtils
 import org.scalatest.{FlatSpec, Matchers}
 
 class BuildReplyTreeProcessFunctionTestSuite extends FlatSpec with Matchers {
 
-  "reply resolver" must "create correct tree" in {
+  "reply resolver" must "create correct set" in {
 
     val postId = 999
     val personId = 1
@@ -35,7 +36,7 @@ class BuildReplyTreeProcessFunctionTestSuite extends FlatSpec with Matchers {
     )(result.map(t => (t._1.commentId, t._2)))
   }
 
-  "reply resolver" must "create correct tree with siblings" in {
+  "reply resolver" must "create correct set with siblings" in {
 
     val postId = 999
     val personId = 1
@@ -43,7 +44,7 @@ class BuildReplyTreeProcessFunctionTestSuite extends FlatSpec with Matchers {
     val firstLevelCommentTimestamp = 1000
     val rawComments: List[RawCommentEvent] =
       List(
-        RawCommentEvent(commentId = firstLevelCommentId, personId, creationDate = DateTimeUtils.toDate(firstLevelCommentId), None, None, None, Some(postId), None, 0),
+        RawCommentEvent(commentId = firstLevelCommentId, personId, creationDate = DateTimeUtils.toDate(firstLevelCommentTimestamp), None, None, None, Some(postId), None, 0),
         RawCommentEvent(commentId = 211, personId, creationDate = DateTimeUtils.toDate(3000), None, None, None, None, Some(111), 0),
         RawCommentEvent(commentId = 212, personId, creationDate = DateTimeUtils.toDate(2000), None, None, None, None, Some(111), 0),
         RawCommentEvent(commentId = 311, personId, creationDate = DateTimeUtils.toDate(2500), None, None, None, None, Some(212), 0),
@@ -65,6 +66,54 @@ class BuildReplyTreeProcessFunctionTestSuite extends FlatSpec with Matchers {
         (312, 3000)
       )
     )(result.map(t => (t._1.commentId, t._2)))
+  }
+
+  "reply resolver" must "create correct tree" in {
+
+    val postId = 999
+    val personId = 1
+    val firstLevelCommentId = 111
+    val firstLevelCommentTimestamp = 1000
+
+    val root = RawCommentEvent(commentId = firstLevelCommentId, personId, creationDate = DateTimeUtils.toDate(firstLevelCommentTimestamp), None, None, None, Some(postId), None, 0)
+    val r211 = RawCommentEvent(commentId = 211, personId, creationDate = DateTimeUtils.toDate(3000), None, None, None, None, Some(111), 0)
+    val r212 = RawCommentEvent(commentId = 212, personId, creationDate = DateTimeUtils.toDate(2000), None, None, None, None, Some(111), 0)
+    val r311 = RawCommentEvent(commentId = 311, personId, creationDate = DateTimeUtils.toDate(2500), None, None, None, None, Some(212), 0)
+    val r312 = RawCommentEvent(commentId = 312, personId, creationDate = DateTimeUtils.toDate(2500), None, None, None, None, Some(211), 0)
+    val r411 = RawCommentEvent(commentId = 411, personId, creationDate = DateTimeUtils.toDate(2500), None, None, None, None, Some(312), 0)
+
+    val rawComments = List(root, r211, r212, r311, r312, r411)
+
+    val tree = BuildReplyTreeProcessFunction.getReplyTree(root,
+      commentId => rawComments.filter(_.replyToCommentId.contains(commentId)))
+
+    println(tree)
+
+    assertResult(
+      Node(root, List(
+        Node(r211, List(
+          Node(r312, List(
+            Leaf(r411)
+          )))),
+        Node(r212, List(
+          Leaf(r311))
+        )
+      )
+      ))(tree)
+
+    val result = BuildReplyTreeProcessFunction.getChildrenWithMaxTimestamp(tree, firstLevelCommentTimestamp).map(t => (t._1.commentId, t._2))
+
+    println(result)
+
+    val expected = Set((311, 2500), (212, 2000), (411, 3000), (312, 3000), (211, 3000))
+    assertResult(expected)(result.toSet)
+
+    val result2 = BuildReplyTreeProcessFunction.getChildrenWithMaxTimestamp2(root, firstLevelCommentTimestamp,
+      comment => rawComments.filter(_.replyToCommentId.contains(comment.commentId)))
+      .map(t => (t._1.commentId, t._2))
+
+    println(result2)
+    assertResult(expected)(result2.toSet)
   }
 
   "reply resolver" must "create correct tree if unordered" in {

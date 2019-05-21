@@ -345,8 +345,61 @@ object BuildReplyTreeProcessFunction {
     loop(Set())(replies, getChildren)
   }
 
+  def getChildrenWithMaxTimestamp2(parent: RawCommentEvent,
+                                   parentTimestamp: Long,
+                                   getChildren: RawCommentEvent => List[RawCommentEvent]): List[(RawCommentEvent, Long)] = {
+    @scala.annotation.tailrec
+    def loop(acc: List[(RawCommentEvent, Long)],
+             children: List[(RawCommentEvent, Long)],
+             getChildren: RawCommentEvent => List[RawCommentEvent]): List[(RawCommentEvent, Long)] = {
+      children match {
+        case Nil => acc
+        case (c, ts) :: xs => getChildren(c) match {
+          case Nil => loop((c, math.max(c.timestamp, ts)) :: acc, xs, getChildren)
+          case cs => loop((c, math.max(c.timestamp, ts)) :: acc, cs.map(child => (child, math.max(child.timestamp, ts))) ::: xs, getChildren)
+        }
+      }
+    }
+
+    loop(List(), getChildren(parent).map(c => (c, math.max(parentTimestamp, c.timestamp))), getChildren)
+  }
+
+  def getChildrenWithMaxTimestamp(tree: ReplyTree, parentTimestamp: Long): List[(RawCommentEvent, Long)] = {
+    @scala.annotation.tailrec
+    def loop(acc: List[(RawCommentEvent, Long)], children: List[(ReplyTree, Long)]): List[(RawCommentEvent, Long)] = {
+      children match {
+        case Nil => acc
+        case (Leaf(c), ts) :: xs => loop((c, math.max(c.timestamp, ts)) :: acc, xs)
+        case (Node(c, cs), ts) :: xs => loop((c, math.max(c.timestamp, ts)) :: acc, cs.map(child => (child, math.max(child.comment.timestamp, ts))) ::: xs)
+      }
+    }
+
+    loop(List(), tree.children.map(c => (c, math.max(parentTimestamp, c.comment.timestamp))))
+  }
+
+  //   def size(t: Tree[Int]): Int = {
+  //    @tailrec
+  //    def inner_size(l: List[Tree[Int]], acc: Int): Int =
+  //      l match {
+  //        case Nil => acc
+  //        case Leaf(v) :: ls => inner_size(ls, acc + 1)
+  //        case Branch(a, b) :: ls => inner_size(a :: b :: ls, acc + 1)
+  //      }
+  //    inner_size(List(t), 0)
+  //  }
+
+  //   def traverse[Node](tree: ReplyTree): Stream[ReplyTree] = tree #:: tree.children.map(traverse).fold(Stream.Empty)(_ ++ _)
+
+  def getReplyTree(root: RawCommentEvent, getChildren: Long => List[RawCommentEvent]): ReplyTree = {
+    getChildren(root.commentId) match {
+      case Nil => Leaf(root)
+      case xs => Node(root, xs.map(getReplyTree(_, getChildren))) // not tail-recursive, but tree is shallow
+    }
+  }
+
   /**
     * Gets the complete set of children to a set of replies
+    *
     * @param replies
     * @param parentTimestamp
     * @param getChildren
@@ -371,7 +424,9 @@ object BuildReplyTreeProcessFunction {
     loop(Set())(replies, parentTimestamp, getChildren)
   }
 
-  private def createComment(c: RawCommentEvent, postId: Long): CommentEvent =
+  private def createComment(c: RawCommentEvent, postId: Long): CommentEvent
+
+  =
     CommentEvent(
       c.commentId,
       c.personId,
@@ -385,10 +440,16 @@ object BuildReplyTreeProcessFunction {
 
   case class PostReference(postId: Long, commentTimestamp: Long)
 
-  sealed trait ReplyTree
+  sealed trait ReplyTree {
+    def comment: RawCommentEvent
 
-  case class Node(children: Seq[ReplyTree], comment: RawCommentEvent) extends ReplyTree
+    def children: List[ReplyTree]
+  }
 
-  case class Leaf(comment: RawCommentEvent) extends ReplyTree
+  case class Node(comment: RawCommentEvent, children: List[ReplyTree]) extends ReplyTree
+
+  case class Leaf(comment: RawCommentEvent) extends ReplyTree {
+    override def children: List[ReplyTree] = Nil
+  }
 
 }
