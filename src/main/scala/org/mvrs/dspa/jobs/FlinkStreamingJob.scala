@@ -25,12 +25,13 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
                                  parallelism: Option[Int] = None,
                                  enableGenericTypes: Boolean = false,
                                  checkpointIntervalOverride: Option[Long] = None) extends FlinkJob {
+
   // read settings
 
   // NOTE
   // - read job-independent global preferences from settings (application.conf)
   // - get job-dependent settings via constructor arguments
-  // To make the class more general-purpose, read settings in project-specific subclass and provide constructor args for all these here
+  // To make this class more general-purpose, read settings in project-specific subclass and provide constructor args for all these here
   private val autoWatermarkInterval = Settings.duration("jobs.auto-watermark-interval").toMilliseconds
   private val latencyTrackingInterval = Settings.config.getInt("jobs.latency-tracking-interval")
   private val stateBackendRocksDb = Settings.config.getBoolean("jobs.state-backend-rocksdb")
@@ -99,5 +100,4 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
   parallelism.foreach(env.setParallelism)
 
   execute() // call template method where subclass sets up job
-
-
+}
