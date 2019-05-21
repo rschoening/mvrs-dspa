@@ -33,7 +33,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   // - since state has to be accessed from the broadcast side also (outside of keyed context), unkeyed state is used.
   //   An alternative would be the use of applyToKeyedState(), however this processes all keyed states in sequence,
   //   which might become too slow if many keys are active
-  @transient private lazy val danglingReplies: mutable.Map[Long, mutable.Set[RawCommentEvent]] = mutable.Map[Long, mutable.Set[RawCommentEvent]]()
+  @transient private lazy val danglingReplies = mutable.Map[Long, mutable.Set[RawCommentEvent]]()
 
   // TODO persist to ElasticSearch, use as cache (then no longer in operator state)
   @transient private lazy val postForComment: mutable.Map[Long, PostReference] = mutable.Map()
@@ -88,7 +88,8 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     assert(ctx.timerService().currentWatermark() == ctx.currentWatermark())
     assert(ctx.currentWatermark() >= currentCommentWatermark)
     if (firstLevelComment.timestamp <= ctx.currentWatermark()) {
-      debug(s"Late element on comment stream: ${firstLevelComment.timestamp} <= ${ctx.currentWatermark()} ($firstLevelComment)")
+      debug(s"Late element on comment stream: ${firstLevelComment.timestamp} <= ${ctx.currentWatermark()} " +
+        s"($firstLevelComment)")
     }
 
     if (ids.contains(firstLevelComment.commentId)) {
@@ -101,7 +102,8 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
 
     // this state is unbounded, replies may refer to arbitrarily old comments
     // consider storing it in ElasticSearch, with a LRU cache maintained in the operator
-    // NOTE how to deal with cache misses? Must be in this operator, however access to ElasticSearch should be non-blocking
+    // NOTE how to deal with cache misses? Must be in this operator, however access to ElasticSearch
+    // should be non-blocking
     postForComment.put(firstLevelComment.commentId, PostReference(postId, firstLevelComment.timestamp))
 
     out.collect(firstLevelComment)
@@ -164,7 +166,8 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
 
         postForComment(reply.commentId) = PostReference(postReference.postId, postReferenceTimestamp)
 
-        processWaitingChildren(reply.commentId, postReferenceTimestamp, postReference.postId, out, reportDropped(_, ctx.output(_, _)))
+        processWaitingChildren(reply.commentId, postReferenceTimestamp, postReference.postId,
+          out, reportDropped(_, ctx.output(_, _)))
 
         if (replyBeforeParent)
           drop(reply, reportDropped(_, ctx.output(_, _)))
@@ -244,7 +247,8 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   }
 
   private def emit(resolvedReply: CommentEvent, out: Collector[CommentEvent]): Unit = {
-    postForComment(resolvedReply.commentId) = PostReference(resolvedReply.postId, resolvedReply.timestamp) // remember comment -> post mapping
+    // remember comment -> post mapping
+    postForComment(resolvedReply.commentId) = PostReference(resolvedReply.postId, resolvedReply.timestamp)
 
     danglingReplies.remove(resolvedReply.commentId) // remove resolved replies from operator state
 
@@ -370,8 +374,18 @@ object BuildReplyTreeProcessFunction {
       children match {
         case Nil => acc
         case (c, ts) :: xs => getChildren(c.commentId) match {
-          case Nil => loop((c, math.max(getTimestamp(c), ts)) :: acc, xs, getChildren)
-          case cs => loop((c, math.max(getTimestamp(c), ts)) :: acc, cs.map(child => (child, math.max(getTimestamp(child), ts))) ::: xs, getChildren)
+          case Nil =>
+            loop(
+              (c, math.max(getTimestamp(c), ts)) :: acc,
+              xs,
+              getChildren
+            )
+          case cs =>
+            loop(
+              (c, math.max(getTimestamp(c), ts)) :: acc,
+              cs.map(child => (child, math.max(getTimestamp(child), ts))) ::: xs,
+              getChildren
+            )
         }
       }
     }
@@ -379,9 +393,7 @@ object BuildReplyTreeProcessFunction {
     loop(List(), replies.map(c => (c, math.max(maximumTimestamp, getTimestamp(c)))).toList, getChildren)
   }
 
-  private def createComment(c: RawCommentEvent, postId: Long): CommentEvent
-
-  =
+  private def createComment(c: RawCommentEvent, postId: Long): CommentEvent =
     CommentEvent(
       c.commentId,
       c.personId,
