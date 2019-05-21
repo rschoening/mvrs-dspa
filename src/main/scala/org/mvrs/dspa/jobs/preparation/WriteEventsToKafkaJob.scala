@@ -9,7 +9,7 @@ import org.mvrs.dspa.{Settings, streams}
   * Streaming job for reading events from csv files and writing them to Kafka (data preparation)
   */
 object WriteEventsToKafkaJob extends FlinkStreamingJob(
-  parallelism = 1, // important to ensure defined order (controlled by randomDelay) in Kafka
+  parallelism = Some(1), // important to ensure defined order (controlled by randomDelay) in Kafka
   // (otherwise order is dependent on task/buffer scheduling, with out-of-orderness orders of magnitude greater
   // than what would normally be specified for randomDelay)
   checkpointIntervalOverride = Some(0), // disable checkpointing for the load job - not fault-tolerant due to reordering step

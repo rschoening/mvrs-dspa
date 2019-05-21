@@ -4,6 +4,7 @@ import org.apache.flink.api.common.restartstrategy.RestartStrategies
 import org.apache.flink.contrib.streaming.state.RocksDBStateBackend
 import org.apache.flink.runtime.state.StateBackend
 import org.apache.flink.runtime.state.filesystem.FsStateBackend
+import org.apache.flink.streaming.api.environment.LocalStreamEnvironment
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 import org.apache.flink.streaming.api.{CheckpointingMode, TimeCharacteristic}
 import org.apache.flink.util.TernaryBoolean
@@ -14,14 +15,14 @@ import org.mvrs.dspa.utils.FlinkUtils
   * Utility base class to simplify implementation of flink jobs. Applies settings from config file.
   *
   * @param timeCharacteristic the time characteristic for the job
-  * @param parallelism        the default parallelism for the job
+  * @param parallelism        optional override of the default parallelism for the job
   * @param enableGenericTypes indicates if generic types should be enabled.
   *                           NOTE due to https://issues.apache.org/jira/browse/FLINK-12410, this has to be enabled
   *                           when reading from Kafka topics. Same also for text input format (generic serialization is
   *                           used for input splits).
   */
 abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCharacteristic.EventTime,
-                                 parallelism: Int = 4,
+                                 parallelism: Option[Int] = None,
                                  enableGenericTypes: Boolean = false,
                                  checkpointIntervalOverride: Option[Long] = None) extends FlinkJob {
   // read settings
@@ -41,12 +42,23 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
   private val asynchronousSnapshots = Settings.config.getBoolean("jobs.asynchronous-snapshots")
   private val restartAttempts = Settings.config.getInt("jobs.restart-attempts")
   private val delayBetweenAttempts = Settings.config.getLong("jobs.delay-between-attempts")
+  private val defaultParallelism = Settings.config.getInt("jobs.local-default-parallelism")
 
   // localWithUI is set by base class based on program arguments
   implicit val env: StreamExecutionEnvironment = FlinkUtils.createStreamExecutionEnvironment(localWithUI)
 
+  if (env.getJavaEnv.isInstanceOf[LocalStreamEnvironment]) {
+    // configuration specific for the local environment (i.e. in-process mini cluster)
+    if (defaultParallelism > 0) {
+      // NOTE default parallelism is otherwise 8 (observed at 1.7.2)
+      env.setParallelism(defaultParallelism)
+    }
+  }
+
   // see https://ci.apache.org/projects/flink/flink-docs-stable/monitoring/metrics.html#latency-tracking
-  env.getConfig.setLatencyTrackingInterval(latencyTrackingInterval)
+  if (latencyTrackingInterval > 0) {
+    env.getConfig.setLatencyTrackingInterval(latencyTrackingInterval)
+  }
 
   if (!enableGenericTypes) {
     // NOTE:
@@ -82,9 +94,10 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
 
   env.getConfig.setAutoWatermarkInterval(autoWatermarkInterval)
   env.setStreamTimeCharacteristic(timeCharacteristic)
-  env.setParallelism(parallelism)
+
+  // apply override of default parallelism, if defined
+  parallelism.foreach(env.setParallelism)
 
   execute() // call template method where subclass sets up job
-}
 
 

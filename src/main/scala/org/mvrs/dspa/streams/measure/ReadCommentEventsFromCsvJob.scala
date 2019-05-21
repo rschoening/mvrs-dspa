@@ -3,10 +3,13 @@ package org.mvrs.dspa.streams.measure
 import org.apache.flink.api.scala._
 import org.mvrs.dspa.functions.ProgressMonitorFunction
 import org.mvrs.dspa.jobs.FlinkStreamingJob
-import org.mvrs.dspa.model.{CommentEvent, RawCommentEvent}
+import org.mvrs.dspa.model.RawCommentEvent
 import org.mvrs.dspa.streams
 
-object ReadCommentEventsFromCsvJob extends FlinkStreamingJob(parallelism = 1, checkpointIntervalOverride = Some(0)) {
+object ReadCommentEventsFromCsvJob extends FlinkStreamingJob(
+  parallelism = Some(1),
+  checkpointIntervalOverride = Some(0)) {
+
   def execute(): Unit = {
     env.getConfig.setAutoWatermarkInterval(1)
     streams.rawComments(speedupFactorOverride = Some(0))
