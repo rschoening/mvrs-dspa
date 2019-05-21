@@ -29,6 +29,8 @@ object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob(ena
       .name(s"ElasticSearch: ${esIndex.indexName}")
       .disableChaining()
 
+    FlinkUtils.printExecutionPlan()
+
     // execute program
     env.execute("Move enriched post statistics from Kafka to ElasticSearch")
   }

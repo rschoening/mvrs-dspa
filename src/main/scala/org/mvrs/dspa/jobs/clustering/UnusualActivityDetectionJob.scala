@@ -112,6 +112,8 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     // write cluster parameter parse errors to text file sink
     outputErrors(controlParameterParseErrors, clusterParameterParseErrorsOutputPath)
 
+    FlinkUtils.printExecutionPlan()
+
     env.execute()
   }
 
@@ -139,13 +141,13 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
 
     val controlParameterParseErrors: DataStream[String] =
       controlParametersParsed
-        .filter(_.isLeft).setParallelism(1)
+        .filter(_.isLeft).name("Filter: parse errors").setParallelism(1)
         .map(_.left.get).setParallelism(1)
         .name("Parameter parse errors")
 
     val controlParameters: DataStream[ClusteringParameter] =
       controlParametersParsed
-        .filter(_.isRight).setParallelism(1)
+        .filter(_.isRight).name("Filter: valid cluster parameters").setParallelism(1)
         .map(_.right.get).setParallelism(1)
         .name("Control stream for clustering parameters")
 
@@ -155,7 +157,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
   def outputErrors(errors: DataStream[String], outputPath: String): Unit =
     if (outputPath != null && !outputPath.trim.isEmpty)
       errors
-        .addSink(createParseErrorSink(outputPath)).name(
+        .addSink(createParseErrorSink(outputPath)).setParallelism(1).name(
         s"Control parameter parse errors: $outputPath")
     else
       errors

@@ -60,6 +60,8 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
       semantic = Semantic.EXACTLY_ONCE
     )
 
+    FlinkUtils.printExecutionPlan()
+
     env.execute("write post statistics to kafka (and post info to elasticsearch)")
   }
 

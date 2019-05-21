@@ -97,6 +97,8 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
       .addSink(ElasticSearchIndexes.recommendations.createSink(recommendationsBatchSize))
       .name("ElasticSearch: recommendations")
 
+    FlinkUtils.printExecutionPlan()
+
     env.execute("recommendations")
 
     def tracePersons(personIds: Set[lang.Long]) = {
