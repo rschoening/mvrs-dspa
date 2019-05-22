@@ -1,25 +1,33 @@
 # mvrs-dspa
 
-* prerequisites:
-  * docker (make sure dockerd runs)
-  * docker compose (linux: not sure what minimum required privileges are; root works, obviously)
-  * maven
-  * IntelliJ IDEA with Scala plugin
-  ![scala plugin](https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/intellij-scala-plugin.png "Scala plugin")
+## Prerequisites
+* docker (make sure dockerd runs)
+* docker compose
+* maven
+* Java 1.8
+* IntelliJ IDEA with Scala plugin
+![scala plugin](https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/intellij-scala-plugin.png "Scala plugin")
 
-  
-* git clone https://github.com/rschoening/mvrs-dspa.git
-* cd to mvrs-dsp
-* mvn package
-* start IDEA -> "Import Project from Maven" (pom.xml in mvrs-dspa)
+## Getting ready
+1. git clone https://github.com/rschoening/mvrs-dspa.git
+1. copy the csv test data directories `streams`and `tables` from 1k-users-sorted or 10k-users-sorted to the subdirectory `docker/data` of the repository
+1. set environment variable MVRS_DSPA_DATA_DIR to the path to the repository subdirectory `docker/data`
+1. cd to mvrs-dsp
+1. mvn clean package
+1. start IDEA -> "Import Project from Maven" (pom.xml in mvrs-dspa)
   * enable "add dependencies for IDEA"
   * select first module only in list (unselect second)
-  
-## TODO
-* run configurations (in git repo) apparently get deleted on mvn project import
-* screenshots for import options
-* docker not yet working in VM, can't test
-* where to put data/set env variable
+1. TODO
+  * run configurations (in git repo) apparently get deleted on mvn project import
+  * screenshots for import options
+
+## Running the Flink jobs
+* TODO
+
+## Solution layout
+* package structure
+* configuration (application.conf)
+* unit tests
 
 ## NOTE
 * if bind address error occurs when starting job that starts the web UI, then check if the flink dashboard is still open in a browser window. The client keeps the port open. 
