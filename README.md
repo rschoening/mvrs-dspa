@@ -25,8 +25,7 @@
 1. make sure that `dockerd` is running
 1. cd to `mvrs-dspa\docker`
 1. as su, enter `docker-compose up -d`
-1. check that all containers were started successfully: enter `docker-compsose ps`
-   * The following containers should be listed:
+1. check that all containers were started successfully: enter `docker-compsose ps` The following containers should be listed:
 ```
             Name                       Command               State                         Ports                       
 --------------------------------------------------------------------------------------------------------------------
@@ -42,8 +41,9 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
 ```
    * in case `docker_elasticsearch_1` is not listed:
       1. as su, enter `sysctl -w vm.max_map_count=262144` (see https://www.elastic.co/guide/en/elasticsearch/reference/6.7/vm-max-map-count.html).
-      1. `docker-compose down` 
+      1. `docker-compose down`
       1. `docker-compose up -d`
+      1. check again with `docker-compose ps`
 
 ## Running the Flink jobs
 * TODO
