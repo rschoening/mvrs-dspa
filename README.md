@@ -24,9 +24,10 @@
 ## Setting up the runtime environment
 1. make sure that `dockerd` is running
 1. cd to `mvrs-dspa\docker`
-1. as su, enter 'docker-compose up`
+1. as su, enter `docker-compose up -d`
 1. check that all containers were started successfully: enter `docker-compsose ps`
    * The following containers should be listed:
+```
             Name                       Command               State                         Ports                       
 --------------------------------------------------------------------------------------------------------------------
 docker_elasticsearch_1   /usr/local/bin/docker-entr ...   Up      0.0.0.0:9201->9200/tcp, 9300/tcp                  
@@ -38,8 +39,11 @@ docker_kibana_1          /usr/local/bin/kibana-docker     Up      0.0.0.0:5602->
 docker_prometheus_1      /bin/prometheus --config.f ...   Up      0.0.0.0:9091->9090/tcp                            
 docker_taskmanager_1     /docker-entrypoint.sh task ...   Up      6121/tcp, 6122/tcp, 6123/tcp, 8081/tcp, 9249/tcp  
 docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->2181/tcp, 22/tcp, 2888/tcp, 3888/tcp
-
-  docker_elasticsearch_1 is not listedn, then as su, enter `sysctl -w vm.max_map_count=262144` 
+```
+   * in case `docker_elasticsearch_1` is not listed:
+      1. as su, enter `sysctl -w vm.max_map_count=262144` (see https://www.elastic.co/guide/en/elasticsearch/reference/6.7/vm-max-map-count.html).
+      1. `docker-compose down` 
+      1. `docker-compose up -d`
 
 ## Running the Flink jobs
 * TODO
