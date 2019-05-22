@@ -8,10 +8,10 @@
 * IntelliJ IDEA with Scala plugin
 ![scala plugin](https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/intellij-scala-plugin.png "Scala plugin")
 
-## Getting ready
-1. git clone https://github.com/rschoening/mvrs-dspa.git
+## Setting up the development environment
+1. cd to parent directory for project, enter `git clone https://github.com/rschoening/mvrs-dspa.git`
 1. copy the csv test data directories `streams`and `tables` from `1k-users-sorted` or `10k-users-sorted` to the subdirectory `docker/data` of the repository
-1. set environment variable MVRS_DSPA_DATA_DIR to the path to the repository subdirectory `docker/data`
+1. set environment variable `MVRS_DSPA_DATA_DIR` to the path to the repository subdirectory `docker/data`
 1. start IDEA -> "Import Project" (pom.xml in mvrs-dspa), accepting all defaults. Unfortunately, during the import process the configured run configurations are deleted. To bring them back:
    1. close IDEA again
    1. cd to the project directory
@@ -19,8 +19,16 @@
    1. start IDEA again and open the project
    1. confirm that the run configurations (drop down list in upper right of IDEA window) are available:
    ![run configurations](https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/idea-run-configurations.png "IDEA run configurations")
-1. cd to mvrs-dsp (or go to `Terminal` tab in IDEA)
-1. run `mvn clean package` 
+1. In `Terminal` tab in IDEA: run `mvn clean package`
+
+## Setting up the runtime environment
+1. make sure that `dockerd` is running
+1. cd to `mvrs-dspa\docker`
+1. as su, enter 'docker-compose up`
+1. check that all containers were started successfully: enter `docker-compsose ps`
+   * The following containers should be listed:
+   
+1. as su, enter `sysctl -w vm.max_map_count=262144` 
 
 ## Running the Flink jobs
 * TODO
