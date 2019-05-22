@@ -107,3 +107,4 @@ fabric.properties
 
 /.idea/misc.xml
 /docker/data
+/dependency-reduced-pom.xml
