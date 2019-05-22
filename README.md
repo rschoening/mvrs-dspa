@@ -10,7 +10,7 @@
 
 ## Getting ready
 1. git clone https://github.com/rschoening/mvrs-dspa.git
-1. copy the csv test data directories `streams`and `tables` from 1k-users-sorted or 10k-users-sorted to the subdirectory `docker/data` of the repository
+1. copy the csv test data directories `streams`and `tables` from `1k-users-sorted` or `10k-users-sorted` to the subdirectory `docker/data` of the repository
 1. set environment variable MVRS_DSPA_DATA_DIR to the path to the repository subdirectory `docker/data`
 1. cd to mvrs-dsp
 1. mvn clean package
