@@ -1,4 +1,4 @@
-# mvrs-dspa
+# DSPA 2019 semester project
 
 ## Prerequisites
 * docker (make sure dockerd runs)
