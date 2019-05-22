@@ -46,3 +46,5 @@
   * Sometimes observed on Windows on first `docker-compose up`in session.
   * Solution: restart docker, try again
 
+* when starting unusual activity task: `Exception in thread "main" org.apache.flink.runtime.client.JobExecutionException: Job execution failed. ... Caused by: java.io.FileNotFoundException: The provided file path file:/c:/data/dspa/project/10k-users-sorted/mvrs/activity-classification.txt does not exist.`
+  * create an empty textfile with 
