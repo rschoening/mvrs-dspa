@@ -1,0 +1,6 @@
+k       = 4
+decay   = 0.2
+label:0 = trolls
+label:1 = bots
+label:2 = lunatics
+label:3 = regular people
