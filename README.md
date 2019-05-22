@@ -47,4 +47,4 @@
   * Solution: restart docker, try again
 
 * when starting unusual activity task: `Exception in thread "main" org.apache.flink.runtime.client.JobExecutionException: Job execution failed. ... Caused by: java.io.FileNotFoundException: The provided file path file:/c:/data/dspa/project/10k-users-sorted/mvrs/activity-classification.txt does not exist.`
-  * create an empty textfile with 
+  * copy parameter file ./docker/data/mvrs/activity-classification.txt to a subdirectory `mvrs` in the data directory indicated by the environment variable `MVRS_DSPA_DATA_DIR`
