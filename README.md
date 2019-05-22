@@ -47,7 +47,7 @@
     * Sometimes observed on Windows on first `docker-compose up`in session.
     * Solution: restart docker, try again
   * on linux: `ERROR: Couldn't connect to Docker daemon at http+docker://localhost - is it running?`
-    * start dockerd
+    * start `dockerd` as su
 * failure to start container elasticsearch (best diagnosed when starting that container individually, using 
 `docker-compose up elasticsearch`: 
 `elasticsearch_1  | [1]: max virtual memory areas vm.max_map_count [65530] is too low, increase to at least [262144]
@@ -59,7 +59,7 @@ elasticsearch_1  | [2019-05-22T12:02:31,608][INFO ][o.e.x.m.p.NativeController] 
 INFO[2019-05-22T14:02:31.910676430+02:00] shim reaped                                   id=22aa3aa2198d5def930036fa3f0ca2e07fe27c6519bf98b611bb653b4a69f457
 INFO[2019-05-22T14:02:31.921933389+02:00] ignoring event                                module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
 docker_elasticsearch_1 exited with code 78`
-  * as root: sysctl -w vm.max_map_count=262144
+  * as su: `sysctl -w vm.max_map_count=262144`
 
 * when starting unusual activity task: `Exception in thread "main" org.apache.flink.runtime.client.JobExecutionException: Job execution failed. ... Caused by: java.io.FileNotFoundException: The provided file path file:/c:/data/dspa/project/10k-users-sorted/mvrs/activity-classification.txt does not exist.`
   * copy parameter file ./docker/data/mvrs/activity-classification.txt to a subdirectory `mvrs` in the data directory indicated by the environment variable `MVRS_DSPA_DATA_DIR`
