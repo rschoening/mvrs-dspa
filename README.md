@@ -31,4 +31,8 @@
 * Kibana docker: http://localhost:5602/
 * Prometheus docker: http://localhost:9091/graph
 * Grafana docker: http://localhost:3001/?orgId=1 (no dashboards delivered as part of solution)
+* ElasticSearch (to check if online):  
 
+## Troubleshooting
+* `Exception in thread "main" java.util.concurrent.ExecutionException: org.apache.kafka.common.errors.TimeoutException: Timed out waiting for a node assignment.`
+  * Probable cause: Kafka not running. Start with `docker-compose up` in directory `docker`
