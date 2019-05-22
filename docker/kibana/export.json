@@ -202,26 +202,6 @@
     }
   },
   {
-    "_id": "dc1e10a0-4fba-11e9-89dd-8bb1ab045918",
-    "_type": "visualization",
-    "_source": {
-      "title": "[DSPA] Post statistics timeline",
-      "visState": "{\"title\":\"[DSPA] Post statistics timeline\",\"type\":\"metrics\",\"params\":{\"axis_formatter\":\"number\",\"axis_position\":\"left\",\"axis_scale\":\"normal\",\"background_color_rules\":[{\"id\":\"64729c40-4fad-11e9-99a4-01a9b83e398d\"}],\"bar_color_rules\":[{\"id\":\"32ea5580-4faf-11e9-99a4-01a9b83e398d\"}],\"id\":\"61ca57f0-469d-11e7-af02-69e470af7417\",\"index_pattern\":\"mvrs-active-post-statistics\",\"interval\":\"6h\",\"pivot_id\":\"replyCount\",\"series\":[{\"axis_position\":\"right\",\"chart_type\":\"line\",\"color\":\"#68BC00\",\"fill\":\"0.2\",\"formatter\":\"number\",\"id\":\"61ca57f1-469d-11e7-af02-69e470af7417\",\"label\":\"users\",\"line_width\":\"1\",\"metrics\":[{\"field\":\"distinctUserCount\",\"id\":\"61ca57f2-469d-11e7-af02-69e470af7417\",\"type\":\"max\"}],\"point_size\":\"0\",\"separate_axis\":0,\"split_mode\":\"everything\",\"stacked\":\"stacked\",\"terms_field\":\"postId\",\"terms_order_by\":\"61ca57f2-469d-11e7-af02-69e470af7417\",\"split_color_mode\":\"gradient\"},{\"axis_position\":\"right\",\"chart_type\":\"line\",\"color\":\"rgba(188,74,0,1)\",\"fill\":\"0.2\",\"formatter\":\"number\",\"id\":\"b9699f60-4fb6-11e9-99a4-01a9b83e398d\",\"line_width\":\"1\",\"metrics\":[{\"field\":\"commentCount\",\"id\":\"b9699f61-4fb6-11e9-99a4-01a9b83e398d\",\"type\":\"max\"}],\"point_size\":\"0\",\"separate_axis\":0,\"split_mode\":\"everything\",\"stacked\":\"stacked\",\"label\":\"comments\"},{\"axis_position\":\"right\",\"chart_type\":\"line\",\"color\":\"rgba(58,70,44,1)\",\"fill\":\"0.2\",\"formatter\":\"number\",\"id\":\"77691430-4fb9-11e9-9220-754200858ed0\",\"line_width\":1,\"metrics\":[{\"field\":\"replyCount\",\"id\":\"77691431-4fb9-11e9-9220-754200858ed0\",\"type\":\"max\"}],\"point_size\":\"0\",\"separate_axis\":0,\"split_mode\":\"everything\",\"stacked\":\"stacked\",\"split_color_mode\":\"gradient\",\"label\":\"replies\"},{\"id\":\"5e688410-4fba-11e9-9220-754200858ed0\",\"color\":\"rgba(0,186,188,1)\",\"split_mode\":\"everything\",\"metrics\":[{\"id\":\"5e688411-4fba-11e9-9220-754200858ed0\",\"type\":\"max\",\"field\":\"likeCount\"}],\"separate_axis\":0,\"axis_position\":\"right\",\"formatter\":\"number\",\"chart_type\":\"line\",\"line_width\":1,\"point_size\":\"0\",\"fill\":\"0.2\",\"stacked\":\"stacked\",\"label\":\"likes\"}],\"show_grid\":1,\"show_legend\":1,\"time_field\":\"timestamp\",\"type\":\"timeseries\",\"gauge_color_rules\":[{\"id\":\"1680a8c0-4fbb-11e9-9220-754200858ed0\"}],\"gauge_width\":10,\"gauge_inner_width\":10,\"gauge_style\":\"half\",\"background_color\":null,\"default_index_pattern\":\"statistics\",\"legend_position\":\"right\"},\"aggs\":[]}",
-      "uiStateJSON": "{}",
-      "description": "",
-      "version": 1,
-      "kibanaSavedObjectMeta": {
-        "searchSourceJSON": "{\"query\":{\"language\":\"kuery\",\"query\":\"\"},\"filter\":[]}"
-      }
-    },
-    "_meta": {
-      "savedObjectVersion": 2
-    },
-    "_migrationVersion": {
-      "visualization": "6.7.2"
-    }
-  },
-  {
     "_id": "3b71e2e0-5bad-11e9-8324-55d54309c27f",
     "_type": "visualization",
     "_source": {
@@ -448,31 +428,6 @@
     }
   },
   {
-    "_id": "a0af2f50-4f0f-11e9-acde-e1c8a6292b89",
-    "_type": "dashboard",
-    "_source": {
-      "title": "[DSPA]  Active post statistics",
-      "hits": 0,
-      "description": "",
-      "panelsJSON": "[{\"embeddableConfig\":{},\"gridData\":{\"x\":0,\"y\":21,\"w\":48,\"h\":11,\"i\":\"1\"},\"id\":\"dc1e10a0-4fba-11e9-89dd-8bb1ab045918\",\"panelIndex\":\"1\",\"type\":\"visualization\",\"version\":\"6.6.1\"},{\"embeddableConfig\":{\"vis\":{\"params\":{\"sort\":{\"columnIndex\":6,\"direction\":null}}}},\"gridData\":{\"x\":0,\"y\":0,\"w\":30,\"h\":21,\"i\":\"2\"},\"id\":\"541e04f0-588c-11e9-8f64-51805961c8e0\",\"panelIndex\":\"2\",\"type\":\"visualization\",\"version\":\"6.6.1\"},{\"embeddableConfig\":{},\"gridData\":{\"x\":30,\"y\":0,\"w\":18,\"h\":9,\"i\":\"6\"},\"id\":\"47edacc0-698b-11e9-ba9d-bb8bdc29536e\",\"panelIndex\":\"6\",\"type\":\"visualization\",\"version\":\"6.7.1\"},{\"embeddableConfig\":{},\"gridData\":{\"x\":30,\"y\":9,\"w\":10,\"h\":12,\"i\":\"7\"},\"id\":\"fdc97550-794a-11e9-a466-a9bbe178e327\",\"panelIndex\":\"7\",\"type\":\"visualization\",\"version\":\"6.7.2\"},{\"embeddableConfig\":{},\"gridData\":{\"x\":40,\"y\":9,\"w\":8,\"h\":12,\"i\":\"8\"},\"id\":\"b6df5af0-794b-11e9-a466-a9bbe178e327\",\"panelIndex\":\"8\",\"type\":\"visualization\",\"version\":\"6.7.2\"}]",
-      "optionsJSON": "{\"darkTheme\":true,\"hidePanelTitles\":false,\"useMargins\":true}",
-      "version": 1,
-      "timeRestore": true,
-      "timeTo": "2012-02-16T22:59:59.999Z",
-      "timeFrom": "2012-02-08T23:00:00.000Z",
-      "refreshInterval": {
-        "pause": false,
-        "value": 5000
-      },
-      "kibanaSavedObjectMeta": {
-        "searchSourceJSON": "{\"query\":{\"language\":\"lucene\",\"query\":\"\"},\"filter\":[]}"
-      }
-    },
-    "_meta": {
-      "savedObjectVersion": 2
-    }
-  },
-  {
     "_id": "83a893d0-6989-11e9-ba9d-bb8bdc29536e",
     "_type": "dashboard",
     "_source": {
@@ -516,6 +471,51 @@
       },
       "kibanaSavedObjectMeta": {
         "searchSourceJSON": "{\"query\":{\"language\":\"kuery\",\"query\":\"\"},\"filter\":[]}"
+      }
+    },
+    "_meta": {
+      "savedObjectVersion": 2
+    }
+  },
+  {
+    "_id": "dc1e10a0-4fba-11e9-89dd-8bb1ab045918",
+    "_type": "visualization",
+    "_source": {
+      "title": "[DSPA] Post statistics timeline",
+      "visState": "{\"title\":\"[DSPA] Post statistics timeline\",\"type\":\"metrics\",\"params\":{\"axis_formatter\":\"number\",\"axis_position\":\"left\",\"axis_scale\":\"normal\",\"background_color_rules\":[{\"id\":\"64729c40-4fad-11e9-99a4-01a9b83e398d\"}],\"bar_color_rules\":[{\"id\":\"32ea5580-4faf-11e9-99a4-01a9b83e398d\"}],\"id\":\"61ca57f0-469d-11e7-af02-69e470af7417\",\"index_pattern\":\"mvrs-active-post-statistics\",\"interval\":\"6h\",\"pivot_id\":\"replyCount\",\"series\":[{\"axis_position\":\"right\",\"chart_type\":\"line\",\"color\":\"#68BC00\",\"fill\":\"0.2\",\"formatter\":\"number\",\"id\":\"61ca57f1-469d-11e7-af02-69e470af7417\",\"label\":\"users\",\"line_width\":\"1\",\"metrics\":[{\"field\":\"distinctUserCount\",\"id\":\"61ca57f2-469d-11e7-af02-69e470af7417\",\"type\":\"max\"}],\"point_size\":\"0\",\"separate_axis\":0,\"split_mode\":\"everything\",\"stacked\":\"stacked\",\"terms_field\":\"postId\",\"terms_order_by\":\"61ca57f2-469d-11e7-af02-69e470af7417\",\"split_color_mode\":\"gradient\"},{\"axis_position\":\"right\",\"chart_type\":\"line\",\"color\":\"rgba(188,74,0,1)\",\"fill\":\"0.2\",\"formatter\":\"number\",\"id\":\"b9699f60-4fb6-11e9-99a4-01a9b83e398d\",\"line_width\":\"1\",\"metrics\":[{\"field\":\"commentCount\",\"id\":\"b9699f61-4fb6-11e9-99a4-01a9b83e398d\",\"type\":\"max\"}],\"point_size\":\"0\",\"separate_axis\":0,\"split_mode\":\"everything\",\"stacked\":\"stacked\",\"label\":\"comments\"},{\"axis_position\":\"right\",\"chart_type\":\"line\",\"color\":\"rgba(58,70,44,1)\",\"fill\":\"0.2\",\"formatter\":\"number\",\"id\":\"77691430-4fb9-11e9-9220-754200858ed0\",\"line_width\":1,\"metrics\":[{\"field\":\"replyCount\",\"id\":\"77691431-4fb9-11e9-9220-754200858ed0\",\"type\":\"max\"}],\"point_size\":\"0\",\"separate_axis\":0,\"split_mode\":\"everything\",\"stacked\":\"stacked\",\"split_color_mode\":\"gradient\",\"label\":\"replies\"},{\"id\":\"5e688410-4fba-11e9-9220-754200858ed0\",\"color\":\"rgba(0,186,188,1)\",\"split_mode\":\"everything\",\"metrics\":[{\"id\":\"5e688411-4fba-11e9-9220-754200858ed0\",\"type\":\"max\",\"field\":\"likeCount\"}],\"separate_axis\":0,\"axis_position\":\"right\",\"formatter\":\"number\",\"chart_type\":\"line\",\"line_width\":1,\"point_size\":\"0\",\"fill\":\"0.2\",\"stacked\":\"stacked\",\"label\":\"likes\"}],\"show_grid\":1,\"show_legend\":1,\"time_field\":\"timestamp\",\"type\":\"timeseries\",\"gauge_color_rules\":[{\"id\":\"1680a8c0-4fbb-11e9-9220-754200858ed0\"}],\"gauge_width\":10,\"gauge_inner_width\":10,\"gauge_style\":\"half\",\"background_color\":null,\"default_index_pattern\":\"mvrs-active-post-statistics\",\"legend_position\":\"right\"},\"aggs\":[]}",
+      "uiStateJSON": "{}",
+      "description": "",
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"query\":{\"language\":\"kuery\",\"query\":\"\"},\"filter\":[]}"
+      }
+    },
+    "_meta": {
+      "savedObjectVersion": 2
+    },
+    "_migrationVersion": {
+      "visualization": "6.7.2"
+    }
+  },
+  {
+    "_id": "a0af2f50-4f0f-11e9-acde-e1c8a6292b89",
+    "_type": "dashboard",
+    "_source": {
+      "title": "[DSPA]  Active post statistics",
+      "hits": 0,
+      "description": "",
+      "panelsJSON": "[{\"embeddableConfig\":{},\"gridData\":{\"x\":0,\"y\":21,\"w\":48,\"h\":11,\"i\":\"1\"},\"id\":\"dc1e10a0-4fba-11e9-89dd-8bb1ab045918\",\"panelIndex\":\"1\",\"type\":\"visualization\",\"version\":\"6.6.1\",\"title\":\"Maxima of post statistic values\"},{\"embeddableConfig\":{\"vis\":{\"params\":{\"sort\":{\"columnIndex\":6,\"direction\":null}}}},\"gridData\":{\"x\":0,\"y\":0,\"w\":30,\"h\":21,\"i\":\"2\"},\"id\":\"541e04f0-588c-11e9-8f64-51805961c8e0\",\"panelIndex\":\"2\",\"type\":\"visualization\",\"version\":\"6.6.1\",\"title\":\"Top 10 posts:  ordered by maximum of distinct users in the analysis window, within the dashboard's time range\"},{\"embeddableConfig\":{},\"gridData\":{\"x\":30,\"y\":0,\"w\":18,\"h\":9,\"i\":\"6\"},\"id\":\"47edacc0-698b-11e9-ba9d-bb8bdc29536e\",\"panelIndex\":\"6\",\"type\":\"visualization\",\"version\":\"6.7.1\",\"title\":\"Popular forums, containing posts with most distinct users\"},{\"embeddableConfig\":{},\"gridData\":{\"x\":30,\"y\":9,\"w\":10,\"h\":12,\"i\":\"7\"},\"id\":\"fdc97550-794a-11e9-a466-a9bbe178e327\",\"panelIndex\":\"7\",\"type\":\"visualization\",\"version\":\"6.7.2\",\"title\":\"Post statistics per hour (event time)\"},{\"embeddableConfig\":{},\"gridData\":{\"x\":40,\"y\":9,\"w\":8,\"h\":12,\"i\":\"8\"},\"id\":\"b6df5af0-794b-11e9-a466-a9bbe178e327\",\"panelIndex\":\"8\",\"type\":\"visualization\",\"version\":\"6.7.2\",\"title\":\"New posts per hour (event time)\"}]",
+      "optionsJSON": "{\"darkTheme\":true,\"hidePanelTitles\":false,\"useMargins\":true}",
+      "version": 1,
+      "timeRestore": true,
+      "timeTo": "2012-02-14T22:59:59.999Z",
+      "timeFrom": "2012-02-07T23:00:00.000Z",
+      "refreshInterval": {
+        "pause": false,
+        "value": 5000
+      },
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"query\":{\"language\":\"lucene\",\"query\":\"\"},\"filter\":[]}"
       }
     },
     "_meta": {
