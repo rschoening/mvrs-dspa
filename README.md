@@ -25,7 +25,7 @@
 1. make sure that `dockerd` is running
 1. cd to `mvrs-dspa\docker`
 1. as su, enter `docker-compose up -d`
-1. check that all containers were started successfully: enter `docker-compsose ps` The following containers should be listed:
+1. check that all containers were started successfully: enter `docker-compose ps` The following containers should be listed:
 ```
             Name                       Command               State                         Ports                       
 --------------------------------------------------------------------------------------------------------------------
