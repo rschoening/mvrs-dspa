@@ -35,7 +35,7 @@
   * Recommendations: http://localhost:5602/app/kibana#/dashboard/7c230710-6855-11e9-9ba6-39d0e49adb7a
   * Activity detection: http://localhost:5602/app/kibana#/dashboard/83a893d0-6989-11e9-ba9d-bb8bdc29536e
 * Prometheus docker: http://localhost:9091/graph
-* Grafana docker: http://localhost:3001/?orgId=1 (no dashboards delivered as part of solution)
+* Grafana docker: http://localhost:3001/?orgId=1 (no dashboards delivered as part of solution; initial login with admin/admin, then change pwd)
 * ElasticSearch docker (to check if online): http://localhost:9201/
 
 ## Troubleshooting
