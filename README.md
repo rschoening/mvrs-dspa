@@ -34,10 +34,10 @@
 * ElasticSearch (to check if online):  
 
 ## Troubleshooting
-* `Exception in thread "main" java.util.concurrent.ExecutionException: org.apache.kafka.common.errors.TimeoutException: Timed out waiting for a node assignment.`
+* When starting one of the Flink jobs: `Exception in thread "main" java.util.concurrent.ExecutionException: org.apache.kafka.common.errors.TimeoutException: Timed out waiting for a node assignment.`
   * Probable cause: Kafka not running.
   * Solution: start with `docker-compose up` in directory `docker`
-* `ERROR: for docker_exporter_1  Cannot start service exporter: driver failed programming external connectivity on endpoint docker_exporter_1 (c1b1acc38d051b138707fbae6e323641332e3f659145eef51ea5764b2a3953e7): Error starting userland proxy: mkdir /port/tcp:0.0.0.0:9101:tcp:172.18.0.2:9100: input/output error`
+* When running `docker-compose up`: `ERROR: for docker_exporter_1  Cannot start service exporter: driver failed programming external connectivity on endpoint docker_exporter_1 (c1b1acc38d051b138707fbae6e323641332e3f659145eef51ea5764b2a3953e7): Error starting userland proxy: mkdir /port/tcp:0.0.0.0:9101:tcp:172.18.0.2:9100: input/output error`
   * Sometimes observed on Windows on first `docker-compose up`in session.
   * Solution: restart docker, try again
 
