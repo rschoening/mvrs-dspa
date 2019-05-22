@@ -60,6 +60,7 @@ INFO[2019-05-22T14:02:31.910676430+02:00] shim reaped                           
 INFO[2019-05-22T14:02:31.921933389+02:00] ignoring event                                module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
 docker_elasticsearch_1 exited with code 78`
   * as su: `sysctl -w vm.max_map_count=262144`
+  * see https://www.elastic.co/guide/en/elasticsearch/reference/6.7/vm-max-map-count.html
 
 * when starting unusual activity task: `Exception in thread "main" org.apache.flink.runtime.client.JobExecutionException: Job execution failed. ... Caused by: java.io.FileNotFoundException: The provided file path file:/c:/data/dspa/project/10k-users-sorted/mvrs/activity-classification.txt does not exist.`
   * copy parameter file `./docker/data/mvrs/activity-classification.txt` to a subdirectory `mvrs` in the data directory indicated by the environment variable `MVRS_DSPA_DATA_DIR`
