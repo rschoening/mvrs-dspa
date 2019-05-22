@@ -147,6 +147,7 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
 
         recommendations
           .filter(t => personIds.contains(t._1))
+          .name("Filter: trace persons")
           .print("-> Resulting recommendation:".padTo(padLength, ' '))
           .name("print")
       }
