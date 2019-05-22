@@ -243,7 +243,7 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
         key = _._1,
         value = _._2))
       .name("Collect posts with which the person interacted " +
-        s"(window: ${DateTimeUtils.formatDuration(windowSize.toMilliseconds)}" +
+        s"(window: ${DateTimeUtils.formatDuration(windowSize.toMilliseconds)} " +
         s"slide ${DateTimeUtils.formatDuration(windowSlide.toMilliseconds)})")
   }
 
