@@ -12,7 +12,7 @@
 1. cd to parent directory for project, enter `git clone https://github.com/rschoening/mvrs-dspa.git`
 1. copy the csv test data directories `streams`and `tables` from `1k-users-sorted` or `10k-users-sorted` to the subdirectory `docker/data` of the repository
 1. set environment variable `MVRS_DSPA_DATA_DIR` to the path to the repository subdirectory `docker/data`
-1. start IDEA -> "Import Project" (pom.xml in mvrs-dspa), accepting all defaults. Unfortunately, during the import process the configured run configurations are deleted. To bring them back:
+1. start IDEA -> "Import Project" (selecting `pom.xml` in `mvrs-dspa`), accepting all defaults. Unfortunately, during the import process the configured run configurations are deleted. To bring them back:
    1. close IDEA again
    1. cd to the project directory
    1. enter `git checkout -- .idea/runConfigurations` 
@@ -44,6 +44,11 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
       1. `docker-compose down`
       1. `docker-compose up -d`
       1. check again with `docker-compose ps`
+1. Import the dashboards in Kibana:
+   1. open Kibana in the browser, at http://localhost:5602/
+   2. go to `Management`-> `Saved Objects` *TODO SCREENSHOT*
+   3. import `export.json` from `mvrs-dspa/docker/kibana`
+   4. go to `Index patterns` and *star* one of the listed index patterns. Any will do (otherwise the imported dashboards are not listed) *TODO SCREENSHOT*
 
 ## Running the Flink jobs
 * TODO
