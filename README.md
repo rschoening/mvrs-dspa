@@ -27,8 +27,19 @@
 1. as su, enter 'docker-compose up`
 1. check that all containers were started successfully: enter `docker-compsose ps`
    * The following containers should be listed:
-   
-1. as su, enter `sysctl -w vm.max_map_count=262144` 
+            Name                       Command               State                         Ports                       
+--------------------------------------------------------------------------------------------------------------------
+docker_elasticsearch_1   /usr/local/bin/docker-entr ...   Up      0.0.0.0:9201->9200/tcp, 9300/tcp                  
+docker_exporter_1        /bin/node_exporter               Up      0.0.0.0:9101->9100/tcp                            
+docker_grafana_1         /run.sh                          Up      0.0.0.0:3001->3000/tcp                            
+docker_jobmanager_1      /docker-entrypoint.sh jobm ...   Up      6123/tcp, 0.0.0.0:8082->8081/tcp, 9249/tcp        
+docker_kafka_1           start-kafka.sh                   Up      0.0.0.0:9092->9092/tcp, 9093/tcp                  
+docker_kibana_1          /usr/local/bin/kibana-docker     Up      0.0.0.0:5602->5601/tcp                            
+docker_prometheus_1      /bin/prometheus --config.f ...   Up      0.0.0.0:9091->9090/tcp                            
+docker_taskmanager_1     /docker-entrypoint.sh task ...   Up      6121/tcp, 6122/tcp, 6123/tcp, 8081/tcp, 9249/tcp  
+docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->2181/tcp, 22/tcp, 2888/tcp, 3888/tcp
+
+  docker_elasticsearch_1 is not listedn, then as su, enter `sysctl -w vm.max_map_count=262144` 
 
 ## Running the Flink jobs
 * TODO
