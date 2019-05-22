@@ -31,7 +31,7 @@
 * Kibana docker: http://localhost:5602/
 * Prometheus docker: http://localhost:9091/graph
 * Grafana docker: http://localhost:3001/?orgId=1 (no dashboards delivered as part of solution)
-* ElasticSearch (to check if online):  
+* ElasticSearch docker (to check if online): http://localhost:9201/
 
 ## Troubleshooting
 * When starting one of the Flink jobs: `Exception in thread "main" java.util.concurrent.ExecutionException: org.apache.kafka.common.errors.TimeoutException: Timed out waiting for a node assignment.`
