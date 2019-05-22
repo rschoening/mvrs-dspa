@@ -87,7 +87,8 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
     * start `dockerd` as su
 * failure to start container elasticsearch (best diagnosed when starting that container individually, using 
 `docker-compose up elasticsearch`: 
-  * `elasticsearch_1  | [1]: max virtual memory areas vm.max_map_count [65530] is too low, increase to at least [262144]
+```
+elasticsearch_1  | [1]: max virtual memory areas vm.max_map_count [65530] is too low, increase to at least [262144]
 elasticsearch_1  | [2019-05-22T12:02:31,504][INFO ][o.e.n.Node               ] [kdPY8cQ] stopping ...
 elasticsearch_1  | [2019-05-22T12:02:31,569][INFO ][o.e.n.Node               ] [kdPY8cQ] stopped
 elasticsearch_1  | [2019-05-22T12:02:31,570][INFO ][o.e.n.Node               ] [kdPY8cQ] closing ...
@@ -95,7 +96,8 @@ elasticsearch_1  | [2019-05-22T12:02:31,598][INFO ][o.e.n.Node               ] [
 elasticsearch_1  | [2019-05-22T12:02:31,608][INFO ][o.e.x.m.p.NativeController] [kdPY8cQ] Native controller process has stopped - no new native processes can be started
 INFO[2019-05-22T14:02:31.910676430+02:00] shim reaped                                   id=22aa3aa2198d5def930036fa3f0ca2e07fe27c6519bf98b611bb653b4a69f457
 INFO[2019-05-22T14:02:31.921933389+02:00] ignoring event                                module=libcontainerd namespace=moby topic=/tasks/delete type="*events.TaskDelete"
-docker_elasticsearch_1 exited with code 78`
+docker_elasticsearch_1 exited with code 78
+```
   * as su: `sysctl -w vm.max_map_count=262144`
   * see https://www.elastic.co/guide/en/elasticsearch/reference/6.7/vm-max-map-count.html
 
