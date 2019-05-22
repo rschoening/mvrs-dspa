@@ -1,18 +1,18 @@
 # DSPA 2019 semester project
 
 ## Prerequisites
-* docker (make sure dockerd runs)
+* docker
 * docker compose
 * maven
 * Java 1.8
-* IntelliJ IDEA with Scala plugin
+* IntelliJ IDEA with Scala plugin:
 ![scala plugin](https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/intellij-scala-plugin.png "Scala plugin")
 
 ## Setting up the development environment
 1. cd to parent directory for project, enter `git clone https://github.com/rschoening/mvrs-dspa.git`
 1. copy the csv test data directories `streams`and `tables` from `1k-users-sorted` or `10k-users-sorted` to the subdirectory `docker/data` of the repository
-1. set environment variable `MVRS_DSPA_DATA_DIR` to the path to the repository subdirectory `docker/data`
-1. start IDEA -> "Import Project" (selecting `pom.xml` in `mvrs-dspa`), accepting all defaults. Unfortunately, during the import process the configured run configurations are deleted. To bring them back:
+1. set environment variable `MVRS_DSPA_DATA_DIR` to the absolute file URI to the repository subdirectory `docker/data` such that it is seen by IDEA (e.g. `export MVRS_DSPA_DATA_DIR=file:///dspa19/projectst/mvrs-dspa/docker/data` in `.profile`)
+1. start IntelliJ IDEA -> "Import Project" (selecting `pom.xml` in `mvrs-dspa`), accepting all defaults. Unfortunately, during the import process the configured run configurations are deleted. To bring them back:
    1. close IDEA again
    1. cd to the project directory
    1. enter `git checkout -- .idea/runConfigurations` 
