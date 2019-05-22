@@ -12,14 +12,15 @@
 1. git clone https://github.com/rschoening/mvrs-dspa.git
 1. copy the csv test data directories `streams`and `tables` from `1k-users-sorted` or `10k-users-sorted` to the subdirectory `docker/data` of the repository
 1. set environment variable MVRS_DSPA_DATA_DIR to the path to the repository subdirectory `docker/data`
-1. cd to mvrs-dsp
-1. mvn clean package
-1. start IDEA -> "Import Project from Maven" (pom.xml in mvrs-dspa)
-  * enable "add dependencies for IDEA"
-  * select first module only in list (unselect second)
-1. TODO
-  * run configurations (in git repo) apparently get deleted on mvn project import
-  * screenshots for import options
+1. start IDEA -> "Import Project" (pom.xml in mvrs-dspa), accepting all defaults. Unfortunately, during the import process the configured run configurations are deleted. To bring them back:
+   1. close IDEA again
+   1. cd to the project directory
+   1. enter `git checkout -- .idea/runConfigurations` 
+   1. start IDEA again and open the project
+   1. confirm that the run configurations (drop down list in upper right of IDEA window) are available:
+   ![run configurations](https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/idea-run-configurations.png "IDEA run configurations")
+1. cd to mvrs-dsp (or go to `Terminal` tab in IDEA)
+1. run `mvn clean package` 
 
 ## Running the Flink jobs
 * TODO
