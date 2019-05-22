@@ -5,6 +5,8 @@
   * docker compose (linux: not sure what minimum required privileges are; root works, obviously)
   * maven
   * IntelliJ IDEA with Scala plugin
+  ![scala plugin](https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/intellij-scala-plugin.png "Scala plugin")
+
   
 * git clone https://github.com/rschoening/mvrs-dspa.git
 * cd to mvrs-dsp
