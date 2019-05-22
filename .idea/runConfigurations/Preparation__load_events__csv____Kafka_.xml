@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Preparation: load events to Kafka" type="Application" factoryName="Application">
+  <configuration default="false" name="Preparation: load events (csv -&gt; Kafka)" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="org.mvrs.dspa.jobs.preparation.WriteEventsToKafkaJob" />
     <module name="mvrs-dspa" />
     <option name="PROGRAM_PARAMETERS" value="local-with-ui" />

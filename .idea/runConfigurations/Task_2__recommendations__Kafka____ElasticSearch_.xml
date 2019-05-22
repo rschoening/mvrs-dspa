@@ -1,11 +1,11 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Task 1.1: active post statistics (kafka -&gt; kafka, post info: kafka -&gt; elasticsearch)" type="Application" factoryName="Application">
-    <option name="MAIN_CLASS_NAME" value="org.mvrs.dspa.jobs.activeposts.ActivePostStatisticsJob" />
+  <configuration default="false" name="Task 2: recommendations (Kafka -&gt; ElasticSearch)" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="org.mvrs.dspa.jobs.recommendations.RecommendationsJob" />
     <module name="mvrs-dspa" />
     <option name="PROGRAM_PARAMETERS" value="local-with-ui" />
     <extension name="coverage">
       <pattern>
-        <option name="PATTERN" value="org.mvrs.dspa.model.*" />
+        <option name="PATTERN" value="org.mvrs.dspa.jobs.*" />
         <option name="ENABLED" value="true" />
       </pattern>
     </extension>
