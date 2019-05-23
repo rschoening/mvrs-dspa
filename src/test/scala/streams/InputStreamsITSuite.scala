@@ -165,7 +165,9 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     print(results)
 
+    assertResult(107142)(results.map(_._2).sum) // comment event count
     assertResult(11575)(results.map(_._1).distinct.size) // distinct posts
+    assertResult(12559)(results.size) // count of per-person windows
 
     val duration = System.currentTimeMillis() - startTime
 
@@ -194,8 +196,7 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     println(result)
 
-    // NOTE result is NOT deterministic
-    // TODO compare sets of two runs (dropped, rooted) - maybe this gives a clue
+    assertResult(107142)(result)
 
     println(s"duration: ${DateTimeUtils.formatDuration(System.currentTimeMillis() - startTime)}")
   }
@@ -206,48 +207,9 @@ class InputStreamsITSuite extends AbstractTestBase {
     val result2 = getCommentIds
 
     println(s"result size 1: ${result1.size} - 2: ${result2.size}")
-    println(s"1 - 2: ${result1 -- result2}")
-    println(s"2 - 1: ${result2 -- result1}")
 
-    /*
-    some examples:
-
-    result size 1: 107216 - 2: 107228
-      1 - 2: Set(236620, 236650)
-      2 - 1: Set(260610, 4984730, 4984350, 2740070, 1045560, 3113890, 3089610, 859410, 2347400, 1045540, 2347390, 859380, 3644180, 260620)
-
-    result size 1: 107232 - 2: 107221
-      1 - 2: Set(236620, 4944550, 4984730, 4944580, 2554680, 3376590, 151800, 4944480, 2554600, 4944500, 236650, 2554640, 151740, 3644180, 2554660)
-      2 - 1: Set(4984350, 5832060, 859410, 859380)
-
-
-      element: 236620
-      ---------------------------------------------------------
-      | id     | uid | creation date        | post  | parent  |
-      ---------------------------------------------------------
-   -> | 236570 | 825 | 2012-03-18T04:11:43Z | 54520 |   -     | (1)  parent -> post (line 9385)
-   ** | 236620 | 109 | 2012-03-18T04:56:00Z |   -   | 236590  | (2)  grandchild     (line 9412, + 45 minutes)
-   -> | 236590 | 642 | 2012-03-18T07:38:42Z |   -   | 236570  | (3)  child          (line 9494, + 2h 42 minutes)
-      ---------------------------------------------------------
-     ==> 236620 *should* be dropped, since its parent is late (but is sometimes emitted)
-
-     element: 236650
-      ---------------------------------------------------------
-      | id     | uid | creation date        | post  | parent  |
-      ---------------------------------------------------------
-   -> | 236570 | 825 | 2012-03-18T04:11:43Z | 54520 |    -    | (1)  parent -> post   (line 9385)
-   -> | 236620 | 109 | 2012-03-18T04:56:00Z |   -   | 236590  | (3)  grandchild       (line 9412)
-   -> | 236590 | 642 | 2012-03-18T07:38:42Z |   -   | 236570  | (4)  child            (line 9494, + 2h 42 minutes)
-   ** | 236650 | 102 | 2012-03-19T02:14:21Z |   -   | 236620  | (2)  great-grandchild (line 9749)
-      ---------------------------------------------------------
-
-     children of 236590: 236640, 236620
-
-     result size 1: 107216 - 2: 107226
-      1 - 2: Set(260610, 5848580, 1788050, 2477070, 110110, 260620)
-      2 - 1: Set(3982270, 2554680, 850740, 5506350, 3571870, 3113890, 2554600, 2347400, 3571880, 850680, 3571850, 2347390, 2554640, 3571910, 3571900, 2554660)
-   */
-
+    assertResult(Set())(result1 -- result2)
+    assertResult(Set())(result2 -- result1)
   }
 
   private def getCommentIds: Set[Long] = {
@@ -258,7 +220,7 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     CollectionSink.values.clear()
     streams
-      .commentsFromCsv(TestUtils.getResourceURIPath("/streams/comments.csv"))
+      .commentsFromCsv(TestUtils.getResourceURIPath("/streams/comments.csv"), watermarkInterval = 100)
       .map(e => (e.commentId, 1))
       .addSink(new CollectionSink())
 

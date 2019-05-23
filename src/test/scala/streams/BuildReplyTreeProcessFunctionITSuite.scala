@@ -26,15 +26,42 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
   private val repetitions = 20
   private val postId = 999
 
-  /*
-   -> | 236570 | 825 | 2012-03-18T04:11:43Z | 54520 |    -    | (1)  parent -> post   (line 9385)
-   -> | 236620 | 109 | 2012-03-18T04:56:00Z |   -   | 236590  | (2)  grandchild       (line 9412)
-   -> | 236590 | 642 | 2012-03-18T07:38:42Z |   -   | 236570  | (3)  child            (line 9494, + 2h 42 minutes)
-   -> | 236640 | 956 | 2012-03-18T10:30:44Z |   -   | 236590  | (4)  grandchild       (line 9622)
-   ** | 236650 | 102 | 2012-03-19T02:14:21Z |   -   | 236620  | (5)  great-grandchild (line 9749)
+  @Test
+  def test_observedCase(): Unit = for (_ <- 0 until repetitions) {
+    val (rooted, dropped) = buildReplyTree(
+      Seq(
+        createReplyTo(875890, 1000, 875870),
+        createComment(commentId = 875870, 1010, postId), // parent
+        createReplyTo(commentId = 875910, 2000, 875890),
+        createReplyTo(commentId = 875930, 3000, 875910),
+        createReplyTo(commentId = 875970, 4000, 875930),
+        createReplyTo(commentId = 876010, 5000, 875970),
+      )
+    )
 
-   children of 236590: 236640, 236620
-   */
+    assert(rooted.forall(_.postId == postId))
+    assertResult(Set(875870))(rooted.map(_.commentId).toSet)
+    assertResult(Set(875970, 875930, 876010, 875910, 875890))(dropped.map(_.commentId).toSet)
+  }
+
+  @Test
+  def test_observedCase_alternateExecution(): Unit = for (_ <- 0 until repetitions) {
+    val (rooted, dropped) = buildReplyTree(
+      Seq(
+        createReplyTo(875890, 1000, 875870), // always dropped
+        createReplyTo(commentId = 875910, 2000, 875890), // sometimes emitted, must be dropped!
+        createReplyTo(commentId = 875930, 3000, 875910), // sometimes emitted, must be dropped!
+        createComment(commentId = 875870, 1010, postId), // parent --> emitted
+        createReplyTo(commentId = 875970, 4000, 875930), // sometimes emitted, must be dropped!
+        createReplyTo(commentId = 876010, 5000, 875970), // sometimes emitted, must be dropped!
+      )
+    )
+
+    assert(rooted.forall(_.postId == postId))
+    assertResult(Set(875870))(rooted.map(_.commentId).toSet)
+    assertResult(Set(875970, 875930, 876010, 875910, 875890))(dropped.map(_.commentId).toSet)
+  }
+
   @Test
   def test_Parent_Grandchild_Child_Greatgrandchild(): Unit = for (_ <- 0 until repetitions) {
     val (rooted, dropped) = buildReplyTree(
@@ -114,6 +141,28 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
     assert(rooted.forall(_.postId == postId))
     assertResult(Set(111, 112))(rooted.map(_.commentId).toSet)
     assertResult(Set(113))(dropped.map(_.commentId).toSet)
+  }
+
+  @Test
+  def test_Parent_Grandchild_Child_unordered(): Unit = for (_ <- 0 until repetitions) {
+    val (rooted, dropped) = buildReplyTree(
+      Seq(
+        createComment(commentId = 111, 2000, postId),
+        createReplyTo(commentId = 113, 3000, 112), // to evicted parent -> drop also
+        createReplyTo(commentId = 112, 1000, 111), // to later post -> drop
+      )
+    )
+
+    // execution:
+    // 1. processElement(111)
+    // 2. processBroadcastElement(113) (ts 3000, referring to past parent not yet received)
+    // 3. processBroadcastElement(112)
+
+    // 113 is rooted also! should be dropped as its parent is dropped
+
+    assert(rooted.forall(_.postId == postId))
+    assertResult(Set(111))(rooted.map(_.commentId).toSet)
+    assertResult(Set(112, 113))(dropped.map(_.commentId).toSet)
   }
 
   @Test

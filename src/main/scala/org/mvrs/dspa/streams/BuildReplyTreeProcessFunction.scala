@@ -15,7 +15,6 @@ import org.mvrs.dspa.streams.BuildReplyTreeProcessFunction._
 import org.mvrs.dspa.utils.FlinkUtils
 import org.slf4j.LoggerFactory
 
-import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
@@ -33,7 +32,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   // - since state has to be accessed from the broadcast side also (outside of keyed context), unkeyed state is used.
   //   An alternative would be the use of applyToKeyedState(), however this processes all keyed states in sequence,
   //   which might become too slow if many keys are active
-  @transient private lazy val danglingReplies: mutable.Map[Long, mutable.Set[RawCommentEvent]] = mutable.Map[Long, mutable.Set[RawCommentEvent]]()
+  @transient private lazy val danglingReplies = mutable.Map[Long, mutable.Set[RawCommentEvent]]()
 
   // TODO persist to ElasticSearch, use as cache (then no longer in operator state)
   @transient private lazy val postForComment: mutable.Map[Long, PostReference] = mutable.Map()
@@ -84,9 +83,9 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
                               out: Collector[CommentEvent]): Unit = {
     assert(ctx.timerService().currentWatermark() == ctx.currentWatermark())
     assert(ctx.currentWatermark() >= currentCommentWatermark)
-
     if (firstLevelComment.timestamp <= ctx.currentWatermark()) {
-      debug(s"Late element on comment stream: ${firstLevelComment.timestamp} <= ${ctx.currentWatermark()} ($firstLevelComment)")
+      debug(s"Late element on comment stream: ${firstLevelComment.timestamp} <= ${ctx.currentWatermark()} " +
+        s"($firstLevelComment)")
     }
 
     val postId = firstLevelComment.postId
@@ -95,8 +94,9 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
 
     // this state is unbounded, replies may refer to arbitrarily old comments
     // consider storing it in ElasticSearch, with a LRU cache maintained in the operator
-    // NOTE how to deal with cache misses? Must be in this operator, however access to ElasticSearch should be non-blocking
-    postForComment.put(firstLevelComment.commentId, PostReference(postId, firstLevelComment.timestamp))
+    // NOTE how to deal with cache misses? Must be in this operator, however access to ElasticSearch
+    // should be non-blocking
+    postForComment(firstLevelComment.commentId) = PostReference(postId, firstLevelComment.timestamp)
 
     out.collect(firstLevelComment)
 
@@ -126,48 +126,39 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   override def processBroadcastElement(reply: RawCommentEvent,
                                        ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, RawCommentEvent, CommentEvent]#Context,
                                        out: Collector[CommentEvent]): Unit = {
-    // println(s"processBroadcastElement(${reply.commentId})")
+    // NOTE on broadcast stream, elements with timestamp == ctx.currentWatermark() are delivered
+    // even if there are no actual late events
 
-    // verified: element count on broadcast stream is deterministic (no elements lost at end, apparently)
-
-    // there should be no events with timestamps older or equal to the watermark
-    if (reply.timestamp < ctx.currentWatermark()) {
-      // NOTE on broadcast stream, elements with timestamp == ctx.currentWatermark() are delivered even if there are no
-      //      actual late events
-      warn(s"Late element on broadcast stream: ${reply.timestamp} <= ${ctx.currentWatermark()} ($reply)")
-    }
     assert(ctx.currentWatermark() >= currentBroadcastWatermark)
     assert(reply.replyToPostId.isEmpty)
     assert(reply.replyToCommentId.isDefined)
 
+    // if a post reference for
     // look up post reference from map
-    reply.replyToCommentId.flatMap(id => postForComment.get(id)) match {
+    reply.replyToCommentId.flatMap(postForComment.get) match {
       case Some(postReference) =>
         // the parent comment was found in the map -> post id is known
-        postForComment(reply.commentId) =
-          PostReference(
-            postReference.postId,
-            if (postReference.commentTimestamp > reply.timestamp) Long.MaxValue
-            else reply.timestamp
-          )
 
         // If the parent comment has a later timestamp, the child reply (and all of its descendants) will be dropped,
         // to ensure deterministic results in spite of
         //  1) the non-deterministic arrival order of broadcast elements vs. primary elements, and
         //  2) the advancement of watermarks (which do so in a non-deterministic, proc-time dependent way)
 
-        processWaitingChildren(reply.commentId, reply.timestamp, postReference.postId, out, reportDropped(_, ctx.output(_, _)))
+        val replyBeforeParent = reply.timestamp < postReference.commentTimestamp
 
-        if (postReference.commentTimestamp > reply.timestamp)
-          drop(reply, reportDropped(_, ctx.output(_, _)))
-        else
-          out.collect(createComment(reply, postReference.postId)) // emit the rooted reply
+        val minimumValidTimestamp = if (replyBeforeParent) Long.MaxValue else reply.timestamp
+
+        processWaitingChildren(reply.commentId, minimumValidTimestamp, postReference.postId,
+          out, reportDropped(_, ctx.output(_, _)))
+
+        if (replyBeforeParent) drop(reply, reportDropped(_, ctx.output(_, _)))
+        else emit(createComment(reply, postReference.postId), out)
 
       case None => rememberDanglingReply(reply) // cache for later evaluation, globally in this operator/worker
     }
 
     // process dangling replies whenever watermark progressed
-    currentBroadcastWatermark = ctx.currentWatermark()
+    currentBroadcastWatermark = if (ctx.currentWatermark() == Long.MinValue) ctx.currentWatermark() else ctx.currentWatermark() - 1 //
     val minimumWatermark = math.min(currentCommentWatermark, currentBroadcastWatermark)
 
     if (minimumWatermark > currentMinimumWatermark) {
@@ -209,6 +200,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
       "post-for-comment",
       createTypeInformation[Map[Long, PostReference]])
 
+    // TODO must use UnionListState
     danglingRepliesListState = context.getOperatorStateStore.getListState(childRepliesDescriptor)
     postForCommentListState = context.getOperatorStateStore.getListState(postForCommentDescriptor)
 
@@ -235,10 +227,9 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     }
   }
 
-  private def createdBeforeParent(child: RawCommentEvent, parentTimestamp: Long): Boolean = child.timestamp < parentTimestamp
-
   private def emit(resolvedReply: CommentEvent, out: Collector[CommentEvent]): Unit = {
-    postForComment(resolvedReply.commentId) = PostReference(resolvedReply.postId, resolvedReply.timestamp) // remember comment -> post mapping
+    // remember comment -> post mapping
+    postForComment(resolvedReply.commentId) = PostReference(resolvedReply.postId, resolvedReply.timestamp)
 
     danglingReplies.remove(resolvedReply.commentId) // remove resolved replies from operator state
 
@@ -248,35 +239,32 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   }
 
   private def drop(reply: RawCommentEvent, report: RawCommentEvent => Unit): Unit = {
-    // NOTE all replies waiting for this must have been processed FIRST
+    // NOTE all replies waiting for this must have been processed FIRSTs
+    postForComment(reply.commentId) = PostReference(Long.MinValue, Long.MaxValue)
+
     danglingReplies.remove(reply.commentId)
     report(reply)
     droppedReplyCount.inc()
   }
 
-  private def processWaitingChildren(commentId: Long, timestamp: Long, postId: Long,
+  private def processWaitingChildren(commentId: Long, earliestValidTimestamp: Long, postId: Long,
                                      collector: Collector[CommentEvent],
                                      reportDropped: RawCommentEvent => Unit) = {
-    danglingReplies.get(commentId) match {
-      case Some(replies) =>
-        // there are replies waiting for this comment.
-        getWithChildren(replies, getWaitingReplies)
-          .groupBy(createdBeforeParent(_, timestamp))
-          .foreach {
-            case (true, earlyChildren) => earlyChildren.foreach(drop(_, reportDropped))
-            case (false, normalChildren) => normalChildren.map(createComment(_, postId)).foreach(emit(_, collector))
-          }
+    getDescendants(commentId, earliestValidTimestamp, getWaitingReplies) match {
+      case Nil => // no replies
 
+      case replies => replies.foreach {
+        case (reply: RawCommentEvent, valid: Boolean) =>
+          if (valid) emit(createComment(reply, postId), collector)
+          else drop(reply, reportDropped)
+      }
         danglingReplies.remove(commentId)
-
-      case None => // no waiting children found
     }
   }
 
   private def reportDropped(reply: RawCommentEvent,
                             output: (OutputTag[RawCommentEvent], RawCommentEvent) => Unit): Unit =
     outputTagDroppedReplies.foreach(output(_, reply))
-
 
   private def evictDanglingReplies(minimumWatermark: Long,
                                    out: Collector[CommentEvent],
@@ -293,7 +281,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
       if (lostReplies.nonEmpty) {
         val lostRepliesWithChildren = getWithChildren(lostReplies, getWaitingReplies)
 
-        lostRepliesWithChildren.foreach(drop(_, reportDropped))
+        lostRepliesWithChildren.foreach(t => drop(t, reportDropped))
 
         replies --= lostReplies // replies is *mutable* set
 
@@ -309,6 +297,9 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     cacheProcessingCount.inc()
   }
 
+  private def getWaitingReplies(commentId: Long): List[RawCommentEvent] =
+    danglingReplies.get(commentId).map(_.toList).getOrElse(List[RawCommentEvent]())
+
   private def getWaitingReplies(event: RawCommentEvent): mutable.Set[RawCommentEvent] =
     danglingReplies.getOrElse(event.commentId, mutable.Set[RawCommentEvent]())
 
@@ -323,20 +314,14 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     danglingRepliesHistogram.update(danglingReplies.size)
   }
 
-  private def warn(msg: => String): Unit = if (LOG.isWarnEnabled()) LOG.warn(msg)
-
   private def debug(msg: => String): Unit = if (LOG.isDebugEnabled) LOG.debug(msg)
 }
 
 object BuildReplyTreeProcessFunction {
-  def resolveDanglingReplies(replies: Iterable[RawCommentEvent],
-                             postId: Long,
-                             getChildren: RawCommentEvent => Iterable[RawCommentEvent]): Set[CommentEvent] =
-    getWithChildren(replies, getChildren).map(createComment(_, postId))
 
   def getWithChildren(replies: Iterable[RawCommentEvent],
                       getChildren: RawCommentEvent => Iterable[RawCommentEvent]): Set[RawCommentEvent] = {
-    @tailrec
+    @scala.annotation.tailrec
     def loop(acc: Set[RawCommentEvent])
             (replies: Iterable[RawCommentEvent],
              getChildren: RawCommentEvent => Iterable[RawCommentEvent]): Set[RawCommentEvent] = {
@@ -345,6 +330,37 @@ object BuildReplyTreeProcessFunction {
     }
 
     loop(Set())(replies, getChildren)
+  }
+
+  def getDescendants(parentId: Long,
+                     parentTimestamp: Long,
+                     getChildren: Long => List[RawCommentEvent]): List[(RawCommentEvent, Boolean)] = {
+    def childInfo(reply: RawCommentEvent, minTimestamp: Long, valid: Boolean): (RawCommentEvent, Long, Boolean) =
+      (reply, math.max(minTimestamp, reply.timestamp), valid && reply.timestamp >= minTimestamp)
+
+    @scala.annotation.tailrec
+    def loop(acc: List[(RawCommentEvent, Long, Boolean)],
+             replies: List[(RawCommentEvent, Long, Boolean)]): List[(RawCommentEvent, Long, Boolean)] =
+      replies match {
+        case Nil => acc // base case
+
+        case (reply, minTimestamp, valid) :: siblings =>
+
+          val newAcc = childInfo(reply, minTimestamp, valid) :: acc // new value for accumulator
+
+          getChildren(reply.commentId) match {
+            case Nil => loop(newAcc, siblings)
+
+            case children => loop(
+              newAcc,
+              children.map(childInfo(_, minTimestamp, valid)) ::: siblings
+            )
+          }
+      }
+
+    val replies = getChildren(parentId).map(childInfo(_, parentTimestamp, valid = true))
+
+    loop(List(), replies).map(t => (t._1, t._3))
   }
 
   private def createComment(c: RawCommentEvent, postId: Long): CommentEvent =
@@ -360,5 +376,17 @@ object BuildReplyTreeProcessFunction {
       c.placeId)
 
   case class PostReference(postId: Long, commentTimestamp: Long)
+
+  sealed trait ReplyTree {
+    def comment: RawCommentEvent
+
+    def children: List[ReplyTree]
+  }
+
+  case class Node(comment: RawCommentEvent, children: List[ReplyTree]) extends ReplyTree
+
+  case class Leaf(comment: RawCommentEvent) extends ReplyTree {
+    override def children: List[ReplyTree] = Nil
+  }
 
 }
