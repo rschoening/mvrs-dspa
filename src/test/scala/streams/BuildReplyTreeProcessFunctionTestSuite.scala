@@ -1,7 +1,7 @@
 package streams
 
 import org.mvrs.dspa.model.RawCommentEvent
-import org.mvrs.dspa.streams.BuildReplyTreeProcessFunction
+import org.mvrs.dspa.streams.BuildReplyTreeProcessFunction._
 import org.mvrs.dspa.utils.DateTimeUtils
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -11,26 +11,22 @@ class BuildReplyTreeProcessFunctionTestSuite extends FlatSpec with Matchers {
   "reply resolver" must "create correct set" in {
     val firstLevelCommentId = 111
     val firstLevelCommentTimestamp = 1000
-    val rawComments: List[RawCommentEvent] =
+    val rawComments =
       List(
         createComment(firstLevelCommentId, firstLevelCommentTimestamp, postId),
         createReplyTo(112, 2000, 111),
         createReplyTo(113, 3000, 112)
       )
 
-    val replies = rawComments.filter(_.replyToCommentId.getOrElse(-1) == firstLevelCommentId)
-
-    val result = BuildReplyTreeProcessFunction.getWithChildrenAndMaxTimestamp(
-      replies, firstLevelCommentTimestamp,
-      commentId => rawComments.filter(_.replyToCommentId.contains(commentId)),
-      c => c.timestamp)
+    val result = getDescendants(firstLevelCommentId, firstLevelCommentTimestamp,
+      commentId => rawComments.filter(_.replyToCommentId.contains(commentId)))
 
     println(result.mkString("\n"))
 
     assertResult(
       Set(
-        (112, 2000),
-        (113, 3000)
+        (112, true),
+        (113, true)
       )
     )(result.map(t => (t._1.commentId, t._2)).toSet)
   }
@@ -39,7 +35,7 @@ class BuildReplyTreeProcessFunctionTestSuite extends FlatSpec with Matchers {
 
     val firstLevelCommentId = 111
     val firstLevelCommentTimestamp = 1000
-    val rawComments: List[RawCommentEvent] =
+    val comments =
       List(
         createComment(firstLevelCommentId, firstLevelCommentTimestamp, postId),
         createReplyTo(211, 3000, 111),
@@ -48,21 +44,17 @@ class BuildReplyTreeProcessFunctionTestSuite extends FlatSpec with Matchers {
         createReplyTo(312, 2500, 211)
       )
 
-    val replies = rawComments.filter(_.replyToCommentId.getOrElse(-1) == firstLevelCommentId)
-
-    val result = BuildReplyTreeProcessFunction.getWithChildrenAndMaxTimestamp(
-      replies, firstLevelCommentTimestamp,
-      commentId => rawComments.filter(_.replyToCommentId.contains(commentId)),
-      c => c.timestamp)
+    val result = getDescendants(firstLevelCommentId, firstLevelCommentTimestamp,
+      id => comments.filter(_.replyToCommentId.contains(id)))
 
     println(result.mkString("\n"))
 
     assertResult(
       Set(
-        (211, 3000),
-        (212, 2000),
-        (311, 2500),
-        (312, 3000)
+        (211, true),
+        (212, true),
+        (311, true),
+        (312, false)
       )
     )(result.map(t => (t._1.commentId, t._2)).toSet)
   }
@@ -71,59 +63,58 @@ class BuildReplyTreeProcessFunctionTestSuite extends FlatSpec with Matchers {
     val firstLevelCommentId = 111
     val firstLevelCommentTimestamp = 1000
 
-    val root = createComment(firstLevelCommentId, firstLevelCommentTimestamp, postId)
-    val r211 = createReplyTo(211, 3000, 111)
-    val r212 = createReplyTo(212, 2000, 111)
-    val r311 = createReplyTo(311, 2500, 212)
-    val r312 = createReplyTo(312, 2500, 211)
-    val r411 = createReplyTo(411, 2500, 312)
+    val comments =
+      List(
+        createComment(firstLevelCommentId, firstLevelCommentTimestamp, postId),
+        createReplyTo(211, 3000, 111),
+        createReplyTo(212, 2000, 111),
+        createReplyTo(311, 2500, 212),
+        createReplyTo(312, 2500, 211),
+        createReplyTo(411, 2500, 312),
+      )
 
-    val rawComments = List(root, r211, r212, r311, r312, r411)
+    val result = getDescendants(firstLevelCommentId, firstLevelCommentTimestamp,
+      id => comments.filter(_.replyToCommentId.contains(id)))
 
-    val expected = Set((311, 2500), (212, 2000), (411, 3000), (312, 3000), (211, 3000))
+    println(result.mkString("\n"))
 
-    val getChildren: Long => List[RawCommentEvent] = commentId => rawComments.filter(_.replyToCommentId.contains(commentId))
-
-    val result2 = BuildReplyTreeProcessFunction.getWithChildrenAndMaxTimestamp(
-      getChildren(root.commentId),
-      root.timestamp,
-      getChildren,
-      c => c.timestamp)
-      .map(t => (t._1.commentId, t._2))
-
-    println(result2)
-    assertResult(expected)(result2.toSet)
+    assertResult(
+      Set(
+        (211, true),
+        (212, true),
+        (311, true),
+        (312, false),
+        (411, false),
+      )
+    )(result.map(t => (t._1.commentId, t._2)).toSet)
   }
 
   it must "create correct tree if unordered" in {
     val firstLevelCommentId = 111
     val firstLevelCommentTimestamp = 2000
-    val rawComments: List[RawCommentEvent] =
+
+    val comments =
       List(
-        createReplyTo(commentId = 114, 1000, 112), // min ts for valid parent: 3000
-        createReplyTo(commentId = 115, 1000, 113), //          ""            : 4000
-        createReplyTo(commentId = 112, 3000, 111), //          ""            : 3000
-        createReplyTo(commentId = 113, 4000, 112), //          ""            : 4000
+        createReplyTo(commentId = 114, 1000, 112),
+        createReplyTo(commentId = 115, 1000, 113),
+        createReplyTo(commentId = 112, 3000, 111),
+        createReplyTo(commentId = 113, 4000, 112),
+        createReplyTo(commentId = 116, 4000, 114),
         createComment(commentId = firstLevelCommentId, firstLevelCommentTimestamp, postId),
       )
 
-    val replies = rawComments.filter(c => c.replyToCommentId.getOrElse(-1) == firstLevelCommentId)
-
-    val result = BuildReplyTreeProcessFunction.getWithChildrenAndMaxTimestamp(
-      replies,
-      firstLevelCommentTimestamp,
-      commentId => rawComments.filter(_.replyToCommentId.contains(commentId)),
-      c => c.timestamp)
+    val result = getDescendants(firstLevelCommentId, firstLevelCommentTimestamp,
+      id => comments.filter(_.replyToCommentId.contains(id)))
 
     println(result.mkString("\n"))
 
-    assertResult(4)(result.size)
     assertResult(
       Set(
-        (112, 3000),
-        (114, 3000),
-        (113, 4000),
-        (115, 4000)
+        (112, true),
+        (114, false),
+        (113, true),
+        (115, false),
+        (116, true)
       )
     )(result.map(t => (t._1.commentId, t._2)).toSet)
   }
