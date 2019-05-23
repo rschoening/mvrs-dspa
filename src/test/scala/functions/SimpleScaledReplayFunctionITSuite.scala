@@ -12,7 +12,7 @@ import scala.collection.JavaConverters._
 
 class SimpleScaledReplayFunctionITSuite extends AbstractTestBase {
 
-  val toleranceMillis = 30L
+  val toleranceMillis = 50L
 
   @Test
   def testScaledReplay(): Unit = assertExpectedSpeedup(List(1000L, 2000L, 3000L), 10.0)
