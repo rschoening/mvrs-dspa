@@ -15,7 +15,6 @@ import org.mvrs.dspa.streams.BuildReplyTreeProcessFunction._
 import org.mvrs.dspa.utils.FlinkUtils
 import org.slf4j.LoggerFactory
 
-import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
@@ -59,9 +58,6 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
 
   @transient private lazy val LOG = LoggerFactory.getLogger(classOf[KMeansClusterFunction])
 
-  private lazy val ids = Set(875890L, 875870L, 875910L, 875930L, 875970L, 876010L)
-
-
   override def open(parameters: Configuration): Unit = {
     // initialize transient variables
     currentCommentWatermark = Long.MinValue
@@ -92,10 +88,6 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
         s"($firstLevelComment)")
     }
 
-    if (ids.contains(firstLevelComment.commentId)) {
-      println(s"processElement(${firstLevelComment.commentId})")
-    }
-
     val postId = firstLevelComment.postId
 
     assert(ctx.getCurrentKey == postId) // must be keyed by post id
@@ -104,7 +96,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     // consider storing it in ElasticSearch, with a LRU cache maintained in the operator
     // NOTE how to deal with cache misses? Must be in this operator, however access to ElasticSearch
     // should be non-blocking
-    postForComment.put(firstLevelComment.commentId, PostReference(postId, firstLevelComment.timestamp))
+    postForComment(firstLevelComment.commentId) = PostReference(postId, firstLevelComment.timestamp)
 
     out.collect(firstLevelComment)
 
@@ -134,22 +126,14 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   override def processBroadcastElement(reply: RawCommentEvent,
                                        ctx: KeyedBroadcastProcessFunction[Long, CommentEvent, RawCommentEvent, CommentEvent]#Context,
                                        out: Collector[CommentEvent]): Unit = {
-    if (ids.contains(reply.commentId)) {
-      println(s"processBroadcastElement(${reply.commentId})")
-    }
+    // NOTE on broadcast stream, elements with timestamp == ctx.currentWatermark() are delivered
+    // even if there are no actual late events
 
-    // verified: element count on broadcast stream is deterministic (no elements lost at end, apparently)
-
-    // there should be no events with timestamps older or equal to the watermark
-    if (reply.timestamp < ctx.currentWatermark()) {
-      // NOTE on broadcast stream, elements with timestamp == ctx.currentWatermark() are delivered even if there are no
-      //      actual late events
-      warn(s"Late element on broadcast stream: ${reply.timestamp} <= ${ctx.currentWatermark()} ($reply)")
-    }
     assert(ctx.currentWatermark() >= currentBroadcastWatermark)
     assert(reply.replyToPostId.isEmpty)
     assert(reply.replyToCommentId.isDefined)
 
+    // if a post reference for
     // look up post reference from map
     reply.replyToCommentId.flatMap(postForComment.get) match {
       case Some(postReference) =>
@@ -164,21 +148,17 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
 
         val minimumValidTimestamp = if (replyBeforeParent) Long.MaxValue else reply.timestamp
 
-        postForComment(reply.commentId) = postReference
-
         processWaitingChildren(reply.commentId, minimumValidTimestamp, postReference.postId,
           out, reportDropped(_, ctx.output(_, _)))
 
-        if (replyBeforeParent)
-          drop(reply, reportDropped(_, ctx.output(_, _)))
-        else
-          out.collect(createComment(reply, postReference.postId)) // emit the rooted reply
+        if (replyBeforeParent) drop(reply, reportDropped(_, ctx.output(_, _)))
+        else emit(createComment(reply, postReference.postId), out)
 
       case None => rememberDanglingReply(reply) // cache for later evaluation, globally in this operator/worker
     }
 
     // process dangling replies whenever watermark progressed
-    currentBroadcastWatermark = ctx.currentWatermark()
+    currentBroadcastWatermark = if (ctx.currentWatermark() == Long.MinValue) ctx.currentWatermark() else ctx.currentWatermark() - 1 //
     val minimumWatermark = math.min(currentCommentWatermark, currentBroadcastWatermark)
 
     if (minimumWatermark > currentMinimumWatermark) {
@@ -220,6 +200,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
       "post-for-comment",
       createTypeInformation[Map[Long, PostReference]])
 
+    // TODO must use UnionListState
     danglingRepliesListState = context.getOperatorStateStore.getListState(childRepliesDescriptor)
     postForCommentListState = context.getOperatorStateStore.getListState(postForCommentDescriptor)
 
@@ -333,8 +314,6 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     danglingRepliesHistogram.update(danglingReplies.size)
   }
 
-  private def warn(msg: => String): Unit = if (LOG.isWarnEnabled()) LOG.warn(msg)
-
   private def debug(msg: => String): Unit = if (LOG.isDebugEnabled) LOG.debug(msg)
 }
 
@@ -342,7 +321,7 @@ object BuildReplyTreeProcessFunction {
 
   def getWithChildren(replies: Iterable[RawCommentEvent],
                       getChildren: RawCommentEvent => Iterable[RawCommentEvent]): Set[RawCommentEvent] = {
-    @tailrec
+    @scala.annotation.tailrec
     def loop(acc: Set[RawCommentEvent])
             (replies: Iterable[RawCommentEvent],
              getChildren: RawCommentEvent => Iterable[RawCommentEvent]): Set[RawCommentEvent] = {
@@ -356,25 +335,30 @@ object BuildReplyTreeProcessFunction {
   def getDescendants(parentId: Long,
                      parentTimestamp: Long,
                      getChildren: Long => List[RawCommentEvent]): List[(RawCommentEvent, Boolean)] = {
-    def loop(acc: List[(RawCommentEvent, Long, Boolean)], replies: List[(RawCommentEvent, Long, Boolean)]): List[(RawCommentEvent, Long, Boolean)] =
+    def childInfo(reply: RawCommentEvent, minTimestamp: Long, valid: Boolean): (RawCommentEvent, Long, Boolean) =
+      (reply, math.max(minTimestamp, reply.timestamp), valid && reply.timestamp >= minTimestamp)
+
+    @scala.annotation.tailrec
+    def loop(acc: List[(RawCommentEvent, Long, Boolean)],
+             replies: List[(RawCommentEvent, Long, Boolean)]): List[(RawCommentEvent, Long, Boolean)] =
       replies match {
         case Nil => acc // base case
 
         case (reply, minTimestamp, valid) :: siblings =>
 
-          val newAcc = (reply, math.max(minTimestamp, reply.timestamp), valid && reply.timestamp >= minTimestamp) :: acc
+          val newAcc = childInfo(reply, minTimestamp, valid) :: acc // new value for accumulator
 
           getChildren(reply.commentId) match {
             case Nil => loop(newAcc, siblings)
 
             case children => loop(
               newAcc,
-              children.map(child => (child, math.max(minTimestamp, reply.timestamp), child.timestamp >= minTimestamp)) ::: siblings
+              children.map(childInfo(_, minTimestamp, valid)) ::: siblings
             )
           }
       }
 
-    val replies = getChildren(parentId).map(child => (child, parentTimestamp, child.timestamp >= parentTimestamp))
+    val replies = getChildren(parentId).map(childInfo(_, parentTimestamp, valid = true))
 
     loop(List(), replies).map(t => (t._1, t._3))
   }
