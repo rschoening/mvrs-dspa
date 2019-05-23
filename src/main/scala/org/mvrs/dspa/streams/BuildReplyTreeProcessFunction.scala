@@ -200,9 +200,16 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
       "post-for-comment",
       createTypeInformation[Map[Long, PostReference]])
 
-    // TODO must use UnionListState
-    danglingRepliesListState = context.getOperatorStateStore.getListState(childRepliesDescriptor)
-    postForCommentListState = context.getOperatorStateStore.getListState(postForCommentDescriptor)
+    // NOTE UnionListState must be used so that state is guaranteed to be available after rescaling etc.
+    // The implicitly sharded postForComment state will therefore be duplicated on all workers, requiring each
+    // worker to be able to hold state about all past posts.
+    // The problem is that the function does not know all the keys (post ids) it is responsible for. If it was then
+    // It could discard the postForComment entries it does not need.
+    // So the current solution should really be replaced with an central cache. This function would have to be taken
+    // apart for this, into a preceding AsyncIO step doing the lookup for each incoming first-level comment and reply,
+    // and a sink to upsert any changed mappings.
+    danglingRepliesListState = context.getOperatorStateStore.getUnionListState(childRepliesDescriptor)
+    postForCommentListState = context.getOperatorStateStore.getUnionListState(postForCommentDescriptor)
 
     if (context.isRestored) {
 
@@ -332,11 +339,21 @@ object BuildReplyTreeProcessFunction {
     loop(Set())(replies, getChildren)
   }
 
+  /**
+    * Gets the descendants of a comment, with an indication if the descendant is valid with regard to causality
+    * (timestamp along parent->child chain must increase monotonically)
+    *
+    * @param parentId        the id of the parent comment
+    * @param parentTimestamp the timestamp of the parent comment
+    * @param getChildren     funcdtion to get the immediate children based on a comment id
+    * @return flattened list of child comments with a boolean indicating validity
+    *         (valid children will be emitted, invalid children will be dropped)
+    */
   def getDescendants(parentId: Long,
                      parentTimestamp: Long,
                      getChildren: Long => List[RawCommentEvent]): List[(RawCommentEvent, Boolean)] = {
-    def childInfo(reply: RawCommentEvent, minTimestamp: Long, valid: Boolean): (RawCommentEvent, Long, Boolean) =
-      (reply, math.max(minTimestamp, reply.timestamp), valid && reply.timestamp >= minTimestamp)
+    def childInfo(reply: RawCommentEvent, minTimestamp: Long, parentIsValid: Boolean): (RawCommentEvent, Long, Boolean) =
+      (reply, math.max(minTimestamp, reply.timestamp), parentIsValid && reply.timestamp >= minTimestamp)
 
     @scala.annotation.tailrec
     def loop(acc: List[(RawCommentEvent, Long, Boolean)],
@@ -344,23 +361,22 @@ object BuildReplyTreeProcessFunction {
       replies match {
         case Nil => acc // base case
 
-        case (reply, minTimestamp, valid) :: siblings =>
+        case (reply, minTimestamp, parentIsValid) :: siblings =>
 
-          val newAcc = childInfo(reply, minTimestamp, valid) :: acc // new value for accumulator
+          val newAcc = childInfo(reply, minTimestamp, parentIsValid) :: acc // new value for accumulator
 
           getChildren(reply.commentId) match {
-            case Nil => loop(newAcc, siblings)
+            // the reply has children, go depth-first
+            case children => loop(newAcc, children.map(childInfo(_, minTimestamp, parentIsValid)) ::: siblings)
 
-            case children => loop(
-              newAcc,
-              children.map(childInfo(_, minTimestamp, valid)) ::: siblings
-            )
+            // no children, proceed with siblings
+            case Nil => loop(newAcc, siblings)
           }
       }
 
-    val replies = getChildren(parentId).map(childInfo(_, parentTimestamp, valid = true))
+    val replies = getChildren(parentId).map(childInfo(_, parentTimestamp, parentIsValid = true))
 
-    loop(List(), replies).map(t => (t._1, t._3))
+    loop(List(), replies).map(t => (t._1, t._3)) // start the recursion
   }
 
   private def createComment(c: RawCommentEvent, postId: Long): CommentEvent =
@@ -376,17 +392,5 @@ object BuildReplyTreeProcessFunction {
       c.placeId)
 
   case class PostReference(postId: Long, commentTimestamp: Long)
-
-  sealed trait ReplyTree {
-    def comment: RawCommentEvent
-
-    def children: List[ReplyTree]
-  }
-
-  case class Node(comment: RawCommentEvent, children: List[ReplyTree]) extends ReplyTree
-
-  case class Leaf(comment: RawCommentEvent) extends ReplyTree {
-    override def children: List[ReplyTree] = Nil
-  }
 
 }
