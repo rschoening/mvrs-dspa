@@ -114,7 +114,7 @@ class BuildReplyTreeProcessFunctionTestSuite extends FlatSpec with Matchers {
         (114, false),
         (113, true),
         (115, false),
-        (116, true)
+        (116, false)
       )
     )(result.map(t => (t._1.commentId, t._2)).toSet)
   }
