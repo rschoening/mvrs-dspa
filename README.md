@@ -52,14 +52,28 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
 
 ## Running the Flink jobs
 ### Data preparation
-* TODO
+#### Loading static data into ElasticSearch
+* Job class: `org.mvrs.dspa.jobs.preparation.LoadStaticDataJob [local-with-ui]`
+* IDEA run configuration: `Preparation: load static tables (csv -> ElasticSearch)` (specifies `local-with-ui`)
+#### Writing events to Kafka
+* Job class: `org.mvrs.dspa.jobs.preparation.WriteEventsToKafkaJob [local-with-ui]`
+* IDEA run configuration: `Preparation: load events (csv -> Kafka)` (specifies `local-with-ui`)
 ### Active post statistics
-* TODO
+#### Calculating post statistics
+* Job class: `org.mvrs.dspa.jobs.activeposts.ActivePostStatisticsJob [local-with-ui]`
+* IDEA run configuration: `Task 1.1: active post statistics (Kafka -> Kafka, post info: Kafka -> ElasticSearch)` (specifies `local-with-ui`)
+#### Writing post statistics results to ElasticSearch index
+* Job class: `org.mvrs.dspa.jobs.activeposts.WriteActivePostStatisticsToElasticSearchJob [local-with-ui]`
+* IDEA run configuration: `Task 1.2: active post statistics - (Kafka -> ElasticSearch) [NO UI]` (_without_ `local-with-ui` to allow for parallel execution with previous task on local machine/minicluster, without conflict on Web UI port)
+* Kibana dashboard: ....
 ### Recommendations
-* TODO
-* recommendations dashboard: set date range to "last 15 minutes"
+* Job class: `org.mvrs.dspa.jobs.recommendations.RecommendationsJob [local-with-ui]`
+* IDEA run configuration: `Task 2: user recommendations (Kafka -> ElasticSearch)` (specifies `local-with-ui`)
+* Kibana dashboard: set date range to "last 15 minutes"
 ### Unusual activity detection
-* TODO
+* Job class: `org.mvrs.dspa.jobs.clustering.UnusualActivityDetectionJob [local-with-ui]`
+* IDEA run configuration: `Task 3: unusual activity detection (Kafka -> ElasticSearch)` (specifies `local-with-ui`)
+* Kibana dashboard: 
 * NOTE
    * Unusual activity detection: cluster metadata graph can have gaps since that visualization does not interpolate across buckets with nodata (which may result due to extending windows)
 
@@ -67,6 +81,8 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
 * package structure
 * configuration (application.conf)
 * unit tests
+* ElasticSearch indexes: see class xy
+* Kafka topics: see class xy
 
 ## Addresses:
 * Flink lokal UI: http://localhost:8081/#/overview
