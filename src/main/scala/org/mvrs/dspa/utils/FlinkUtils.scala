@@ -88,7 +88,7 @@ object FlinkUtils {
       val config = new Configuration
 
       config.setBoolean(ConfigConstants.LOCAL_START_WEBSERVER, true)
-      config.setString(WebOptions.LOG_PATH, "./data/flinkui.log")
+      config.setString(WebOptions.LOG_PATH, "./data/flinkui.log") // TODO revise
 
       config.setString("metrics.reporters", "prometheus")
       config.setString("metrics.reporter.prometheus.class", "org.apache.flink.metrics.prometheus.PrometheusReporter")
@@ -97,6 +97,9 @@ object FlinkUtils {
     }
     else StreamExecutionEnvironment.getExecutionEnvironment
   }
+
+  def createRemoteStreamExecutionEnvironment(host: String, port: Int, jarFiles: String*): StreamExecutionEnvironment =
+    StreamExecutionEnvironment.createRemoteEnvironment(host: String, port, jarFiles: _*)
 
   /**
     * Creates the type info serialization schema for a given type
@@ -108,10 +111,12 @@ object FlinkUtils {
   def createTypeInfoSerializationSchema[T: TypeInformation](implicit env: StreamExecutionEnvironment): TypeInformationSerializationSchema[T] =
     new TypeInformationSerializationSchema[T](createTypeInformation[T], env.getConfig)
 
-
   def createBatchExecutionEnvironment(localWithUI: Boolean = false): ExecutionEnvironment =
     if (localWithUI) ExecutionEnvironment.createLocalEnvironmentWithWebUI()
     else ExecutionEnvironment.getExecutionEnvironment
+
+  def createRemoteBatchExecutionEnvironment(host: String, port: Int, jarFiles: String*): ExecutionEnvironment =
+    ExecutionEnvironment.createRemoteEnvironment(host: String, port, jarFiles: _*)
 
   /**
     * Shorthand for reading a csv file in the format of the project test data, and returning a DataSet

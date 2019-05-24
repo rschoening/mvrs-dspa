@@ -4,7 +4,6 @@ import org.apache.flink.api.common.restartstrategy.RestartStrategies
 import org.apache.flink.contrib.streaming.state.RocksDBStateBackend
 import org.apache.flink.runtime.state.StateBackend
 import org.apache.flink.runtime.state.filesystem.FsStateBackend
-import org.apache.flink.streaming.api.environment.LocalStreamEnvironment
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 import org.apache.flink.streaming.api.{CheckpointingMode, TimeCharacteristic}
 import org.apache.flink.util.TernaryBoolean
@@ -43,17 +42,14 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
   private val asynchronousSnapshots = Settings.config.getBoolean("jobs.asynchronous-snapshots")
   private val restartAttempts = Settings.config.getInt("jobs.restart-attempts")
   private val delayBetweenAttempts = Settings.config.getLong("jobs.delay-between-attempts")
-  private val defaultParallelism = Settings.config.getInt("jobs.local-default-parallelism")
 
-  // localWithUI is set by base class based on program arguments
-  implicit val env: StreamExecutionEnvironment = FlinkUtils.createStreamExecutionEnvironment(localWithUI)
+  StreamExecutionEnvironment.setDefaultLocalParallelism(defaultLocalParallelism)
 
-  if (env.getJavaEnv.isInstanceOf[LocalStreamEnvironment]) {
-    // configuration specific for the local environment (i.e. in-process mini cluster)
-    if (defaultParallelism > 0) {
-      // NOTE default parallelism is otherwise 8 (observed at 1.7.2)
-      env.setParallelism(defaultParallelism)
-    }
+  // NOTE: environment is set by base class based on program arguments
+  implicit val env: StreamExecutionEnvironment = environmentType match {
+    case EnvironmentType.Default => FlinkUtils.createStreamExecutionEnvironment()
+    case EnvironmentType.LocalWithUI => FlinkUtils.createStreamExecutionEnvironment(true)
+    case EnvironmentType.Remote => FlinkUtils.createRemoteStreamExecutionEnvironment(flinkClusterHost, flinkClusterPort, flinkClusterJars: _*)
   }
 
   // see https://ci.apache.org/projects/flink/flink-docs-stable/monitoring/metrics.html#latency-tracking

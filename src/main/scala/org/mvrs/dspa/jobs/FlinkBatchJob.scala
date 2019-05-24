@@ -8,11 +8,20 @@ import org.mvrs.dspa.utils.FlinkUtils
   *
   * @param parallelism the default parallelism for the job
   */
-abstract class FlinkBatchJob(parallelism: Int = 4) extends FlinkJob {
+abstract class FlinkBatchJob(parallelism: Option[Int] = None) extends FlinkJob {
   // localWithUI is set by base class based on program arguments
-  implicit val env: ExecutionEnvironment = FlinkUtils.createBatchExecutionEnvironment(localWithUI)
 
-  env.setParallelism(parallelism)
+  ExecutionEnvironment.setDefaultLocalParallelism(defaultLocalParallelism)
+
+  // NOTE: environment is set by base class based on program arguments
+  implicit val env: ExecutionEnvironment = environmentType match {
+    case EnvironmentType.Default => FlinkUtils.createBatchExecutionEnvironment()
+    case EnvironmentType.LocalWithUI => FlinkUtils.createBatchExecutionEnvironment(true)
+    case EnvironmentType.Remote => FlinkUtils.createRemoteBatchExecutionEnvironment(flinkClusterHost, flinkClusterPort, flinkClusterJars: _*)
+  }
+
+  // apply override of default parallelism, if defined
+  parallelism.foreach(env.setParallelism)
 
   execute()
 }
