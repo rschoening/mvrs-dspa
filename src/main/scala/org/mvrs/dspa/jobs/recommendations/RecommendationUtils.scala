@@ -69,11 +69,7 @@ object RecommendationUtils {
     * end up in the same bucket are likely to be similar. The targetThreshold controls
     * the desired level of similarity - the higher the threshold, the more efficiently
     * you can find all the similar sets.
-    *
-    * This abstract superclass is generic with regards to the size of the hash used.
-    * Depending on the number of unique values in the domain of the sets, you may want
-    * a MinHasher16, a MinHasher32, or a new custom subclass.
-    *
+    * ...
     * This implementation is modeled after Chapter 3 of Ullman and Rajaraman's Mining of Massive Datasets:
     * http://infolab.stanford.edu/~ullman/mmds/ch3a.pdf
     *

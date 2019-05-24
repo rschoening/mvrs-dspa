@@ -40,17 +40,24 @@ class RecommendationUtilsTestSuite extends FlatSpec with Matchers {
     // NOTE this is just to exercise the basic principle, not to verify correctness of the LSH approach/twitter's implementation
 
     //noinspection RedundantDefaultArgument
-    val minHasher = RecommendationUtils.createMinHasher(numHashes = 100, targetThreshold = 0.1)
+    val targetThreshold = 0.2
+    val numHashes = 100
+    val minHasher = RecommendationUtils.createMinHasher(numHashes, targetThreshold)
 
     // some inclusion probability values for given Jaccard similarities
     // - increasing numHashes steepens the probability curve at the target threshold
+    // for target threshold 0.2:
+    println(s"target threshold: $targetThreshold  numHashes: $numHashes")
     println("0.01:" + minHasher.probabilityOfInclusion(0.01)) // 0.004
     println("0.02:" + minHasher.probabilityOfInclusion(0.02)) //  0.017
     println("0.05:" + minHasher.probabilityOfInclusion(0.05)) //  0.102
     println("0.1: " + minHasher.probabilityOfInclusion(0.1)) //   0.350
-    println("0.2: " + minHasher.probabilityOfInclusion(0.2)) //   0.827 --> target threshold
+    println("0.2: " + minHasher.probabilityOfInclusion(0.2)) //   0.827 --> at target threshold 0.2
     println("0.5: " + minHasher.probabilityOfInclusion(0.5)) //   0.999
     println("0.9: " + minHasher.probabilityOfInclusion(0.9)) //   0.999
+
+    // uncomment to get table of probability curve
+    // (0 to 100).map(sim => s"$sim; ${minHasher.probabilityOfInclusion(sim / 100.0)}").foreach(println)
 
     // at target threshold 0.2: 17.3% false negatives with 100 hashes; 10% with 1000 hashes, 3.5% with 10000 hashes
     // With higher values for numHashes, the bucket count gets very large --> high cost for bucket storage/retrieval (and hashing)
@@ -102,6 +109,7 @@ class RecommendationUtilsTestSuite extends FlatSpec with Matchers {
     println(approximateSelection.map(s => s"- $s").mkString("\n"))
 
     assert(approximateSelection.forall(!_.startsWith("disjoint"))) // there could be false positives, but we're lucky
+    assertResult(Set("equal", "similar", "subset", "superset"))(approximateSelection) // no false negatives
   }
 
   private def approximationError(features: List[String], otherFeatures: List[String], minHasher: MinHasher32): Double =

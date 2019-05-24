@@ -24,13 +24,14 @@ import scala.collection.mutable
 
 /**
   * Streaming job for unusual activity detection (DSPA Task #3)
+  *
+  * @todo add integration tests
+  *       come up with better text features
+  *       if a cluster gets too small, split the largest cluster
+  *       extract features within clustering operator (more flexibility to standardize/normalize features)
   */
 object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes = true) {
-  // TODO
-  // - add integration tests
-  // - extract features within clustering operator (more flexibility to standardize/normalize features)
-  // - if a cluster gets too small, split the largest cluster
-  // - come up with better text features
+
   def execute(): JobExecutionResult = {
     // read settings
     val clusterParameterFilePath = Settings.config.getString("jobs.activity-detection.cluster-parameter-file-path")
@@ -53,6 +54,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     ElasticSearchIndexes.classification.create()
     ElasticSearchIndexes.clusterMetadata.create()
 
+    // consume comments and posts from Kafka
     val kafkaConsumerGroup = Some("activity-detection")
     val comments: DataStream[CommentEvent] = streams.comments(kafkaConsumerGroup)
     val posts: DataStream[PostEvent] = streams.posts(kafkaConsumerGroup)
@@ -118,6 +120,14 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     env.execute()
   }
 
+  /**
+    * Continuously read updated clustering control parameters from a text file
+    *
+    * @param controlFilePath The path to the control parameters file
+    * @param updateInterval
+    * @param env
+    * @return
+    */
   def readControlParameters(controlFilePath: String, updateInterval: Long = 1000L)
                            (implicit env: StreamExecutionEnvironment): DataStream[String] = {
     val inputFormat = new TextInputFormat(new Path(controlFilePath))
