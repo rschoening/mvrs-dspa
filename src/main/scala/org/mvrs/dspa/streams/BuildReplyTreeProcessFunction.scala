@@ -345,38 +345,36 @@ object BuildReplyTreeProcessFunction {
     *
     * @param parentId        the id of the parent comment
     * @param parentTimestamp the timestamp of the parent comment
-    * @param getChildren     funcdtion to get the immediate children based on a comment id
+    * @param getChildren     function to get the immediate children based on a comment id
     * @return flattened list of child comments with a boolean indicating validity
     *         (valid children will be emitted, invalid children will be dropped)
     */
   def getDescendants(parentId: Long,
                      parentTimestamp: Long,
                      getChildren: Long => List[RawCommentEvent]): List[(RawCommentEvent, Boolean)] = {
-    def childInfo(reply: RawCommentEvent, minTimestamp: Long, parentIsValid: Boolean): (RawCommentEvent, Long, Boolean) =
-      (reply, math.max(minTimestamp, reply.timestamp), parentIsValid && reply.timestamp >= minTimestamp)
+    def childInfo(reply: RawCommentEvent,
+                  parentTimestamp: Long,
+                  parentIsValid: Boolean): (RawCommentEvent, Boolean) =
+      (
+        reply,
+        parentIsValid && reply.timestamp >= parentTimestamp // child is valid if parent is and timestamp >= parent ts
+      )
 
     @scala.annotation.tailrec
-    def loop(acc: List[(RawCommentEvent, Long, Boolean)],
-             replies: List[(RawCommentEvent, Long, Boolean)]): List[(RawCommentEvent, Long, Boolean)] =
+    def loop(acc: List[(RawCommentEvent, Boolean)],
+             replies: List[(RawCommentEvent, Boolean)]): List[(RawCommentEvent, Boolean)] =
       replies match {
         case Nil => acc // base case
 
-        case (reply, minTimestamp, parentIsValid) :: siblings =>
-
-          val newAcc = childInfo(reply, minTimestamp, parentIsValid) :: acc // new value for accumulator
-
-          getChildren(reply.commentId) match {
-            // the reply has children, go depth-first
-            case children => loop(newAcc, children.map(childInfo(_, minTimestamp, parentIsValid)) ::: siblings)
-
-            // no children, proceed with siblings
-            case Nil => loop(newAcc, siblings)
-          }
+        case (reply, parentIsValid) :: siblings =>
+          loop(
+            childInfo(reply, reply.timestamp, parentIsValid) :: acc,
+            getChildren(reply.commentId).map(childInfo(_, reply.timestamp, parentIsValid)) ::: siblings
+          )
       }
 
-    val replies = getChildren(parentId).map(childInfo(_, parentTimestamp, parentIsValid = true))
-
-    loop(List(), replies).map(t => (t._1, t._3)) // start the recursion
+    // start the recursion, assuming the parent to start from is valid
+    loop(List(), getChildren(parentId).map(childInfo(_, parentTimestamp, parentIsValid = true)))
   }
 
   private def createComment(c: RawCommentEvent, postId: Long): CommentEvent =
