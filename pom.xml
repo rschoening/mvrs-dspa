@@ -23,7 +23,7 @@ under the License.
 
 	<groupId>org.mvrs.dspa</groupId>
 	<artifactId>mvrs-dspa</artifactId>
-	<version>0.1</version>
+	<version>0.9</version>
 	<packaging>jar</packaging>
 
 	<name>DSPA19 semester project</name>
