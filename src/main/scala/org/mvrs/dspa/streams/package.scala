@@ -9,6 +9,9 @@ import org.mvrs.dspa.model._
 import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.utils.kafka.KafkaTopic
 
+/**
+  * Methods for reading the test data event streams, from the test data csv files or from Kafka.
+  */
 package object streams {
 
   /**

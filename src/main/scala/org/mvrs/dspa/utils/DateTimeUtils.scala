@@ -6,6 +6,9 @@ import java.util.Date
 
 import org.apache.commons.lang3.time.DurationFormatUtils
 
+/**
+  * Utilities for date/time conversion
+  */
 object DateTimeUtils {
   private val dateFormat =
     ThreadLocal.withInitial[SimpleDateFormat](() => new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))

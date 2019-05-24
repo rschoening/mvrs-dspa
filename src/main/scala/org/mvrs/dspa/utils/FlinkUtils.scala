@@ -28,6 +28,9 @@ import org.mvrs.dspa.utils.kafka.KafkaTopic
 import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
 
+/**
+  * Utilities for Flink
+  */
 object FlinkUtils {
   /**
     * Convert from flink's common Time to the old streaming Time still used for windows
@@ -38,22 +41,38 @@ object FlinkUtils {
   def convert(time: org.apache.flink.api.common.time.Time): org.apache.flink.streaming.api.windowing.time.Time =
     org.apache.flink.streaming.api.windowing.time.Time.milliseconds(time.toMilliseconds)
 
-  def asyncStream[IN, OUT](dataStream: DataStream[IN], asyncFunction: AsyncFunction[IN, OUT])
+  /**
+    * Helper for creation asynchronous data streams from Scala
+    *
+    * @param dataStream    The input stream
+    * @param asyncFunction The async IO function
+    * @param timeout       for the asynchronous operation to complete
+    * @param timeUnit      of the given timeout
+    * @param capacity      The max number of async i/o operation that can be triggered
+    * @param unordered     Indicates if the output records may be reordered, or if the input order should be maintained
+    * @tparam IN  Type of input record
+    * @tparam OUT Type of output record
+    * @return output stream
+    */
+  def asyncStream[IN, OUT](dataStream: DataStream[IN], asyncFunction: AsyncFunction[IN, OUT], unordered: Boolean = true)
                           (implicit timeout: Long = 5, timeUnit: TimeUnit = TimeUnit.SECONDS, capacity: Int = 5): DataStream[OUT] = {
     new DataStream[OUT](
-      AsyncDataStream.unorderedWait(dataStream.javaStream, asyncFunction, timeout, timeUnit, capacity)
+      if (unordered)
+        AsyncDataStream.unorderedWait(dataStream.javaStream, asyncFunction, timeout, timeUnit, capacity)
+      else
+        AsyncDataStream.orderedWait(dataStream.javaStream, asyncFunction, timeout, timeUnit, capacity)
     )
   }
 
   /**
     * Calculates time-to-live based on a time in event time, a replay speedup factor and a minimum time (in processing time) to cover late events
     *
-    * @param time              time-to-live in event time
-    * @param speedupFactor     replay speedup factor - if 0 (infinite speedup, i.e. read as fast as possible): the minimum time is returned
-    * @param minimumTimeMillis the minimum time-to-live in processing time (milliseconds). Without this lower bound,
-    *                          the time-to-live in event time can get very small with high speedup factors, with the
+    * @param time              Time-to-live in event time
+    * @param speedupFactor     Replay speedup factor - if 0 (infinite speedup, i.e. read as fast as possible): the minimum time is returned
+    * @param minimumTimeMillis The minimum time-to-live in processing time (milliseconds). Without this lower bound,
+    *                          The time-to-live in event time can get very small with high speedup factors, with the
     *                          effect that even slightly late events miss the state that has been set up for them.
-    * @return the time-to-live in processing time
+    * @return The time-to-live in processing time
     */
   def getTtl(time: Time, speedupFactor: Double = 0, minimumTimeMillis: Long = 60000): Time =
     Time.of(
@@ -79,6 +98,13 @@ object FlinkUtils {
     else StreamExecutionEnvironment.getExecutionEnvironment
   }
 
+  /**
+    * Creates the type info serialization schema for a given type
+    *
+    * @param env The stream execution environment.
+    * @tparam T The type, for which TypeInformation must be available
+    * @return The serialization schema
+    */
   def createTypeInfoSerializationSchema[T: TypeInformation](implicit env: StreamExecutionEnvironment): TypeInformationSerializationSchema[T] =
     new TypeInformationSerializationSchema[T](createTypeInformation[T], env.getConfig)
 
@@ -87,10 +113,32 @@ object FlinkUtils {
     if (localWithUI) ExecutionEnvironment.createLocalEnvironmentWithWebUI()
     else ExecutionEnvironment.getExecutionEnvironment
 
+  /**
+    * Shorthand for reading a csv file in the format of the project test data, and returning a DataSet
+    *
+    * @param path            to the csv file
+    * @param env             The batch execution environment
+    * @param typeInformation The type information for the output type
+    * @tparam T The type of the DataSet records
+    * @return DataSet
+    */
   def readCsv[T: ClassTag](path: String)
                           (implicit env: ExecutionEnvironment, typeInformation: TypeInformation[T]): DataSet[T] =
     env.readCsvFile[T](path, fieldDelimiter = "|", ignoreFirstLine = true)
 
+  /**
+    * Shorthand for creating a new Kafka topic and writing a given stream to it.
+    *
+    * @param stream            The stream to write to Kafka
+    * @param topic             The topic
+    * @param numPartitions     The number of partitions to create for the topic
+    * @param partitioner       The optional partitioner for writing to the Topic. If no partitioner is specified, Kafka's
+    *                          default partitioner (round-robin) is used.
+    * @param replicationFactor The replication factor for the topic
+    * @param semantic          The write semantic used by Flink
+    * @tparam E The record type
+    * @return The stream sink
+    */
   def writeToNewKafkaTopic[E](stream: DataStream[E],
                               topic: KafkaTopic[E],
                               numPartitions: Int = 5,
@@ -101,7 +149,21 @@ object FlinkUtils {
     stream.addSink(topic.producer(partitioner, semantic)).name(s"Kafka: ${topic.name}")
   }
 
-  def createKafkaProducer[T](topicId: String,
+  /**
+    * Creates a Flink Kafka producer.
+    *
+    * @param topicName             The topic name
+    * @param bootstrapServers      The bootstrap servers to connect to
+    * @param serializationSchema   The serialization schema
+    * @param partitioner           The optional partitioner for writing to the Topic. If no partitioner is specified, Kafka's
+    *                              default partitioner (round-robin) is used.
+    * @param semantic              The write semantic used by Flink
+    * @param kafkaProducerPoolSize The Kafka producer pool size for writing with EXACTLY_ONCE semantic
+    * @param writeTimestampToKafka Indicates if timestamps should be explicitly written to Kafka
+    * @tparam T The record type to produce
+    * @return The Flink Kafka producer
+    */
+  def createKafkaProducer[T](topicName: String,
                              bootstrapServers: String,
                              serializationSchema: SerializationSchema[T],
                              partitioner: Option[FlinkKafkaPartitioner[T]],
@@ -112,7 +174,7 @@ object FlinkUtils {
     val customPartitioner: Optional[FlinkKafkaPartitioner[T]] = Optional.ofNullable(partitioner.orNull)
 
     val producer = new FlinkKafkaProducer[T](
-      topicId,
+      topicName,
       new KeyedSerializationSchemaWrapper(serializationSchema),
       kafka.connectionProperties(bootstrapServers),
       customPartitioner,
@@ -128,22 +190,52 @@ object FlinkUtils {
     producer
   }
 
-  def createKafkaConsumer[T](topic: String,
+  /**
+    * Creates a Flink Kafka consumer
+    *
+    * @param topicName                  The topic name
+    * @param props                      The consumer properties for connecting to Kafka
+    * @param deserializationSchema      The deserialization schema
+    * @param commitOffsetsOnCheckpoints Specifies whether or not the consumer should commit offsets back to Kafka on
+    *                                   checkpoints. This setting will only have effect if checkpointing is enabled for
+    *                                   the job. If checkpointing isn't enabled, only the "enable.auto.commit"
+    *                                   property settings will be used.
+    * @tparam T The record type
+    * @return The Flink Kafka consumer
+    */
+  def createKafkaConsumer[T](topicName: String,
                              props: Properties,
                              deserializationSchema: DeserializationSchema[T],
                              commitOffsetsOnCheckpoints: Boolean): FlinkKafkaConsumer[T] = {
-    val consumer = new FlinkKafkaConsumer[T](topic, deserializationSchema, props)
+    val consumer = new FlinkKafkaConsumer[T](topicName, deserializationSchema, props)
     consumer.setStartFromEarliest() // by default, start from earliest. Caller can override on returned instance
     consumer.setCommitOffsetsOnCheckpoints(commitOffsetsOnCheckpoints)
     consumer
   }
 
-  def timeStampExtractor[T](maxOutOfOrderness: org.apache.flink.api.common.time.Time, extract: T => Long): AssignerWithPeriodicWatermarks[T] = {
-    new BoundedOutOfOrdernessTimestampExtractor[T](org.apache.flink.streaming.api.windowing.time.Time.milliseconds(maxOutOfOrderness.toMilliseconds)) {
+  /**
+    * Creates a bounded-out-of-orderness timestamp extractor
+    *
+    * @param maxOutOfOrderness The (fixed) interval between the maximum timestamp seen in the records
+    *                          and that of the watermark to be emitted.
+    * @param extract           The function to extract the timestamp from a record
+    * @tparam T The record type
+    * @return The timestamp extractor
+    */
+  def timeStampExtractor[T](maxOutOfOrderness: Time, extract: T => Long): AssignerWithPeriodicWatermarks[T] = {
+    new BoundedOutOfOrdernessTimestampExtractor[T](
+      org.apache.flink.streaming.api.windowing.time.Time.milliseconds(maxOutOfOrderness.toMilliseconds)) {
       override def extractTimestamp(element: T): Long = extract(element)
     }
   }
 
+  /**
+    * Converts from a Flink ListState to a scala Seq
+    *
+    * @param listState The ListState instance
+    * @tparam T The record type
+    * @return Seq of [[T]]
+    */
   def toSeq[T](listState: ListState[T]): Seq[T] =
     listState.get() match {
       case null => Nil // no state -> null!
@@ -199,6 +291,11 @@ object FlinkUtils {
                      getValue: () => T): ScalaGauge[T] =
     group.gauge[T, ScalaGauge[T]](name, ScalaGauge[T](() => getValue()))
 
+  /**
+    * Prints the current job execution plan to the default output.
+    *
+    * @param env The stream execution environment.
+    */
   def printExecutionPlan()(implicit env: StreamExecutionEnvironment): Unit = {
     println("\nexecution plan:")
     println(env.getExecutionPlan)

@@ -3,7 +3,7 @@ package org.mvrs.dspa.utils
 import scala.collection.immutable
 
 /**
-  * type class for default values (from https://stackoverflow.com/a/24208907)
+  * Type Class for default values (from [[https://stackoverflow.com/a/24208907]])
   *
   * @param default the default value
   * @tparam A the type for which the default value is defined

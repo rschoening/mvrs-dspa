@@ -8,6 +8,9 @@ import org.mvrs.dspa.utils.elastic.ElasticSearchNode
 
 import scala.collection.JavaConverters._
 
+/**
+  * Object for accessing application settings
+  */
 object Settings {
   /**
     * The configuration read from application.conf (all resources with this name on classpath)

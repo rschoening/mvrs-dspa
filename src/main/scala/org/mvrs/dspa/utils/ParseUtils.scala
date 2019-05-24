@@ -7,6 +7,9 @@ import java.util.Date
 import kantan.codecs.Decoder
 import kantan.csv.{CellDecoder, DecodeError, codecs}
 
+/**
+  * Helper methods for parsing strings
+  */
 object ParseUtils {
   private val formatter = DateTimeFormatter.ISO_DATE_TIME
 
@@ -22,10 +25,10 @@ object ParseUtils {
       .toSet
   }
 
-  def toEpochMillis(str: String): Long = ZonedDateTime.parse(str, formatter).toInstant.toEpochMilli
+  def toEpochMillis(zonedDateTime: String): Long = ZonedDateTime.parse(zonedDateTime, formatter).toInstant.toEpochMilli
 
-  def toUtcLocalDateTime(str: String): LocalDateTime =
-    ZonedDateTime.parse(str, formatter).withZoneSameInstant(ZoneId.of("UTC")).toLocalDateTime
+  def toUtcLocalDateTime(zonedDateTime: String): LocalDateTime =
+    ZonedDateTime.parse(zonedDateTime, formatter).withZoneSameInstant(ZoneId.of("UTC")).toLocalDateTime
 
   // since flink can't serialize ZonedDateTime/LocalDateTime natively, event classes currently use java.util.Date in UTC
   def toUtcDate(str: String): Date =
