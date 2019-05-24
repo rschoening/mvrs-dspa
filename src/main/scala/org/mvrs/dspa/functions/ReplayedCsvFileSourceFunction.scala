@@ -16,7 +16,6 @@ import scala.io.Codec
   * Source function for reading from csv file and applying a speedup factor and optionally, a delay to the emitted
   * elements.
   *
-  * @inheritdoc
   * @param filePath                           path to csv file
   * @param skipFirstLine                      indicates if the first (header) line should be skipped
   * @param cellSeparator                      the csv cell separator character
@@ -30,7 +29,7 @@ import scala.io.Codec
   * @param watermarkIntervalMillis            the interval for emitting watermarks, in event time
   * @param minimumWatermarkEmitIntervalMillis the minimum emit interval for watermarks, in processing time
   * @param charsetName                        the java.nio charset name. Default: UTF8
-  * @param rowDecoder                         required implicit row decoder for the element type (kantan.csv)
+  * @param rowDecoder                         required implicit row decoder for the element type ([[https://nrinaudo.github.io/kantan.csv/ kantan.csv]])
   * @tparam OUT type of emitted elements
   */
 class ReplayedCsvFileSourceFunction[OUT: HeaderDecoder](filePath: String,

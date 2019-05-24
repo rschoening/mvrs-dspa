@@ -38,8 +38,8 @@ class KafkaTopic[T: Decoder : Encoder : TypeInformation](val name: String, val c
     * @param partitioner the partitioner to use. If no partitioner is specified, the default kafka partitioner (round-robin) is used.
     *                    Depending on how the flink producer is created, the default is either flink's fixed partitioner, or
     *                    kafka's default partitioner. This method consistently uses the kafka default if left unspecified.
-    * @param semantic    Defines semantic that will be used by this producer (see [[org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer.Semantic]]).
-    * @return
+    * @param semantic    Defines semantic that will be used by this producer.
+    * @return The Flink Kafka producer
     */
   def producer(partitioner: Option[FlinkKafkaPartitioner[T]] = None,
                semantic: FlinkKafkaProducer.Semantic = Semantic.AT_LEAST_ONCE): FlinkKafkaProducer[T] =
@@ -57,7 +57,7 @@ class KafkaTopic[T: Decoder : Encoder : TypeInformation](val name: String, val c
     * @param readCommitted              indicates if read-committed isolation is used
     * @param commitOffsetsOnCheckpoints Specifies whether or not the consumer should commit offsets back to Kafka on checkpoints.
     *                                   This setting will only have effect if checkpointing is enabled for the job
-    * @return the kafka consumer
+    * @return the Flink Kafka consumer
     */
   def consumer(groupId: String,
                readCommitted: Boolean = true,

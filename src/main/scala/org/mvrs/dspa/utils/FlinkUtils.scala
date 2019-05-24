@@ -234,7 +234,7 @@ object FlinkUtils {
     *
     * @param listState The ListState instance
     * @tparam T The record type
-    * @return Seq of [[T]]
+    * @return Seq of T
     */
   def toSeq[T](listState: ListState[T]): Seq[T] =
     listState.get() match {
