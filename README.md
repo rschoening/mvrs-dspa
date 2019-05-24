@@ -51,18 +51,22 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
    4. go to `Index patterns` and *star* one of the listed index patterns. Any will do (otherwise the imported dashboards are not listed) *TODO SCREENSHOT*
 
 ## Running the Flink jobs
+### Data preparation
 * TODO
+### Active post statistics
+* TODO
+### Recommendations
+* TODO
+* recommendations dashboard: set date range to "last 15 minutes"
+### Unusual activity detection
+* TODO
+* NOTE
+   * Unusual activity detection: cluster metadata graph can have gaps since that visualization does not interpolate across buckets with nodata (which may result due to extending windows)
 
 ## Solution layout
 * package structure
 * configuration (application.conf)
 * unit tests
-
-## NOTE
-* if bind address error occurs when starting job that starts the web UI, then check if the flink dashboard is still open in a browser window. The client keeps the port open. 
-* Unusual activity detection: cluster metadata graph can have gaps since that visualization does not interpolate across buckets with nodata (which may result due to extending windows)
-* recommendations dashboard: set date range to "last 15 minutes"
-* save good start date ranges for all kibana dashboards
 
 ## Addresses:
 * Flink lokal UI: http://localhost:8081/#/overview
@@ -76,6 +80,7 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
 * ElasticSearch docker (to check if online): http://localhost:9201/
 
 ## Troubleshooting
+* if bind address error occurs when starting job that starts the web UI, then check if the flink dashboard is still open in a browser window. The client keeps the port open.
 * When starting one of the Flink jobs: `Exception in thread "main" java.util.concurrent.ExecutionException: org.apache.kafka.common.errors.TimeoutException: Timed out waiting for a node assignment.`
   * Probable cause: Kafka not running.
   * Solution: start with `docker-compose up` in directory `docker`
