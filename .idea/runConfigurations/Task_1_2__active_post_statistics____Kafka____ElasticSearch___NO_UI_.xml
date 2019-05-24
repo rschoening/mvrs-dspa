@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Task 1.2: active post statistics - (Kafka -&gt; ElasticSearch)" type="Application" factoryName="Application">
+  <configuration default="false" name="Task 1.2: active post statistics - (Kafka -&gt; ElasticSearch) [NO UI]" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="org.mvrs.dspa.jobs.activeposts.WriteActivePostStatisticsToElasticSearchJob" />
     <module name="mvrs-dspa" />
     <extension name="coverage">
