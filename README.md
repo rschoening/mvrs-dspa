@@ -85,19 +85,40 @@ NOTE: Kibana dashboards
 ```
 src
 └─ main
-|  └─ resources
-|  |  └─ application.conf
-|  |  └─ 
-|  └─ scala
-|     └─ org.mvrs.dspa
-|        └─ db 
-└─ test
-
-|org.mvrs.dspa
-|
-└─ db
-|
-
+│  └─ resources
+│  │  └─ application.conf            | configuration file (default values; file with overrides can be placed on classpath)
+│  └─ scala
+│     └─ org.mvrs.dspa               | root package of Scala solution
+│        └─ db                       | package with data access types for ElasticSearch 
+|        │    ElasticSearch.scala    | - static registry of ElasticSearch indices
+│        └─ functions                | package for stream functions that are not strictly tied to one job
+│        └─ jobs                     | package with job implementations 
+|        │  └─ activeposts           | package for active post statistics jobs
+|        │  └─ clustering            | package for unusual activity detection job
+|        │  └─ preparation           | package for data preparation jobs (static tables, events)
+|        │  └─ recommendations       | package for user recommendations job
+│        └─ model                    | package for domain model types
+│        └─ streams                  | package for input streams (csv, Kafka)
+|        │    package.scala          | methods for reading input streams (csv or Kafka, comments raw or resolved)
+|        │    KafkaTopics.scala      | static registry of Kafka topics
+│        └─ utils                    | (more or less) generic utilities 
+|        Settings.scala              | Object for accessing settings in application.conf
+└─ test                              | tests and test resources
+│  └─ resources                      |
+│  │  └─ resources                   |
+│  │     └─ streams                  | directory with reduced streaming test data files (csv)
+│  └─ scala
+│     └─ categories                  | package for definition of test categories
+│     └─ db
+│     └─ functions
+│     └─ jobs
+│     └─ streams
+│     └─ utils
+└─ target
+   └─ site
+   │  └─ scaladoc
+   │        index.html
+   │  mvrs-dspa-1.0.jar
 ```
 ### Configuration
 * application.conf
