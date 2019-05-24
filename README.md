@@ -61,6 +61,11 @@ NOTE: Kibana dashboards
 #### Writing events to Kafka
 * Job class: `org.mvrs.dspa.jobs.preparation.WriteEventsToKafkaJob [local-with-ui]`
 * IDEA run configuration: `Preparation: load events (csv -> Kafka)` (specifies `local-with-ui`)
+* NOTES
+  * out-of-orderness can be configured here -> events are reordered in Kafka (verify using ProgressMonitorFunction TODO set up jobs for this)
+  * no speedup (or infinite speedup) is applied. Speedup is of interest in analytic tasks
+  * writing is done on single worker, to single Kafka partition. Motivation: control out-of-orderness
+  * 
 ### Active post statistics
 #### Calculating post statistics
 * Job class: `org.mvrs.dspa.jobs.activeposts.ActivePostStatisticsJob [local-with-ui]`
@@ -69,16 +74,19 @@ NOTE: Kibana dashboards
 * Job class: `org.mvrs.dspa.jobs.activeposts.WriteActivePostStatisticsToElasticSearchJob [local-with-ui]`
 * IDEA run configuration: `Task 1.2: active post statistics - (Kafka -> ElasticSearch) [NO UI]` (_without_ `local-with-ui` to allow for parallel execution with previous task on local machine/minicluster, without conflict on Web UI port)
 * Kibana dashboard: ....
+* TODO execution plan image
 ### Recommendations
 * Job class: `org.mvrs.dspa.jobs.recommendations.RecommendationsJob [local-with-ui]`
 * IDEA run configuration: `Task 2: user recommendations (Kafka -> ElasticSearch)` (specifies `local-with-ui`)
 * Kibana dashboard: set date range to "last 15 minutes"
+* TODO execution plan image
+* TODO check lateness with ProgressMonitorFunction, on Kafka input without reordering --> Async I/O?
 ### Unusual activity detection
 * Job class: `org.mvrs.dspa.jobs.clustering.UnusualActivityDetectionJob [local-with-ui]`
 * IDEA run configuration: `Task 3: unusual activity detection (Kafka -> ElasticSearch)` (specifies `local-with-ui`)
 * Kibana dashboard: 
-* NOTE
    * Unusual activity detection: cluster metadata graph can have gaps since that visualization does not interpolate across buckets with nodata (which may result due to extending windows)
+* TODO execution plan image
 
 ## Solution overview
 ### Package structure
