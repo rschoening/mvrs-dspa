@@ -51,6 +51,9 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
    4. go to `Index patterns` and *star* one of the listed index patterns. Any will do (otherwise the imported dashboards are not listed) *TODO SCREENSHOT*
 
 ## Running the Flink jobs
+NOTE: Kafka topics
+NOTE: ElasticSearch indices
+NOTE: Kibana dashboards
 ### Data preparation
 #### Loading static data into ElasticSearch
 * Job class: `org.mvrs.dspa.jobs.preparation.LoadStaticDataJob [local-with-ui]`
@@ -77,12 +80,40 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
 * NOTE
    * Unusual activity detection: cluster metadata graph can have gaps since that visualization does not interpolate across buckets with nodata (which may result due to extending windows)
 
-## Solution layout
-* package structure
-* configuration (application.conf)
-* unit tests
+## Solution overview
+### Package structure
+```
+src
+└─ main
+|  └─ resources
+|  |  └─ application.conf
+|  |  └─ 
+|  └─ scala
+|     └─ org.mvrs.dspa
+|        └─ db 
+└─ test
+
+|org.mvrs.dspa
+|
+└─ db
+|
+
+```
+### Configuration
+* application.conf
+### Unit tests
+### Scaladoc
+can be generated with mvn scala:doc
+### Unit tests
+* Unit tests: Scalatest
+* Integration tests: JUnit
+* run configurations
+### ElasticSearch
 * ElasticSearch indexes: see class xy
+### Kafka
 * Kafka topics: see class xy
+### Kibana
+* Dashboards
 
 ## Addresses:
 * Flink lokal UI: http://localhost:8081/#/overview
