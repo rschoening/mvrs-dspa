@@ -9,6 +9,13 @@ import org.mvrs.dspa.utils.elastic.{AsyncCachingElasticSearchFunction, ElasticSe
 
 import scala.concurrent.Future
 
+/**
+  * Async IO function to look up known persons from an ElasticSearch index, and removing them from the set of candidates.
+  *
+  * @param knownPersonsIndex The name of the ElasticSearch index storing the persons known to a person
+  * @param knownPersonsType  The type for storing the persons known to a person.
+  * @param nodes             the elastic search nodes to connect to
+  */
 class AsyncExcludeKnownPersonsFunction(knownPersonsIndex: String, knownPersonsType: String, nodes: ElasticSearchNode*)
   extends AsyncCachingElasticSearchFunction[(Long, MinHashSignature, Set[Long]), (Long, MinHashSignature, Set[Long]), Set[Long], GetResponse](_._1.toString, nodes) {
 

@@ -8,9 +8,17 @@ import org.mvrs.dspa.utils.elastic.{AsyncCachingElasticSearchFunction, ElasticSe
 
 import scala.concurrent.Future
 
+
+/**
+  * Async I/O function for looking up statically defined person features and producing an output stream of
+  * (person id, Set[feature]) tuples, where the feature set consists of both activity-based and static features
+  *
+  * @param personFeaturesIndex The name of the ElasticSearch index containing the static person features
+  * @param personFeaturesType  The name of the ElasticSearch type for the static person features
+  * @param nodes               The elastic search nodes to connect to
+  */
 class AsyncUnionWithPersonFeaturesFunction(personFeaturesIndex: String, personFeaturesType: String, nodes: ElasticSearchNode*)
   extends AsyncCachingElasticSearchFunction[(Long, Set[String]), (Long, Set[String]), Set[String], GetResponse](_._1.toString, nodes) {
-
 
   /**
     * Derives the value to cache based on the input element and retrieved output element, in case of a cache miss.

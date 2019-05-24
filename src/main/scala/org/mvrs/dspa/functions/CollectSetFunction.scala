@@ -6,13 +6,13 @@ import org.mvrs.dspa.utils.Default
 import scala.collection.mutable
 
 /**
-  * Helper function to accumulate element values into sets and return a tuple of (key, set)
+  * Aggregate function to accumulate element values into sets and return a tuple of (key, set)
   *
-  * @param key    function to get key of element (requires implementation of Default)
-  * @param value  function to get the value to be placed into the set
-  * @tparam IN    type of input elements
-  * @tparam K     key type
-  * @tparam V     value type
+  * @param key   function to get key of element (requires implementation of Default)
+  * @param value function to get the value to be placed into the set
+  * @tparam IN type of input elements
+  * @tparam K  key type
+  * @tparam V  value type
   */
 class CollectSetFunction[IN, K: Default, V](key: IN => K, value: IN => V)
   extends AggregateFunction[IN, (K, mutable.Set[V]), (K, Set[V])]() {

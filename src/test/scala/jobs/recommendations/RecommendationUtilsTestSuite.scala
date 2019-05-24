@@ -54,7 +54,7 @@ class RecommendationUtilsTestSuite extends FlatSpec with Matchers {
 
     // at target threshold 0.2: 17.3% false negatives with 100 hashes; 10% with 1000 hashes, 3.5% with 10000 hashes
     // With higher values for numHashes, the bucket count gets very large --> high cost for bucket storage/retrieval (and hashing)
-    // --> it seems reasonable to use a target threshold that is a bit lower than the minimum similarity to be included in the
+    // -> it seems reasonable to use a target threshold that is a bit lower than the minimum similarity to be included in the
     //    recommendation, and use a moderate value for numHashes --> 100 (default)
     // e.g. similarity for inclusion in recommendation >= 0.2 -> targetThreshold = 0.1 and numHashes = 100 => probability for inclusion at 0.2: 99%
 

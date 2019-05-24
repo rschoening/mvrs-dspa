@@ -9,6 +9,13 @@ import org.mvrs.dspa.utils.elastic.{AsyncElasticSearchFunction, ElasticSearchNod
 
 import scala.util.{Failure, Success}
 
+/**
+  * Async I/O function for looking up candidate persons mapped to the same LSH buckets as the input person.
+  *
+  * @param lshBucketsIndex The name of the ElasticSearch index containing the LSH buckets and associated person ids
+  * @param minHasher       The MinHasher used to calculate the buckets to look up in the index
+  * @param nodes           The ElasticSearch nodes to connect to
+  */
 class AsyncCandidateUsersLookupFunction(lshBucketsIndex: String, minHasher: MinHasher32, nodes: ElasticSearchNode*)
   extends AsyncElasticSearchFunction[(Long, MinHashSignature), (Long, MinHashSignature, Set[Long])](nodes) {
 
@@ -21,7 +28,7 @@ class AsyncCandidateUsersLookupFunction(lshBucketsIndex: String, minHasher: MinH
 
     val buckets = minHasher.buckets(input._2)
 
-    // TODO or use termsQuery to get more compact result?
+    // TODO use termsQuery to get more compact result?
     client.execute {
       search(lshBucketsIndex) query {
         idsQuery(buckets.map(_.toString))
@@ -36,10 +43,16 @@ class AsyncCandidateUsersLookupFunction(lshBucketsIndex: String, minHasher: MinH
     val ids: Set[Long] =
       response.result.hits.hits.flatMap(
         _.sourceAsMap("uid").asInstanceOf[List[Int]].map(_.toLong)) // uids are returned as ints even if in the mapping they are declared as long
-        .filter(_ != input._1)
+        .filter(_ != input._1) // exclude the input person, which is likely in the same bucket also
         .toSet
 
-    List((input._1, input._2, ids))
+    List(
+      (
+        input._1, // person id
+        input._2, // MinHash signature of input person
+        ids // person ids of candidates from same buckets
+      )
+    )
   }
 }
 

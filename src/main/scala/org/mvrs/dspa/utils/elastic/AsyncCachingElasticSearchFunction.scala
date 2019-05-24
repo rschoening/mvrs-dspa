@@ -16,18 +16,20 @@ import org.mvrs.dspa.utils.Cache
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
+import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success}
 
 /**
   * Function base class for asynchronous requests to ElasticSearch that use an LRU cache
   *
   * @param getCacheKey        function to get the cache key (string) from an input element
-  * @param nodes              the elastic search nodes
+  * @param nodes              the elastic search nodes to connect to
   * @param maximumCacheSize   the maximum cache size for the LRU cache
   * @param cacheEmptyResponse indicates if an empty database response is cached, i.e. the query is not retried if it
   *                           once returned empty for a given cache key.
   * @param checkpointCache    indicates if the cache content should be included in checkpoints. If false, the cache will
   *                           be empty on recovery.
+  * @param ttl                the optional time-to-live duration (in processing time) for cached records.
   * @tparam IN  type of input elements
   * @tparam OUT type of output elements
   * @tparam V   type of cached value. This value can be different from the output element, which often also included
@@ -39,7 +41,8 @@ abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: Ty
                                                                                                   nodes: Seq[ElasticSearchNode],
                                                                                                   maximumCacheSize: Long = 10000,
                                                                                                   cacheEmptyResponse: Boolean = false,
-                                                                                                  checkpointCache: Boolean = true)
+                                                                                                  checkpointCache: Boolean = true,
+                                                                                                  ttl: Option[Duration] = None)
   extends AsyncElasticSearchFunction[IN, OUT](nodes)
     with CheckpointedFunction {
 
@@ -111,7 +114,7 @@ abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: Ty
                                  input: IN,
                                  resultFuture: ResultFuture[OUT]): Unit =
     cache.get(getCacheKey(input)) match {
-      case Some(value) =>
+      case Some(value) => // cache hit
         cacheHits.inc()
         cacheHitsPerSecond.markEvent()
 
@@ -120,7 +123,7 @@ abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: Ty
             .getOrElse(Nil)
             .asJava)
 
-      case None =>
+      case None => // cache miss
         cacheMisses.inc()
         cacheMissesPerSecond.markEvent()
 
@@ -155,11 +158,11 @@ abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: Ty
   private def unpack(response: Response[R], input: IN): Option[OUT] = {
     unpackResponse(response, input) match {
       case result@Some(output) =>
-        cache.put(getCacheKey(input), Some(getCacheValue(input, output)))
+        cache.put(getCacheKey(input), Some(getCacheValue(input, output)), ttl)
         result
 
       case result@None =>
-        if (cacheEmptyResponse) cache.put(getCacheKey(input), None)
+        if (cacheEmptyResponse) cache.put(getCacheKey(input), None, ttl)
         result
     }
   }
