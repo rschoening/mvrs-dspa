@@ -1,5 +1,6 @@
 package org.mvrs.dspa.jobs.preparation
 
+import org.apache.flink.api.common.JobExecutionResult
 import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.streams.KafkaTopics
 import org.mvrs.dspa.utils.FlinkUtils
@@ -14,7 +15,7 @@ object WriteEventsToKafkaJob extends FlinkStreamingJob(
   // than what would normally be specified for randomDelay)
   checkpointIntervalOverride = Some(0), // disable checkpointing for the load job - not fault-tolerant due to reordering step
 ) {
-  def execute(): Unit = {
+  def execute(): JobExecutionResult = {
     val noSpeedup = Some(0.0) // don't use speedup for writing events to kafka
 
     FlinkUtils.writeToNewKafkaTopic(

@@ -95,5 +95,5 @@ abstract class FlinkStreamingJob(timeCharacteristic: TimeCharacteristic = TimeCh
   // apply override of default parallelism, if defined
   parallelism.foreach(env.setParallelism)
 
-  execute() // call template method where subclass sets up job
+  executeJob()
 }

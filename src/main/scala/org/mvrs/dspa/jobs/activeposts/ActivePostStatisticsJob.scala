@@ -1,5 +1,6 @@
 package org.mvrs.dspa.jobs.activeposts
 
+import org.apache.flink.api.common.JobExecutionResult
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.scala.{DataStream, createTypeInformation}
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer.Semantic
@@ -16,7 +17,7 @@ import org.mvrs.dspa.{Settings, streams}
   * to ElasticSearch (DSPA Task #1)
   */
 object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = true) {
-  def execute(): Unit = {
+  def execute(): JobExecutionResult = {
     // read settings
     val windowSize = Settings.duration("jobs.active-post-statistics.window-size")
     val windowSlide = Settings.duration("jobs.active-post-statistics.window-slide")
@@ -63,7 +64,7 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
 
     FlinkUtils.printExecutionPlan()
 
-    env.execute("write post statistics to kafka (and post info to elasticsearch)")
+    env.execute("write post statistics to kafka (and post info to ElasticSearch)")
   }
 
   //noinspection ConvertibleToMethodValue

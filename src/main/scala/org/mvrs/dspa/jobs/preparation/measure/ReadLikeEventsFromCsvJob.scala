@@ -1,28 +1,20 @@
 package org.mvrs.dspa.jobs.preparation.measure
 
+import org.apache.flink.api.common.JobExecutionResult
 import org.apache.flink.api.scala._
 import org.mvrs.dspa.functions.SimpleTextFileSinkFunction
 import org.mvrs.dspa.jobs.FlinkStreamingJob
-import org.mvrs.dspa.utils.DateTimeUtils
 import org.mvrs.dspa.{Settings, streams}
 
 object ReadLikeEventsFromCsvJob extends FlinkStreamingJob {
-  def execute(): Unit = {
+  def execute(): JobExecutionResult = {
     streams
       .likesFromCsv(Settings.config.getString("data.likes-csv-path"), speedupFactor = 100000)
       .map(_.toString)
       .addSink(new SimpleTextFileSinkFunction("c:\\temp\\likes")) // NOTE any temp file
 
-    val start = System.currentTimeMillis()
-
     // execute program
     env.execute("Write like events to text files for measurements")
-
-    val end = System.currentTimeMillis()
-
-    val duration = end - start
-
-    println(s"Duration: ${DateTimeUtils.formatDuration(duration)}")
 
     // event count in 1k file: 662890
     // start date: 2012-02-02T01:09:00.000Z

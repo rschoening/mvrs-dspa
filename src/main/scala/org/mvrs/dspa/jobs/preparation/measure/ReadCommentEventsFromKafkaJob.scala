@@ -1,5 +1,6 @@
 package org.mvrs.dspa.jobs.preparation.measure
 
+import org.apache.flink.api.common.JobExecutionResult
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.api.scala._
 import org.mvrs.dspa.functions.ProgressMonitorFunction
@@ -9,7 +10,7 @@ import org.mvrs.dspa.streams
 
 object ReadCommentEventsFromKafkaJob extends FlinkStreamingJob(enableGenericTypes = true) {
 
-  def execute(): Unit = {
+  def execute(): JobExecutionResult = {
     env.setParallelism(4)
 
     env.getConfig.setAutoWatermarkInterval(1L)

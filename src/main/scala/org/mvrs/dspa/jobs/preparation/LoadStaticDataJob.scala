@@ -1,6 +1,7 @@
 package org.mvrs.dspa.jobs.preparation
 
 import com.twitter.algebird.MinHashSignature
+import org.apache.flink.api.common.JobExecutionResult
 import org.apache.flink.api.scala.{DataSet, _}
 import org.mvrs.dspa.Settings
 import org.mvrs.dspa.db.ElasticSearchIndexes
@@ -9,7 +10,7 @@ import org.mvrs.dspa.jobs.recommendations.{FeaturePrefix, RecommendationUtils}
 import org.mvrs.dspa.utils.FlinkUtils
 
 object LoadStaticDataJob extends FlinkBatchJob {
-  def execute(): Unit = {
+  def execute(): JobExecutionResult = {
 
     val directory = Settings.config.getString("data.tables-directory")
     val hasInterestInTagCsv = path(directory, "person_hasInterest_tag.csv")

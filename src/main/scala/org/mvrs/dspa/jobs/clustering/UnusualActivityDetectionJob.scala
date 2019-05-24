@@ -1,6 +1,7 @@
 package org.mvrs.dspa.jobs.clustering
 
 import com.google.common.base.Splitter
+import org.apache.flink.api.common.JobExecutionResult
 import org.apache.flink.api.common.serialization.SimpleStringEncoder
 import org.apache.flink.api.common.state.MapStateDescriptor
 import org.apache.flink.api.common.time.Time
@@ -30,7 +31,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
   // - extract features within clustering operator (more flexibility to standardize/normalize features)
   // - if a cluster gets too small, split the largest cluster
   // - come up with better text features
-  def execute(): Unit = {
+  def execute(): JobExecutionResult = {
     // read settings
     val clusterParameterFilePath = Settings.config.getString("jobs.activity-detection.cluster-parameter-file-path")
     val clusterParameterParseErrorsOutputPath = Settings.config.getString("jobs.activity-detection.cluster-parameter-file-parse-errors-path")

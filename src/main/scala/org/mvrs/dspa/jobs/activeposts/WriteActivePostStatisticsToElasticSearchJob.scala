@@ -1,5 +1,6 @@
 package org.mvrs.dspa.jobs.activeposts
 
+import org.apache.flink.api.common.JobExecutionResult
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.jobs.FlinkStreamingJob
@@ -13,7 +14,7 @@ import org.mvrs.dspa.{Settings, streams}
   * ElasticSearch, and writing them to ElasticSearch (DSPA Task #1)
   */
 object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob(enableGenericTypes = true) {
-  def execute(): Unit = {
+  def execute(): JobExecutionResult = {
     // read settings
     implicit val esNodes: Seq[ElasticSearchNode] = Settings.elasticSearchNodes
     val batchSize = Settings.config.getInt("jobs.active-post-statistics.post-statistics-elasticsearch-batch-size")

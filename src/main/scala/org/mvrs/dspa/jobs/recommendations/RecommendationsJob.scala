@@ -3,6 +3,7 @@ package org.mvrs.dspa.jobs.recommendations
 import java.lang
 
 import com.twitter.algebird.{MinHashSignature, MinHasher32}
+import org.apache.flink.api.common.JobExecutionResult
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.db.ElasticSearchIndexes
@@ -20,7 +21,7 @@ import scala.collection.JavaConverters._
   * ElasticSearch (DSPA Task #2)
   */
 object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
-  def execute(): Unit = {
+  def execute(): JobExecutionResult = {
     // read settings
     val windowSize = Settings.duration("jobs.recommendation.activity-window-size")
     val windowSlide = Settings.duration("jobs.recommendation.activity-window-slide")
@@ -35,11 +36,11 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
     implicit val esNodes: Seq[ElasticSearchNode] = Settings.elasticSearchNodes
     implicit val minHasher: MinHasher32 = RecommendationUtils.minHasher
 
-    // (re)create the indexes for post features and for storing recommendations (person-id -> List((person-id, similarity))
+    // (re)create the indexes for post features and recommendations
     ElasticSearchIndexes.postFeatures.create()
-    ElasticSearchIndexes.recommendations.create()
+    ElasticSearchIndexes.recommendations.create() // person-id -> List[(person-id, similarity)
 
-    // consume post stream for writing post features, with separate consumer group (to avoid back pressure on main recommendation)
+    // consume post stream for writing post features, with separate consumer group
     val postFeaturesStream: DataStream[PostEvent] = streams.posts(Some("recommendations-post-features"))
 
     // look up forum features for posts
@@ -99,8 +100,6 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
 
     FlinkUtils.printExecutionPlan()
 
-    env.execute("recommendations")
-
     def tracePersons(personIds: Set[lang.Long]) = {
       // debug output for selected person Ids
 
@@ -152,6 +151,8 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
           .name("print")
       }
     }
+
+    env.execute("recommendations")
   }
 
   def lookupForumFeatures(postsStream: DataStream[PostEvent]): DataStream[(PostEvent, Set[String])] = {

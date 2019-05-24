@@ -23,5 +23,5 @@ abstract class FlinkBatchJob(parallelism: Option[Int] = None) extends FlinkJob {
   // apply override of default parallelism, if defined
   parallelism.foreach(env.setParallelism)
 
-  execute()
+  executeJob()
 }

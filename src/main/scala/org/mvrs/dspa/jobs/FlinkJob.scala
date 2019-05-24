@@ -1,7 +1,11 @@
 package org.mvrs.dspa.jobs
 
+import java.util.concurrent.TimeUnit
+
+import org.apache.flink.api.common.JobExecutionResult
 import org.mvrs.dspa.Settings
-import org.mvrs.dspa.jobs.EnvironmentType.Environment
+import org.mvrs.dspa.jobs.EnvironmentType.EnvironmentType
+import org.mvrs.dspa.utils.DateTimeUtils
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
@@ -21,7 +25,18 @@ abstract class FlinkJob() extends App {
 
   protected val environmentType = getEnvironmentFromArgs(args)
 
-  def execute(): Unit
+  protected def executeJob(): Unit = {
+    val result = execute()
+
+    println(s"Job finished in ${DateTimeUtils.formatDuration(result.getNetRuntime(TimeUnit.MILLISECONDS))}")
+  }
+
+  /**
+    * Template method for subclasses to set up and submit the job graph
+    *
+    * @return
+    */
+  def execute(): JobExecutionResult
 
   protected def debug(msg: => String): Unit = if (LOG.isDebugEnabled) LOG.debug(msg)
 
@@ -29,7 +44,13 @@ abstract class FlinkJob() extends App {
 
   protected def warn(msg: => String): Unit = if (LOG.isWarnEnabled()) LOG.warn(msg)
 
-  private def getEnvironmentFromArgs(args: Array[String]): Environment =
+  /**
+    * Get the environment type from program arguments
+    *
+    * @param args
+    * @return
+    */
+  private def getEnvironmentFromArgs(args: Array[String]): EnvironmentType =
     if (args.length == 0) EnvironmentType.Default
     else if (args.length == 1) args(0) match {
       case "local-with-ui" => EnvironmentType.LocalWithUI
@@ -39,6 +60,6 @@ abstract class FlinkJob() extends App {
 }
 
 object EnvironmentType extends Enumeration {
-  type Environment = Value
+  type EnvironmentType = Value
   val Default, LocalWithUI, Remote = Value
 }

@@ -1,5 +1,6 @@
 package org.mvrs.dspa.streams.measure
 
+import org.apache.flink.api.common.JobExecutionResult
 import org.apache.flink.api.scala._
 import org.mvrs.dspa.functions.ProgressMonitorFunction
 import org.mvrs.dspa.jobs.FlinkStreamingJob
@@ -10,7 +11,7 @@ object ReadCommentEventsFromCsvJob extends FlinkStreamingJob(
   parallelism = Some(1),
   checkpointIntervalOverride = Some(0)) {
 
-  def execute(): Unit = {
+  def execute(): JobExecutionResult = {
     env.getConfig.setAutoWatermarkInterval(1)
     streams.rawComments(speedupFactorOverride = Some(0))
       .process(new ProgressMonitorFunction[RawCommentEvent])
