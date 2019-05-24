@@ -121,7 +121,7 @@ src
    │  mvrs-dspa-1.0.jar
 ```
 ### Configuration
-* application.conf
+* application.conf (based on https://github.com/lightbend/config/blob/master/README.md)
 ### Unit tests
 ### Scaladoc
 can be generated with mvn scala:doc
@@ -137,15 +137,15 @@ can be generated with mvn scala:doc
 * Dashboards
 
 ## Addresses:
-* Flink lokal UI: http://localhost:8081/#/overview
-* Flink docker: http://localhost:8082/#/overview
-* Kibana docker: http://localhost:5602/
+* Flink lokal UI: http://localhost:8081
+* Flink docker: http://localhost:8082
+* Kibana docker: http://localhost:5602
   * Active post statistics: http://localhost:5602/app/kibana#/dashboard/a0af2f50-4f0f-11e9-acde-e1c8a6292b89
   * Recommendations: http://localhost:5602/app/kibana#/dashboard/7c230710-6855-11e9-9ba6-39d0e49adb7a
   * Activity detection: http://localhost:5602/app/kibana#/dashboard/83a893d0-6989-11e9-ba9d-bb8bdc29536e
-* Prometheus docker: http://localhost:9091/graph
-* Grafana docker: http://localhost:3001/?orgId=1 (no dashboards delivered as part of solution; initial login with admin/admin, then change pwd)
-* ElasticSearch docker (to check if online): http://localhost:9201/
+* Prometheus docker: http://localhost:9091
+* Grafana docker: http://localhost:3001 (no dashboards delivered as part of solution; initial login with admin/admin, then change pwd)
+* ElasticSearch docker (to check if online): http://localhost:9201
 
 ## Troubleshooting
 * if bind address error occurs when starting job that starts the web UI, then check if the flink dashboard is still open in a browser window. The client keeps the port open.
