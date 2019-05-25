@@ -6,7 +6,7 @@
 * maven
 * Java 1.8
 * IntelliJ IDEA with Scala plugin:
-![scala plugin](https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/intellij-scala-plugin.png "Scala plugin")
+<img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/intellij-scala-plugin.png" alt="Scala plugin" width="60%"/>
 
 ## Setting up the development environment
 1. cd to parent directory for project, enter `git clone https://github.com/rschoening/mvrs-dspa.git`
@@ -51,31 +51,122 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
    4. go to `Index patterns` and *star* one of the listed index patterns. Any will do (otherwise the imported dashboards are not listed) *TODO SCREENSHOT*
 
 ## Running the Flink jobs
-* TODO
+NOTE: Kafka topics
+NOTE: ElasticSearch indices
+NOTE: Kibana dashboards
+### Data preparation
+The following two jobs must have been run prior to running any of the analytics jobs. Note that the events must be written to Kafka again after stopping and restarting the Kafka docker container, as this container in its current configuration resets the Kafka 
+topics on startup. On the other hand, the ElasticSearch indexes are maintained in a docker volume across restarts, so the static data
+does only need to be loaded once (unless the configuration for LSH hashing is changed see 'Recommendations' below).
+#### Loading static data into ElasticSearch
+* Job class: `org.mvrs.dspa.jobs.preparation.LoadStaticDataJob [local-with-ui]`
+* IDEA run configuration: `Preparation: load static tables (csv -> ElasticSearch)` (with argument `local-with-ui` to launch the Flink dashboard UI)
+#### Writing events to Kafka
+* Job class: `org.mvrs.dspa.jobs.preparation.WriteEventsToKafkaJob [local-with-ui]`
+* IDEA run configuration: `Preparation: load events (csv -> Kafka)` (with argument `local-with-ui` to launch the Flink dashboard UI)
+* NOTES
+  * out-of-orderness can be configured here -> events are reordered in Kafka (verify using ProgressMonitorFunction TODO set up jobs for this)
+  * no speedup (or infinite speedup) is applied. Speedup is of interest in analytic tasks
+  * writing is done on single worker, to single Kafka partition. Motivation: control out-of-orderness
+  * 
+### Active post statistics
+#### Calculating post statistics
+* Job class: `org.mvrs.dspa.jobs.activeposts.ActivePostStatisticsJob [local-with-ui]`
+* IDEA run configuration: `Task 1.1: active post statistics (Kafka -> Kafka, post info: Kafka -> ElasticSearch)` (specified `local-with-ui` to launch the Flink dashboard UI)
+#### Writing post statistics results to ElasticSearch index
+* Job class: `org.mvrs.dspa.jobs.activeposts.WriteActivePostStatisticsToElasticSearchJob [local-with-ui]`
+* IDEA run configuration: `Task 1.2: active post statistics - (Kafka -> ElasticSearch) [NO UI]` (_without_ argument `local-with-ui`, to allow for parallel execution with previous task on local machine/minicluster, without conflict on Web UI port)
+* Kibana dashboard: ....
+* TODO execution plan image
+### Recommendations
+* Inputs (created by data preparation jobs, which have to be run before, see above): 
+  * Event topics in Kafka: `mvrs_comments`, `mvrs_likes`, `mvrs_posts`
+  * ElasticSearch indexes with static data: `mvrs-recommendation-person-features`, `mvrs-recommendation-forum-features`, `mvrs-recommendation-person-minhash`, `mvrs-recommendation-known-persons`, `mvrs-recommendation-lsh-buckets`
+* Outputs (re-generated automatically when the job starts):
+  * ElasticSearch index with recommendation documents: `mvrs-recommendations`
+  * ElasticSearch index with post features: `mvrs-recommendation-post-features`
+* Job class: `org.mvrs.dspa.jobs.recommendations.RecommendationsJob [local-with-ui]`
+* IDEA run configuration: `Task 2: user recommendations (Kafka -> ElasticSearch)` (with argument `local-with-ui` to launch the Flink dashboard UI)
+* Kibana dashboard: [\[DSPA\] Recommendations](http://localhost:5602/app/kibana#/dashboard/7c230710-6855-11e9-9ba6-39d0e49adb7a)
+  The recommendation documents are upserted by person id, and stored with the processing timestamp of the last update.
+  Note: set date range to "last 15 minutes"
+* TODO execution plan image
+### Unusual activity detection
+* Job class: `org.mvrs.dspa.jobs.clustering.UnusualActivityDetectionJob [local-with-ui]`
+* IDEA run configuration: `Task 3: unusual activity detection (Kafka -> ElasticSearch)`  (specified `local-with-ui` to launch the Flink dashboard UI)
+* Kibana dashboard: 
+   * Unusual activity detection: cluster metadata graph can have gaps since that visualization does not interpolate across buckets with nodata (which may result due to extending windows)
+* TODO execution plan image
 
-## Solution layout
-* package structure
-* configuration (application.conf)
-* unit tests
-
-## NOTE
-* if bind address error occurs when starting job that starts the web UI, then check if the flink dashboard is still open in a browser window. The client keeps the port open. 
-* Unusual activity detection: cluster metadata graph can have gaps since that visualization does not interpolate across buckets with nodata (which may result due to extending windows)
-* recommendations dashboard: set date range to "last 15 minutes"
-* save good start date ranges for all kibana dashboards
+## Solution overview
+### Package structure
+```
+src
+└─ main
+│  └─ resources
+│  │  └─ application.conf            | configuration file (default values; file with overrides can be placed on classpath)
+│  └─ scala
+│     └─ org.mvrs.dspa               | root package of Scala solution
+│        └─ db                       | package with data access types for ElasticSearch 
+|        │    ElasticSearch.scala    | - static registry of ElasticSearch indices
+│        └─ functions                | package for stream functions that are not strictly tied to one job
+│        └─ jobs                     | package with job implementations 
+|        │  └─ activeposts           | package for active post statistics jobs
+|        │  └─ clustering            | package for unusual activity detection job
+|        │  └─ preparation           | package for data preparation jobs (static tables, events)
+|        │  └─ recommendations       | package for user recommendations job
+│        └─ model                    | package for domain model types
+│        └─ streams                  | package for input streams (csv, Kafka)
+|        │    package.scala          | methods for reading input streams (csv or Kafka, comments raw or resolved)
+|        │    KafkaTopics.scala      | static registry of Kafka topics
+│        └─ utils                    | (more or less) generic utilities 
+|        Settings.scala              | Object for accessing settings in application.conf
+└─ test                              | tests and test resources
+│  └─ resources                      |
+│  │  └─ resources                   |
+│  │     └─ streams                  | directory with reduced streaming test data files (csv)
+│  └─ scala
+│     └─ categories                  | package for definition of test categories
+│     └─ db
+│     └─ functions
+│     └─ jobs
+│     └─ streams
+│     └─ utils
+└─ target
+   └─ site
+   │  └─ scaladoc
+   │        index.html
+   │  mvrs-dspa-1.0.jar
+```
+### Configuration
+* application.conf (based on https://github.com/lightbend/config/blob/master/README.md)
+### Unit tests
+### Scaladoc
+can be generated with mvn scala:doc
+### Unit tests
+* Unit tests: Scalatest
+* Integration tests: JUnit
+* run configurations
+### ElasticSearch
+* ElasticSearch indexes: see class xy
+### Kafka
+* Kafka topics: see class xy
+### Kibana
+* Dashboards
 
 ## Addresses:
-* Flink lokal UI: http://localhost:8081/#/overview
-* Flink docker: http://localhost:8082/#/overview
-* Kibana docker: http://localhost:5602/
+* Flink lokal UI: http://localhost:8081
+* Flink docker: http://localhost:8082
+* Kibana docker: http://localhost:5602
   * Active post statistics: http://localhost:5602/app/kibana#/dashboard/a0af2f50-4f0f-11e9-acde-e1c8a6292b89
   * Recommendations: http://localhost:5602/app/kibana#/dashboard/7c230710-6855-11e9-9ba6-39d0e49adb7a
   * Activity detection: http://localhost:5602/app/kibana#/dashboard/83a893d0-6989-11e9-ba9d-bb8bdc29536e
-* Prometheus docker: http://localhost:9091/graph
-* Grafana docker: http://localhost:3001/?orgId=1 (no dashboards delivered as part of solution; initial login with admin/admin, then change pwd)
-* ElasticSearch docker (to check if online): http://localhost:9201/
+* Prometheus docker: http://localhost:9091
+* Grafana docker: http://localhost:3001 (no dashboards delivered as part of solution; initial login with admin/admin, then change pwd)
+* ElasticSearch docker (to check if online): http://localhost:9201
 
 ## Troubleshooting
+* if bind address error occurs when starting job that starts the web UI, then check if the flink dashboard is still open in a browser window. The client keeps the port open.
 * When starting one of the Flink jobs: `Exception in thread "main" java.util.concurrent.ExecutionException: org.apache.kafka.common.errors.TimeoutException: Timed out waiting for a node assignment.`
   * Probable cause: Kafka not running.
   * Solution: start with `docker-compose up` in directory `docker`
