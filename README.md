@@ -82,7 +82,7 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * Checking results: the load progress and final result can be observed in Kibana:
    * Document counts on index management page:
      <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-index-management.png" alt="Kibana index management" width="60%"/>
-   * `Discover` page (make sure to set time period to something like 'Last 15 minutes', as the static data is timestamped with insertion time):
+   * `Discover` page (make sure to set time range to something like 'Last 15 minutes', as the static data is timestamped with insertion time):
    
      <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-discover-static-data-loading.png" alt="Kibana discover - static data" width="60%"/>
 
@@ -120,7 +120,7 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * in IDEA, execute the run configuration `Task 1.1: active post statistics (Kafka -> Kafka, post info: Kafka -> ElasticSearch)`
    * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
 * Checking results:
-  * View the incoming documents in `mvrs-active-post-statistics-postinfos` using the `Discover` page in Kibana (setting the time period to the start event time of the stream, i.e. February 2012 for the low-volume stream).
+  * View the incoming documents in `mvrs-active-post-statistics-postinfos` using the `Discover` page in Kibana (setting the time range to the start event time of the stream, i.e. February 2012 for the low-volume stream).
   * run the following job to write the statistics to ElasticSearch ()
 #### Notes
 * Job-specific configuration parameters are defined in `jobs.active-post-statistics` ([application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf))
@@ -139,7 +139,7 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
   * The run configuration does _not_ set the argument `local-with-ui`, to allow for parallel execution with previous task on local machine/minicluster.
 * Checking results:
    * Kibana dashboard: [\[DSPA\] Active post statistics](http://localhost:5602/app/kibana#/dashboard/a0af2f50-4f0f-11e9-acde-e1c8a6292b89)
-   * Make sure to set the time period (upper right) to the beginning of the stream (February 2012 for the low volume stream). A period of one week is recommended.
+   * Make sure to set the time range (upper right) to the beginning of the stream (February 2012 for the low volume stream). A period of one week is recommended.
    * Note when clicking on a tag in the tag cloud (or some other parts of visualizations), a persistent filter is defined. These filters are displayed on the top-left of the dashboard and can be removed again.
 
 #### Notes
@@ -159,8 +159,8 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
    * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
 * Checking results:
    * Kibana dashboard: [\[DSPA\] Recommendations](http://localhost:5602/app/kibana#/dashboard/7c230710-6855-11e9-9ba6-39d0e49adb7a)
-   * Make sure to set the time period (upper right) to the beginning of the stream (February 2012 for the low volume stream). All visualizations in Kibana depend on this time period.
-   * The recommendation documents are shown on the left and can be investigated in detail (expanding the document tree, displaying as JSON etc.). Note that old recommendations for a given person are continuously replaced by current ones. In a given time period, the number of documents will therefore diminish over time. Use the right-arrow next to the time period display to advance along with the tail of the stream. To look at a document in detail, it may be necessary to stop the stream, otherwise the document may be deleted at any time.
+   * Make sure to set the time range (upper right) to the beginning of the stream (February 2012 for the low volume stream). All visualizations in Kibana depend on this time range.
+   * The recommendation documents are shown on the left and can be investigated in detail (expanding the document tree, displaying as JSON etc.). Note that old recommendations for a given person are continuously replaced by current ones. In a given time range, the number of documents will therefore diminish over time. Use the right-arrow next to the time range display to advance along with the tail of the stream. To look at a document in detail, it may be necessary to stop the stream, otherwise the document may be deleted at any time.
    <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-dashboard-recommendations.png" alt="Kibana dashboard: recommendations" width="60%"/>
 
 #### Notes
@@ -180,12 +180,12 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
    * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
 * Checking results:
    * Kibana dashboard: [\[DSPA\] Unusual activity detection](http://localhost:5602/app/kibana#/dashboard/83a893d0-6989-11e9-ba9d-bb8bdc29536e)
-   * Make sure to set the time period (upper right) to the beginning of the stream (February 2012 for the low volume stream). A period of one week is recommended.
+   * Make sure to set the time range (upper right) to the beginning of the stream (February 2012 for the low volume stream). A period of one week is recommended.
 
 #### Notes
 * Job-specific configuration parameters are defined in `jobs.activity-detection` ([application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf))
 * The labelling of clusters based on the control stream is currently only applied during the next cluster update. It would make more sense to apply these labels immediately for subsequent classifications. This would require connecting to the control stream twice, both on the cluster model update stream (for `k` and `decay`) and on the event classification stream (for the labels).
-* The cluster metadata graph can have gaps since the used Kibana visualization does not interpolate across buckets with nodata (which may result due to extending windows). With a time period of 7 days, this should not happen. Different, more advanced visualizations are available in Kibana that interpolate across empty buckets. 
+* The cluster metadata graph can have gaps since the used Kibana visualization does not interpolate across buckets with nodata (which may result due to extending windows). With a time range of 7 days, this should not happen. Different, more advanced visualizations are available in Kibana that interpolate across empty buckets. 
 
 ## Solution overview
 ### Package structure
