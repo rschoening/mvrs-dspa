@@ -23,6 +23,8 @@ import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer.Semantic
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer, FlinkKafkaProducer}
 import org.apache.flink.streaming.util.serialization.KeyedSerializationSchemaWrapper
+import org.mvrs.dspa.functions.ProgressMonitorFunction
+import org.mvrs.dspa.functions.ProgressMonitorFunction.ProgressInfo
 import org.mvrs.dspa.utils.kafka.KafkaTopic
 
 import scala.collection.JavaConverters._
@@ -306,5 +308,21 @@ object FlinkUtils {
     println(env.getExecutionPlan)
     println()
   }
+
+  def addProgressMonitor[I: TypeInformation](stream: DataStream[I])
+                                            (filter: (I, ProgressInfo) => Boolean,
+                                             write: String => Unit = println(_)): DataStream[I] =
+    stream.process(new ProgressMonitorFunction())
+      .map { t: (I, ProgressInfo) => {
+        if (filter(t._1, t._2)) {
+
+          if (t._2.elementCount == 1 && t._2.subtask == 0) write(ProgressInfo.getSchemaInfo)
+
+          write(t._2.toString)
+        }
+
+        t._1
+      }
+      }
 
 }

@@ -67,7 +67,7 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
     val elementTimestamp = ctx.timestamp()
     val watermark = ctx.timerService().currentWatermark()
 
-    val isLate = elementTimestamp < watermark // actually, <=
+    val isLate = elementTimestamp <= watermark // TODO revert if observed again - elementTimestamp < watermark // actually, <=
     val isBehindNewest = elementTimestamp < maximumTimestamp
     val watermarkAdvanced = watermark > previousWatermark
     val hasPreviousWatermark = previousWatermark != Long.MinValue
@@ -92,7 +92,7 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
     if (watermarkAdvanced) watermarkAdvancedPerSecond.markEvent()
     if (watermarkAdvanced) watermarkAdvancedCounter.inc()
 
-    // NOTE histograms appear to not work reliably, at least for display in Flink dashboard
+    // NOTE histograms appear to not work reliably for display in Flink dashboard
     if (watermarkAdvanced && hasPreviousWatermark) watermarkIncrementHistogram.update(watermarkIncrement)
     latenessHistogram.update(lateness)
     behindNewestHistogram.update(behindNewest)
@@ -255,31 +255,7 @@ object ProgressMonitorFunction {
 
     /**
       * Returns a displayable string representation of the progress information, in a tabular layout.
-      *
-      * === columns ===
-      * -  ts :  the timestamp of the element (short format, seconds resolution)
-      * - ect : the total number of elements seen so far
-      * - e/s : the average number of elements per second (processing time) so far
-      * -------
-      * -  bn : the number of seconds (in event time) the element is behind the maximum event time seen so far ('latest' if this element has the highest event time so far)
-      * - bnc : the number of elements seen so far that were behined the maximum event time seen when they were received
-      * - max : the maximum time difference (in event time) that an element seen so far was behind the maximum event time when it was received
-      * -------
-      * -  lt : the number of seconds (in event time) the element is late, i.e. that its timestamp is behind the current watermark ('on time' if the element has a timestamp >= than the current watermark)
-      * - ltc : the number of elements seen so far that were late
-      * - max : the maximum time difference that an element seen so far was behind the watermark wen it was received
-      * -------
-      * -  wn : the timestamp of the current watermark ('NO watermark') if no watermark has been received yet. If the watermark has increased, '+' is appended to the time. '=' indicates that the watermark has stayed the same since the last observed element
-      * - +wc : the event time duration by which the watermark has increased since the last watermark value
-      * - max : the maximum event time value by which the watermark has increased between two observed elements
-      * - +/s : the average number of times per second (processing time) that an increase of the watermark timestamp was observed between two elements
-      * - nwm : the number of elements seen that were received before the first watermark
-      * -------
-      * -  ew : the number of elements seen since the last increase of the watermark
-      * - max : the maximum number of elements for which the watermark stayed the same since the previous increase
-      * -------
-      * - rt  : the run time since the (re)start of the task
-      * -------
+      * See [ProgressInfo.getSchemaInfo] for the list of columns
       *
       * @return String representation
       */
@@ -289,19 +265,54 @@ object ProgressMonitorFunction {
       pad(s"| e/s: ${math.round(avgElementsPerSecond)}", 14) +
       pad(s"|| bn: ${if (isBehindNewest) shortDuration(millisBehindNewest) else "latest"}", 17) +
       pad(s"| bnc: $elementsBehindNewestCount", 14) +
-      pad(s"| max: ${if (maximumBehindNewest == 0) "-" else shortDuration(maximumBehindNewest)}", 18) +
+      pad(s"| bmx: ${if (maximumBehindNewest == 0) "-" else shortDuration(maximumBehindNewest)}", 18) +
       pad(s"|| lt: ${if (isLate) shortDuration(millisBehindWatermark) else "on time"}", 17) +
       pad(s"| ltc: $lateElementsCount", 13) +
-      pad(s"| max: ${if (maximumLateness == 0) "-" else shortDuration(maximumLateness)}", 18) +
+      pad(s"| lmx: ${if (maximumLateness == 0) "-" else shortDuration(maximumLateness)}", 18) +
       pad(s"|| wn: ${if (!hasWatermark) "NO watermark" else shortDateTime(watermark)}", 27) +
       pad(s"${if (watermarkIncrement == 0) "=" else "+" + shortDuration(watermarkIncrement)}", 11) +
+      pad(s"| wmx: ${if (maximumWatermarkIncrement == 0) "-" else shortDuration(maximumWatermarkIncrement)}", 18) +
       pad(s"| +wc: $watermarkAdvancedCount", 12) +
-      pad(s"| max: ${if (maximumWatermarkIncrement == 0) "-" else shortDuration(maximumWatermarkIncrement)}", 18) +
       pad(s"| +/s: ${math.round(avgWatermarksPerSecond)}", 13) +
       pad(s"| nwm: $noWatermarkCount", 12) +
       pad(s"|| ew: $elementsSinceWatermarkAdvanced", 14) +
-      pad(s"| max: $maxElementsSinceWatermarkAdvanced", 14) +
+      pad(s"| emx: $maxElementsSinceWatermarkAdvanced", 14) +
       s"|| rt: ${longDuration(millisSinceStart)}"
+  }
+
+  object ProgressInfo {
+    def getSchemaInfo: String = {
+      """------------------------------------------------------------------------------------------------------------------------
+        |-  ts :  the timestamp of the element (short format, seconds resolution)
+        |- ect : the total number of elements seen so far
+        |- e/s : the average number of elements per second (processing time) so far
+        |-------
+        |-  bn : the number of seconds (in event time) the element is behind the maximum event time seen so far ('latest' if this
+        |        element has the highest event time so far)
+        |- bnc : the number of elements seen so far that were behined the maximum event time seen when they were received
+        |- bmx : the maximum time difference (in event time) that an element seen so far was behind the maximum event time when
+        |        it was received
+        |-------
+        |-  lt : the number of seconds (in event time) the element is late, i.e. that its timestamp is behind the current
+        |        watermark ('on time' if the element has a timestamp >= than the current watermark)
+        |- ltc : the number of elements seen so far that were late
+        |- lmx : the maximum time difference that an element seen so far was behind the watermark wen it was received
+        |-------
+        |-  wn : the timestamp of the current watermark ('NO watermark') if no watermark has been received yet. If the watermark
+        |        has increased, '+' with the watermark time increment is appended to the timestamp. '=' indicates that the
+        |        watermark has stayed the same since the last element on the input stream
+        |- wmx : the maximum event time value by which the watermark has increased between two observed elements
+        |- +wc : the number of times that the watermark timestamp has advanced prior to the element
+        |- +/s : the average number of times per second (processing time) that an increase of the watermark timestamp was
+        |        observed between two elements
+        |- nwm : the number of elements seen that were received before the first watermark
+        |-------
+        |-  ew : the number of elements seen since the last increase of the watermark
+        |- emx : the maximum number of elements for which the watermark stayed the same since the previous increase
+        |-------
+        |-  rt : the run time since the (re)start of the task
+        |------------------------------------------------------------------------------------------------------------------------""".stripMargin
+    }
   }
 
   private def pad(str: String, chars: Int): String = str.padTo(chars, ' ')
