@@ -38,6 +38,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     val clusterParameterParseErrorsOutputPath = Settings.config.getString("jobs.activity-detection.cluster-parameter-file-parse-errors-path")
     val frequencyWindowSize = Settings.duration("jobs.activity-detection.frequency-window-size")
     val frequencyWindowSlide = Settings.duration("jobs.activity-detection.frequency-window-slide")
+    val ignoreActivityOlderThan = Settings.duration("jobs.activity-detection.ignore-activity-older-than")
     val defaultK = Settings.config.getInt("jobs.activity-detection.default-k")
     val defaultDecay = Settings.config.getDouble("jobs.activity-detection.default-decay")
     val clusterWindowSize = Settings.duration("jobs.activity-detection.cluster-window-size")
@@ -60,8 +61,6 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     val posts: DataStream[PostEvent] = streams.posts(kafkaConsumerGroup)
 
     // read raw control file lines
-    // NOTE generic types have to be enabled, since reading the control parameter file using TextInputFormat
-    // causes "type org.apache.flink.streaming.api.functions.source.TimestampedFileInputSplit is treated as a generic type"
     val controlParameterLines: DataStream[String] = readControlParameters(clusterParameterFilePath)
 
     // parse into valid parameters and parse error streams
@@ -78,10 +77,8 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     // get aggregated features (text and frequency-based)
     val aggregatedFeaturesStream: DataStream[FeaturizedEvent] =
       aggregateFeatures(
-        eventFeaturesStream,
-        frequencyStream,
-        FlinkUtils.getTtl(Time.hours(3), speedupFactor)
-      )
+        eventFeaturesStream, frequencyStream,
+        ignoreActivityOlderThan, FlinkUtils.getTtl(frequencyWindowSize, speedupFactor))
 
     // cluster combined features (on a single worker) in a custom window:
     // - tumbling window of configured size
@@ -121,12 +118,12 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
   }
 
   /**
-    * Continuously read updated clustering control parameters from a text file
+    * Continuously read updated clustering control parameter lines from a text file
     *
     * @param controlFilePath The path to the control parameters file
-    * @param updateInterval
-    * @param env
-    * @return
+    * @param updateInterval  The time interval (in millis) between consecutive path scans
+    * @param env             The stream execution environment
+    * @return Stream of control parameter file lines (yet unparsed)
     */
   def readControlParameters(controlFilePath: String, updateInterval: Long = 1000L)
                            (implicit env: StreamExecutionEnvironment): DataStream[String] = {
@@ -140,27 +137,32 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
       .assignTimestampsAndWatermarks(
       FlinkUtils.timeStampExtractor[String](
         Time.seconds(0),
-        _ => Long.MaxValue)) // required for downstream timers
+        _ => Long.MaxValue)) // fake timestamp at MaxValue; required for downstream timers
   }
 
   /**
+    * Parses the stream control parameter lines and emits a stream of valid parsed parameters and a stream of error
+    * messages.
     *
-    * @param controlParameterLines
-    * @return
+    * @param controlParameterLines The input stream of control parameter lines
+    * @return Pair of streams: parameter stream and error message stream
     */
   def parseControlParameters(controlParameterLines: DataStream[String]): (DataStream[ClusteringParameter], DataStream[String]) = {
     val controlParametersParsed: DataStream[Either[String, ClusteringParameter]] =
       controlParameterLines
-        .flatMap(ClusteringParameter.parse(_).map(_.left.map(_.getMessage))) // left: parse error message
+        .flatMap(ClusteringParameter.parse(_).map(_.left.map(_.getMessage))) // map the left side (parse exception) to a message string
         .setParallelism(1)
         .name("FlatMap: Parse parameters")
 
+    // filtered stream of only parse errors
     val controlParameterParseErrors: DataStream[String] =
       controlParametersParsed
-        .filter(_.isLeft).name("Filter: parse errors").setParallelism(1)
+        .filter(_.isLeft)
+        .name("Filter: parse errors").setParallelism(1)
         .map(_.left.get).setParallelism(1)
         .name("Map: Parameter parse errors")
 
+    // filtered stream of only valid parameters
     val controlParameters: DataStream[ClusteringParameter] =
       controlParametersParsed
         .filter(_.isRight)
@@ -199,10 +201,12 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
   }
 
   /**
+    * Extracts text-based features from input streams of comments and posts, and returns a unioned stream of
+    * featurized events (carrying the feature vectors plus core information about the events)
     *
-    * @param comments
-    * @param posts
-    * @return
+    * @param comments The input stream of comment events
+    * @param posts    The input stream of post events
+    * @return The stream of featurized events
     */
   def getEventFeatures(comments: DataStream[CommentEvent],
                        posts: DataStream[PostEvent]): DataStream[FeaturizedEvent] = {
@@ -216,7 +220,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
             c.timestamp,
             extractTextFeatures(c.content))
         )
-        .name("Extract comment features")
+        .name("Map: Extract comment features")
 
     val postFeaturesStream =
       posts
@@ -228,19 +232,20 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
             p.timestamp,
             extractTextFeatures(p.content))
         )
-        .name("Extract post features")
+        .name("Map: Extract post features")
 
     // return unioned stream
     commentFeaturesStream.union(postFeaturesStream)
   }
 
   /**
+    * Produces a stream of post/comment counts per person, for a sliding window
     *
-    * @param comments
-    * @param posts
-    * @param windowSize
-    * @param windowSlide
-    * @return
+    * @param comments    The input stream of comments
+    * @param posts       The input stream of posts
+    * @param windowSize  The size of the sliding window
+    * @param windowSlide The slide duration of the sliding window
+    * @return Stream of pairs (person id, post/comment count within the window) emitted at the end of the sliding window
     */
   def getEventFrequencyPerPerson(comments: DataStream[CommentEvent],
                                  posts: DataStream[PostEvent],
@@ -257,27 +262,29 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
 
     frequencyInputStream
       .timeWindow(FlinkUtils.convert(windowSize), FlinkUtils.convert(windowSlide))
-      .sum(1)
+      .sum(1) // 0-based, 1 -> counter
       .name("Calculate post/comment frequency per person" +
-        s"(window: ${DateTimeUtils.formatDuration(windowSize.toMilliseconds)} " +
-        s"slide ${DateTimeUtils.formatDuration(windowSlide.toMilliseconds)})")
+      s"(window: ${DateTimeUtils.formatDuration(windowSize.toMilliseconds)} " +
+      s"slide ${DateTimeUtils.formatDuration(windowSlide.toMilliseconds)})")
   }
 
   /**
     *
     * @param eventFeaturesStream
     * @param frequencyStream
+    * @param ignoreActivityOlderThan
     * @param stateTtl
     * @return
     */
   def aggregateFeatures(eventFeaturesStream: DataStream[FeaturizedEvent],
                         frequencyStream: DataStream[(Long, Int)],
-                        stateTtl: Time): DataStream[FeaturizedEvent] =
+                        ignoreActivityOlderThan: Time,
+                        stateTtl: Time) =
     eventFeaturesStream
       .keyBy(_.personId)
       .connect(frequencyStream.keyBy(_._1)) // both streams keyed on person id
-      .process(new AggregateFeaturesFunction(stateTtl)) // join event with latest known frequency for the person
-      .name("Aggregate features")
+      .process(new AggregateFeaturesFunction(ignoreActivityOlderThan, stateTtl)) // join event with latest known frequency for the person
+      .name("CoProcess: Aggregate features")
 
   /**
     *
@@ -351,9 +358,14 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
   }
 
   /**
+    * Extracts a feature vector from text.
     *
-    * @param content
-    * @return
+    * @param content The text to extract the feature vector from
+    * @return The feature vector (would in reality be very large)
+    * @note This is just a placeholder for feature extraction based on natural language analysis and in general,
+    *       real data science.
+    *       A streaming-specific concern might be how to standardize/normalize these features (whatever they are),
+    *       potentially based on distribution information for a sliding window
     */
   def extractTextFeatures(content: Option[String]): mutable.ArrayBuffer[Double] = {
     val tokens =
@@ -369,10 +381,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
       // TODO how to scale/normalize features?
       // TODO do this in windowing function to allow normalization/standardization?
 
-      // buffer += math.log(tokens.size)
-      // buffer += math.log(tokens.map(_.toLowerCase()).distinct.size) // distinct word count
       buffer += 10 * tokens.map(_.toLowerCase()).distinct.size / tokens.size // proportion of distinct words
-      // ... and some bogus features:
       buffer += tokens.count(_.forall(_.isUpper)) / tokens.size // % of all-UPPERCASE words
       buffer += tokens.count(_.length == 4) / tokens.size // % of four-letter words
     }
