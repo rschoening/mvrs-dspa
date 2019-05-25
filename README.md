@@ -18,7 +18,7 @@
    1. enter `git checkout -- .idea/runConfigurations` 
    1. start IDEA again and open the project
    1. confirm that the run configurations (drop down list in upper right of IDEA window) are available:
-   ![run configurations](https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/idea-run-configurations.png "IDEA run configurations")
+   <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/idea-run-configurations.png" alt="IDEA run configurations" width="60%"/>
 1. In `Terminal` tab in IDEA: run `mvn clean package`
 
 ## Setting up the runtime environment
