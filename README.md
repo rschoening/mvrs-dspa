@@ -125,10 +125,10 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
   * The run configuration does _not_ set the argument `local-with-ui`, to allow for parallel execution with previous task on local machine/minicluster.
 * Checking results:
    * Kibana dashboard: ....
+   * click on tag etc.: filter!
 * TODO execution plan image
 #### Notes
 * speedup
-* max-out-of-orderness
 * job-specific parameters
 
 ### Recommendations
@@ -138,12 +138,16 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * Outputs (re-generated automatically when the job starts):
    * ElasticSearch index with recommendation documents: `mvrs-recommendations`
    * ElasticSearch index with post features: `mvrs-recommendation-post-features`
+* [Execution plan](https://github.com/rschoening/mvrs-dspa/blob/master/doc/plans/recommendations.pdf)
 * In IDEA, execute the run configuration `Task 2: user recommendations (Kafka -> ElasticSearch)` 
    * Job class: `org.mvrs.dspa.jobs.recommendations.RecommendationsJob`
    * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
 * Checking results:
    * Kibana dashboard: [\[DSPA\] Recommendations](http://localhost:5602/app/kibana#/dashboard/7c230710-6855-11e9-9ba6-39d0e49adb7a)
-* TODO execution plan image
+   * Make sure to set the time period (upper right) to the beginning of the stream (February 2012 for the low volume stream). All visualizations in Kibana depend on this time period.
+   * The recommendation documents are shown on the left and can be investigated in detail (expanding the document tree, displaying as JSON etc.). Note that old recommendations for a given person are continuously replaced by current ones. In a given time period, the number of documents will therefore diminish over time. Use the right-arrow next to the time period display to advance along with the tail of the stream. To look at a document in detail, it may be necessary to stop the stream, otherwise the document may be deleted at any time.
+   <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-dashboard-recommendations.png" alt="Kibana dashboard: recommendations" width="60%"/>
+
 #### Notes
 * speedup
 * max-out-of-orderness
