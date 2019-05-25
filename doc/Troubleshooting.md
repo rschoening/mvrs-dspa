@@ -1,6 +1,9 @@
 ## Troubleshooting
-* if bind address error occurs when starting job that starts the web UI, then check if the flink dashboard is still open in a browser window. The client keeps the port open.
-* When starting one of the Flink jobs using a IDEA run configuration that launches the Flink Dashboard for the local minicluster: `Exception in thread "main" java.net.BindException: Address already in use: bind
+### When starting a Flink Job
+* `Exception in thread "main" java.util.concurrent.ExecutionException: org.apache.kafka.common.errors.TimeoutException: Timed out waiting for a node assignment.`
+  * Probable cause: Kafka not running.
+  * Solution: start with `docker-compose up` in directory `docker`
+* When using a IDEA run configuration that launches the Flink Dashboard for the local minicluster: `Exception in thread "main" java.net.BindException: Address already in use: bind
 	at sun.nio.ch.Net.bind0(Native Method)
 	at sun.nio.ch.Net.bind(Net.java:433)
 	at sun.nio.ch.Net.bind(Net.java:425)
@@ -8,17 +11,15 @@
 	at org.apache.flink.shaded.netty4.io.netty.channel.socket.nio.NioServerSocketChannel.doBind(NioServerSocketChannel.java:128)`
   * Probable causes: either another running Flink job has already started the dashboard (on the same port), or the dashboard is still open in the browser (in some situations this also keeps the port open)
   * Solution: shut down the other job and/or the browser window, or change the run configuration to start the job without the `local-with-ui` program argument.
-* When starting one of the Flink jobs: `Exception in thread "main" java.util.concurrent.ExecutionException: org.apache.kafka.common.errors.TimeoutException: Timed out waiting for a node assignment.`
-  * Probable cause: Kafka not running.
-  * Solution: start with `docker-compose up` in directory `docker`
-* When running `docker-compose up`:
+
+### When running `docker-compose up`:
   * `ERROR: for docker_exporter_1  Cannot start service exporter: driver failed programming external connectivity on endpoint docker_exporter_1 (c1b1acc38d051b138707fbae6e323641332e3f659145eef51ea5764b2a3953e7): Error starting userland proxy: mkdir /port/tcp:0.0.0.0:9101:tcp:172.18.0.2:9100: input/output error`
     * Sometimes observed on Windows on first `docker-compose up`in session.
     * Solution: restart docker, try again
   * on linux: `ERROR: Couldn't connect to Docker daemon at http+docker://localhost - is it running?`
     * start `dockerd` as su
 * failure to start container `elasticsearch` (best diagnosed when starting that container individually, using 
-`docker-compose up elasticsearch`: 
+`docker-compose up elasticsearch`:
 ```
 elasticsearch_1  | [1]: max virtual memory areas vm.max_map_count [65530] is too low, increase to at least [262144]
 elasticsearch_1  | [2019-05-22T12:02:31,504][INFO ][o.e.n.Node               ] [kdPY8cQ] stopping ...
