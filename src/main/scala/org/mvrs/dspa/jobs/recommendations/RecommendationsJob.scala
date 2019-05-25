@@ -106,7 +106,7 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
 
     // add sink
     recommendations
-      .process(new TimestampAssignerFunction[Recommendation])
+      .process(new TimestampAssignerFunction[Recommendation]) // assign timestamp which was carried along by the context
       .addSink(ElasticSearchIndexes.recommendations.createSink(recommendationsBatchSize))
       .name("ElasticSearch: recommendations")
 
