@@ -167,58 +167,65 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 ## Solution overview
 ### Package structure
 ```
-src
-└─ main
-│  └─ resources
-│  │  └─ application.conf            | configuration file (default values; file with overrides can be placed on classpath)
-│  └─ scala
-│     └─ org.mvrs.dspa               | root package of Scala solution
-│        └─ db                       | package with data access types for ElasticSearch 
-|        │    ElasticSearch.scala    | - static registry of ElasticSearch indices
-│        └─ functions                | package for stream functions that are not strictly tied to one job
-│        └─ jobs                     | package with job implementations 
-|        │  └─ activeposts           | package for active post statistics jobs
-|        │  └─ clustering            | package for unusual activity detection job
-|        │  └─ preparation           | package for data preparation jobs (static tables, events)
-|        │  └─ recommendations       | package for user recommendations job
-│        └─ model                    | package for domain model types
-│        └─ streams                  | package for input streams (csv, Kafka)
-|        │    package.scala          | methods for reading input streams (csv or Kafka, comments raw or resolved)
-|        │    KafkaTopics.scala      | static registry of Kafka topics
-│        └─ utils                    | (more or less) generic utilities 
-|        Settings.scala              | Object for accessing settings in application.conf
-└─ test                              | tests and test resources
-│  └─ resources                      |
-│  │  └─ resources                   |
-│  │     └─ streams                  | directory with reduced streaming test data files (csv)
-│  └─ scala
-│     └─ categories                  | package for definition of test categories
-│     └─ db
-│     └─ functions
-│     └─ jobs
-│     └─ streams
-│     └─ utils
-└─ target
-   └─ site
-   │  └─ scaladoc
-   │        index.html
-   │  mvrs-dspa-1.0.jar
+└─ src                                      
+│  └─ main                                  
+│  │  └─ resources                          
+│  │  │  └─ application.conf                │ configuration file, with documentation on all settings
+│  │  └─ scala                              │
+│  │     └─ org.mvrs.dspa                   │ root package of Scala solution
+│  │        └─ db                           │ package with data access types for ElasticSearch 
+│  │        │    ElasticSearchIndexes.scala │ - static registry of ElasticSearch indices
+│  │        │                               │ - for each index there is a gateway class performing the schema-dependent
+│  │        │                               │   operations required for that index (index creation, document creation, 
+│  │        │                               │   Flink sink creation, AsyncI/O-function creation)
+│  │        └─ functions                    │ package for stream functions that are not strictly tied to one job
+│  │        └─ jobs                         │ package with job implementations 
+│  │        │  └─ activeposts               │ package for active post statistics jobs
+│  │        │  └─ clustering                │ package for unusual activity detection job
+│  │        │  └─ preparation               │ package for data preparation jobs (static tables, events)
+│  │        │  └─ recommendations           │ package for user recommendations job
+│  │        └─ model                        │ package for domain model types
+│  │        └─ streams                      │ package for input streams (csv, Kafka)
+│  │        │    package.scala              │ methods for reading input streams (csv or Kafka, comments raw or resolved)
+│  │        │    KafkaTopics.scala          │ static registry of Kafka topics
+│  │        └─ utils                        │ (more or less) generic utilities 
+│  │        Settings.scala                  │ Object for accessing settings in application.conf
+│  └─ test                                  │ tests and test resources
+│     └─ resources                          │
+│     │  └─ resources                       │
+│     │     └─ streams                      │ directory with reduced streaming test data files (csv)
+│     └─ scala                              │
+│     └─ categories                         │ package for definition of test categories
+│     └─ db                                 │ integration tests (ignored) for interaction with ElasticSearch
+│     └─ functions                          │ unit and integration tests for functions package
+│     └─ jobs                               │ unit and integration tests for the analytic tasks 
+│     └─ streams                            │ unit and integration tests for the primary input streams
+│     └─ utils                              │ tests and trials for utilities
+└─ target                                   │
+   └─ site                                  │
+   │  └─ scaladoc                           │ scaladoc site generated with mvn scala:doc
+   │        index.html                      │
+   │  mvrs-dspa-1.0.jar                     │ the fat jar that can be submitted to a Flink cluster, built by mvn package
 ```
 ### Configuration
-* application.conf (based on https://github.com/lightbend/config/blob/master/README.md)
-### Unit tests
+* `mvrs-dspa/src/main/resources/application.conf`
+  * Based on https://github.com/lightbend/config/blob/master/README.md
+  * Settings are documented in the file
+  * Settings can be overridden at runtime using various mechanisms (see https://github.com/lightbend/config/blob/master/README.md#overview) 
 ### Scaladoc
-can be generated with mvn scala:doc
+* located in `mvrs-dspa/target/site/scaladoc`
+* generated with `mvn scala:doc`
 ### Unit tests
-* Unit tests: Scalatest
-* Integration tests: JUnit
-* run configurations
-### ElasticSearch
-* ElasticSearch indexes: see class xy
-### Kafka
-* Kafka topics: see class xy
-### Kibana
-* Dashboards
+* Unit tests:
+  * Scalatest
+  * Naming convention: `...TestSuite`
+* Integration tests:
+  * JUnit
+  * Naming convention: `...ITSuite`
+  * Most integration tests avoid external dependencies. Those that do interact with ElasticSearch or Kafka are ignored, and are only executed when invoked invidiually.
+* run configurations: 
+  * `ALL: integration tests (junit)`
+  * `ALL: unit tests (scalatest)`
 
 ## Addresses:
 * Flink lokal UI: http://localhost:8081
