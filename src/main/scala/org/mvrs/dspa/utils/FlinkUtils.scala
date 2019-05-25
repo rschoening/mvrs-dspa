@@ -309,9 +309,20 @@ object FlinkUtils {
     println()
   }
 
+  /**
+    * Adds a progress monitor that emits progress information for specific filter conditions to a defined write target.
+    *
+    * @param stream The stream to monitor
+    * @param filter The condition under which to emit detailed progress information for an element
+    * @param write  The write target (default: println)
+    * @param name   The operator name
+    * @tparam I The record type
+    * @return The complete and untransformed input stream
+    */
   def addProgressMonitor[I: TypeInformation](stream: DataStream[I])
                                             (filter: (I, ProgressInfo) => Boolean,
-                                             write: String => Unit = println(_)): DataStream[I] =
+                                             write: String => Unit = println(_),
+                                             name: String = "Progress monitor"): DataStream[I] =
     stream.process(new ProgressMonitorFunction())
       .map { t: (I, ProgressInfo) => {
         if (filter(t._1, t._2)) {
@@ -323,6 +334,6 @@ object FlinkUtils {
 
         t._1
       }
-      }
+      }.name(name)
 
 }
