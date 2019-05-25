@@ -19,7 +19,6 @@ abstract class ElasticSearchIndexSink[T](indexName: String, nodes: ElasticSearch
       new ElasticsearchSinkFunction[T] {
         private def createUpsertRequest(record: T): UpdateRequest = {
 
-          // val b : BulkRequest = new BulkRequest()
           // NOTE this closes over the containing class, which therefore must be serializable
           val document = createDocument(record).asJava
           val id = getDocumentId(record)
@@ -36,17 +35,6 @@ abstract class ElasticSearchIndexSink[T](indexName: String, nodes: ElasticSearch
 
     // configuration for the bulk requests
     builder.setBulkFlushMaxActions(batchSize)
-
-    // if ever needed: provide a RestClientFactory for custom configuration on the internally created REST client
-    //
-    //    builder.setRestClientFactory(
-    //      restClientBuilder => {
-    //         restClientBuilder.setDefaultHeaders(...)
-    //         restClientBuilder.setMaxRetryTimeoutMillis(...)
-    //         restClientBuilder.setPathPrefix(...)
-    //         restClientBuilder.setHttpClientConfigCallback(...)
-    //      }
-    //    )
 
     builder.build()
   }
