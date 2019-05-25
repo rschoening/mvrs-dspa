@@ -55,12 +55,15 @@ NOTE: Kafka topics
 NOTE: ElasticSearch indices
 NOTE: Kibana dashboards
 ### Data preparation
+The following two jobs must have been run prior to running any of the analytics jobs. Note that the events must be written to Kafka again after stopping and restarting the Kafka docker container, as this container in its current configuration resets the Kafka 
+topics on startup. On the other hand, the ElasticSearch indexes are maintained in a docker volume across restarts, so the static data
+does only need to be loaded once (unless the configuration for LSH hashing is changed see 'Recommendations' below).
 #### Loading static data into ElasticSearch
 * Job class: `org.mvrs.dspa.jobs.preparation.LoadStaticDataJob [local-with-ui]`
-* IDEA run configuration: `Preparation: load static tables (csv -> ElasticSearch)` (specifies `local-with-ui`)
+* IDEA run configuration: `Preparation: load static tables (csv -> ElasticSearch)` (with argument `local-with-ui` to launch the Flink dashboard UI)
 #### Writing events to Kafka
 * Job class: `org.mvrs.dspa.jobs.preparation.WriteEventsToKafkaJob [local-with-ui]`
-* IDEA run configuration: `Preparation: load events (csv -> Kafka)` (specifies `local-with-ui`)
+* IDEA run configuration: `Preparation: load events (csv -> Kafka)` (with argument `local-with-ui` to launch the Flink dashboard UI)
 * NOTES
   * out-of-orderness can be configured here -> events are reordered in Kafka (verify using ProgressMonitorFunction TODO set up jobs for this)
   * no speedup (or infinite speedup) is applied. Speedup is of interest in analytic tasks
@@ -69,21 +72,27 @@ NOTE: Kibana dashboards
 ### Active post statistics
 #### Calculating post statistics
 * Job class: `org.mvrs.dspa.jobs.activeposts.ActivePostStatisticsJob [local-with-ui]`
-* IDEA run configuration: `Task 1.1: active post statistics (Kafka -> Kafka, post info: Kafka -> ElasticSearch)` (specifies `local-with-ui`)
+* IDEA run configuration: `Task 1.1: active post statistics (Kafka -> Kafka, post info: Kafka -> ElasticSearch)` (specified `local-with-ui` to launch the Flink dashboard UI)
 #### Writing post statistics results to ElasticSearch index
 * Job class: `org.mvrs.dspa.jobs.activeposts.WriteActivePostStatisticsToElasticSearchJob [local-with-ui]`
-* IDEA run configuration: `Task 1.2: active post statistics - (Kafka -> ElasticSearch) [NO UI]` (_without_ `local-with-ui` to allow for parallel execution with previous task on local machine/minicluster, without conflict on Web UI port)
+* IDEA run configuration: `Task 1.2: active post statistics - (Kafka -> ElasticSearch) [NO UI]` (_without_ argument `local-with-ui`, to allow for parallel execution with previous task on local machine/minicluster, without conflict on Web UI port)
 * Kibana dashboard: ....
 * TODO execution plan image
 ### Recommendations
+* Inputs (created by data preparation jobs, see above): 
+  * Event topics in Kafka: `mvrs_comments`, `mvrs_likes`, `mvrs_posts`
+  * ElasticSearch indexes with static data: `mvrs-recommendation-person-features`, `mvrs-recommendation-forum-features`, `mvrs-recommendation-person-minhash`, `mvrs-recommendation-known-persons`, `mvrs-recommendation-lsh-buckets`
+* Outputs (re-generated automatically when the job starts):
+  * ElasticSearch index with recommendation documents: `mvrs-recommendations`
+  * ElasticSearch index with post features: `mvrs-mvrs-recommendation-post-features`
 * Job class: `org.mvrs.dspa.jobs.recommendations.RecommendationsJob [local-with-ui]`
-* IDEA run configuration: `Task 2: user recommendations (Kafka -> ElasticSearch)` (specifies `local-with-ui`)
-* Kibana dashboard: set date range to "last 15 minutes"
+* IDEA run configuration: `Task 2: user recommendations (Kafka -> ElasticSearch)` (with argument `local-with-ui` to launch the Flink dashboard UI)
+* Kibana dashboard: [http://localhost:5602/app/kibana#/dashboard/7c230710-6855-11e9-9ba6-39d0e49adb7a \[DSPA\] Recommendations]
+set date range to "last 15 minutes"
 * TODO execution plan image
-* TODO check lateness with ProgressMonitorFunction, on Kafka input without reordering --> Async I/O?
 ### Unusual activity detection
 * Job class: `org.mvrs.dspa.jobs.clustering.UnusualActivityDetectionJob [local-with-ui]`
-* IDEA run configuration: `Task 3: unusual activity detection (Kafka -> ElasticSearch)` (specifies `local-with-ui`)
+* IDEA run configuration: `Task 3: unusual activity detection (Kafka -> ElasticSearch)`  (specified `local-with-ui` to launch the Flink dashboard UI)
 * Kibana dashboard: 
    * Unusual activity detection: cluster metadata graph can have gaps since that visualization does not interpolate across buckets with nodata (which may result due to extending windows)
 * TODO execution plan image
