@@ -125,7 +125,7 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
       else
         watermarkCount.toDouble / (sumOfProcTimeBetweenWatermarksMillis / 1000) // incorrect after restore from checkpoint (metric is checkpointed, sum is not)
 
-    val avgEventsPerSecond =
+    val avgElementsPerSecond =
       if (sumOfProcTimeBetweenEventsMillis == 0)
         Double.NaN
       else
@@ -153,7 +153,7 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
           maximumWatermarkIncrement,
           nowNanos - startTimeNanos,
           avgWatermarksPerSecond,
-          avgEventsPerSecond
+          avgElementsPerSecond
         )
       )
     )
@@ -253,23 +253,53 @@ object ProgressMonitorFunction {
       */
     val millisSinceStart: Long = nanosSinceStart / 1000 / 1000
 
+    /**
+      * Returns a displayable string representation of the progress information, in a tabular layout.
+      *
+      * === columns ===
+      * -  ts :  the timestamp of the element (short format, seconds resolution)
+      * - ect : the total number of elements seen so far
+      * - e/s : the average number of elements per second (processing time) so far
+      * -------
+      * -  bn : the number of seconds (in event time) the element is behind the maximum event time seen so far ('latest' if this element has the highest event time so far)
+      * - bnc : the number of elements seen so far that were behined the maximum event time seen when they were received
+      * - max : the maximum time difference (in event time) that an element seen so far was behind the maximum event time when it was received
+      * -------
+      * -  lt : the number of seconds (in event time) the element is late, i.e. that its timestamp is behind the current watermark ('on time' if the element has a timestamp >= than the current watermark)
+      * - ltc : the number of elements seen so far that were late
+      * - max : the maximum time difference that an element seen so far was behind the watermark wen it was received
+      * -------
+      * -  wn : the timestamp of the current watermark ('NO watermark') if no watermark has been received yet. If the watermark has increased, '+' is appended to the time. '=' indicates that the watermark has stayed the same since the last observed element
+      * - +wc : the event time duration by which the watermark has increased since the last watermark value
+      * - max : the maximum event time value by which the watermark has increased between two observed elements
+      * - +/s : the average number of times per second (processing time) that an increase of the watermark timestamp was observed between two elements
+      * - nwm : the number of elements seen that were received before the first watermark
+      * -------
+      * -  ew : the number of elements seen since the last increase of the watermark
+      * - max : the maximum number of elements for which the watermark stayed the same since the previous increase
+      * -------
+      * - rt  : the run time since the (re)start of the task
+      * -------
+      *
+      * @return String representation
+      */
     override def toString: String = s"[$subtask] " +
       s"ts: ${shortDateTime(timestamp)} " +
-      pad(s"| elc: $elementCount", 14) +
-      pad(s"| el/s: ${math.round(avgElementsPerSecond)}", 15) +
+      pad(s"| ect: $elementCount", 14) +
+      pad(s"| e/s: ${math.round(avgElementsPerSecond)}", 14) +
       pad(s"|| bn: ${if (isBehindNewest) shortDuration(millisBehindNewest) else "latest"}", 17) +
-      pad(s"| max: ${if (maximumBehindNewest == 0) "-" else shortDuration(maximumBehindNewest)}", 18) +
       pad(s"| bnc: $elementsBehindNewestCount", 14) +
+      pad(s"| max: ${if (maximumBehindNewest == 0) "-" else shortDuration(maximumBehindNewest)}", 18) +
       pad(s"|| lt: ${if (isLate) shortDuration(millisBehindWatermark) else "on time"}", 17) +
       pad(s"| ltc: $lateElementsCount", 13) +
       pad(s"| max: ${if (maximumLateness == 0) "-" else shortDuration(maximumLateness)}", 18) +
       pad(s"|| wn: ${if (!hasWatermark) "NO watermark" else shortDateTime(watermark)}", 27) +
       pad(s"${if (watermarkIncrement == 0) "=" else "+" + shortDuration(watermarkIncrement)}", 11) +
+      pad(s"| +wc: $watermarkAdvancedCount", 12) +
       pad(s"| max: ${if (maximumWatermarkIncrement == 0) "-" else shortDuration(maximumWatermarkIncrement)}", 18) +
-      pad(s"| +ct: $watermarkAdvancedCount", 12) +
       pad(s"| +/s: ${math.round(avgWatermarksPerSecond)}", 13) +
       pad(s"| nwm: $noWatermarkCount", 12) +
-      pad(s"| elw: $elementsSinceWatermarkAdvanced", 14) +
+      pad(s"|| ew: $elementsSinceWatermarkAdvanced", 14) +
       pad(s"| max: $maxElementsSinceWatermarkAdvanced", 14) +
       s"|| rt: ${longDuration(millisSinceStart)}"
   }
