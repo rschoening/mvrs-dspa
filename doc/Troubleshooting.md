@@ -34,6 +34,6 @@ docker_elasticsearch_1 exited with code 78
   * Probable causes: either another running Flink job has already started the dashboard (on the same port), or the dashboard is still open in the browser (in some situations this also keeps the port open)
   * Solution: shut down the other job and/or the browser window, or change the run configuration to start the job without the `local-with-ui` program argument.
 
-### When starting unusual activity task
+### When starting the Flink job for Unusual Activity Detection
 * `Exception in thread "main" org.apache.flink.runtime.client.JobExecutionException: Job execution failed. ... Caused by: java.io.FileNotFoundException: The provided file path file:/c:/data/dspa/project/10k-users-sorted/mvrs/activity-classification.txt does not exist.`
   * copy parameter file `./docker/data/mvrs/activity-classification.txt` to a subdirectory `mvrs` in the data directory indicated by the environment variable `MVRS_DSPA_DATA_DIR` (if using a non-default location the data directory)

@@ -3,15 +3,16 @@
 ## Prerequisites
 * docker
 * docker compose
-* maven
+* Maven 3.6
 * Java 1.8
-* IntelliJ IDEA with Scala plugin:
+* IntelliJ IDEA 2019.1
+* Scala plugin for IntelliJ IDEA:
 <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/intellij-scala-plugin.png" alt="Scala plugin" width="60%"/>
 
 ## Setting up the development environment
 1. cd to parent directory for project, enter `git clone https://github.com/rschoening/mvrs-dspa.git`
 1. copy the csv test data directories `streams`and `tables` from `1k-users-sorted` or `10k-users-sorted` to the subdirectory `docker/data` of the repository
-1. set environment variable `MVRS_DSPA_DATA_DIR` to the absolute file URI to the repository subdirectory `docker/data` such that it is seen by IDEA (e.g. `export MVRS_DSPA_DATA_DIR=file:///dspa19/projects/mvrs-dspa/docker/data` in `.profile`)
+1. set environment variable `MVRS_DSPA_DATA_DIR` to the absolute file URI to the repository subdirectory `docker/data` such that it is visible for IDEA (e.g. `export MVRS_DSPA_DATA_DIR=file:///dspa19/projects/mvrs-dspa/docker/data` in `.profile`)
 1. start IntelliJ IDEA -> "Import Project" (selecting `pom.xml` in `mvrs-dspa`), accepting all defaults. Unfortunately, during the import process the configured run configurations are deleted. To bring them back:
    1. close IDEA again
    1. cd to the project directory
@@ -23,7 +24,7 @@
 
 ## Setting up the runtime environment
 1. make sure that `dockerd` is running
-1. cd to `mvrs-dspa\docker`
+1. cd to the repository: `mvrs-dspa\docker`
 1. as su, enter `docker-compose up -d`
 1. check that all containers were started successfully: enter `docker-compose ps` The following containers should be listed:
 ```
@@ -57,13 +58,16 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
 ## Running the Flink jobs
 ### Overview
 * The data preparation and analytic jobs can be configured using the [application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf) file. The individual settings are explained in that file.
-* The analytic jobs depend on the data to have previously been loaded using the data preparation jobs. There are no dependencies between analytic jobs for different project tasks.
+* The analytic jobs depend on the data to have previously been loaded using the data preparation jobs. There are no dependencies _between_ analytic jobs for different project tasks.
 * Note that restarting the Kafka container resets the topics. Also, when staring jobs that write to a Kafka topic, the topic is first deleted and recreated if it exists. Consequences are:
-  * after starting the docker container for Kafka, the data preparation job that writes events to Kafka must be re-run (the same is not true for the ElasticSearch indices, which are maintained across container restarts in a docker volume)
-  * when starting a job that writes to a Kafka topic, there should not be another job running that reads from the same topic.
+  * after starting the docker container for Kafka, the data preparation job that writes events to Kafka must be re-run (the same is _not_ true for the ElasticSearch indices, which are maintained across container restarts in a docker volume)
+  * when starting a job that writes to a Kafka topic, there should not be another job running that reads from the same topic, or the deletion will fail.
 
 ### Data preparation
-The following two jobs must have been run prior to running any of the analytics jobs. As noted above, the second of the jobs (writing to Kafka) needs to be re-run after restarting the Kafka container. The first job (writing static data to ElasticSearch) must be re-run after changing the LSH configuration relevant for the recommendations task, as the MinHash/LSH configuration in the prepared static data and the recommendation job must match for meaningful results.
+The following two jobs must have been run prior to running any of the analytics jobs.
+* The first job (writing static data to ElasticSearch) must be re-run after changing the LSH configuration relevant for the recommendations task, as the MinHash/LSH configuration in the prepared static data and the recommendation job must match for meaningful results.
+* As noted above, the second of the jobs (writing to Kafka) needs to be re-run after restarting the Kafka container.
+
 The two jobs terminate in less than a minute total, for the low-volume testdata.
 
 #### Loading static data into ElasticSearch
@@ -86,11 +90,12 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * Job class: `org.mvrs.dspa.jobs.preparation.WriteEventsToKafkaJob`
 * in IDEA, execute the run configuration `Preparation: load events (csv -> Kafka)`
    * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
+* Checking results: either by querying partition offsets using the Kafka CLI, or using the analytic jobs.
 
 ##### NOTES
   * To simulate out-of-order events, the value for `data.random-delay` in `application.conf` file can be modified prior to loading the events into Kafka. The random delay is used to parameterize a normal distribution of random delays, with a mean of 1/4 and standard deviation of 1/2 of the configured value, capping the distribution at that value (see `org.mvrs.dspa.utils.FlinkUtils.getNormalDelayMillis()`)  
   * The speedup factor (`data.speedup-factor` in `application.conf`) is only applied during the analytic jobs, not during data preparation.
-  * To allow precise control over the ordering and lateness of events when reading from Kafka, the preparation job uses a single worker, and writes to a single Kafka partition. Doing otherwise would create additional sources of un-ordering that would not allow exact control of lateness/reordering based on defined values for `data.random-delay` and `data.max-out-of-orderness`.
+  * To allow precise control over the ordering and lateness of events when reading from Kafka, the preparation job uses a single worker, and writes to a single Kafka partition. Doing otherwise would create additional sources of un-ordering that would not allow exact control of lateness/reordering based on defined values for `data.random-delay` and `data.max-out-of-orderness`. See also the discussion for `data.kafka-partition.count` in [application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf)
 
 ### Active post statistics
 #### Calculating post statistics
@@ -105,7 +110,7 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * Checking results:
   * run second job to write to ElasticSearch index
 #### Notes
-* speedup
+* speedup TODO
 * max-out-of-orderness
 * job-specific parameters
 
