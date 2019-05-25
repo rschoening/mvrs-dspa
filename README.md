@@ -6,7 +6,7 @@
 * maven
 * Java 1.8
 * IntelliJ IDEA with Scala plugin:
-![scala plugin](https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/intellij-scala-plugin.png "Scala plugin")
+<img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/intellij-scala-plugin.png" alt="Scala plugin" width="60%"/>
 
 ## Setting up the development environment
 1. cd to parent directory for project, enter `git clone https://github.com/rschoening/mvrs-dspa.git`
