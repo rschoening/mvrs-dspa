@@ -48,8 +48,10 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
    1. open Kibana in the browser, at http://localhost:5602/
    1. go to `Management`-> `Saved Objects`
    1. import `export.json` from `mvrs-dspa/docker/kibana`
+   
       <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-saved-objects-import.png" alt="Kibana import objects" width="60%"/>
    1. go to `Index patterns` and *star* one of the listed index patterns. Any will do (otherwise the imported dashboards are not listed)
+   
       <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-index-patterns-star.png" alt="Kibana import objects" width="60%"/>
 
 ## Running the Flink jobs
@@ -73,12 +75,12 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * in IDEA, execute the run configuration `Preparation: load static tables (csv -> ElasticSearch)`
    * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
    * The job can be re-run as needed. Output indices are deleted and recreated if they already exist.
-* Checking results:
-   * the load progress and final result can be observed in Kibana:
-      * Index management:
-         <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-index-management.png" alt="Kibana index management" width="60%"/>
-      * Discover (make sure to set time period to something like 'Last 15 minutes', as the static data is timestamped with insertion time):
-         <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-discover-static-data-loading.png" alt="Kibana index management" width="60%"/>
+* Checking results: the load progress and final result can be observed in Kibana:
+   * Document counts on index management page:
+     <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-index-management.png" alt="Kibana index management" width="60%"/>
+   * Discover page (make sure to set time period to something like 'Last 15 minutes', as the static data is timestamped with insertion time):
+   
+     <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-discover-static-data-loading.png" alt="Kibana index management" width="60%"/>
 
 #### Writing events to Kafka
 * Job class: `org.mvrs.dspa.jobs.preparation.WriteEventsToKafkaJob`
