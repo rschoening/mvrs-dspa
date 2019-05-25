@@ -48,9 +48,9 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
    1. open Kibana in the browser, at http://localhost:5602/
    2. go to `Management`-> `Saved Objects`
    3. import `export.json` from `mvrs-dspa/docker/kibana`
-    <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/kibana-saved-objects-import.png" alt="Kibana import objects" width="60%"/>
+    <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-saved-objects-import.png" alt="Kibana import objects" width="60%"/>
    4. go to `Index patterns` and *star* one of the listed index patterns. Any will do (otherwise the imported dashboards are not listed)
-   <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/kibana-index-patterns-star.png" alt="Kibana import objects" width="60%"/>
+   <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-index-patterns-star.png" alt="Kibana import objects" width="60%"/>
 
 ## Running the Flink jobs
 ### Overview
@@ -76,9 +76,9 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * Checking results:
    * the load progress and final result can be observed in Kibana:
       * Index management:
-      <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/kibana-index-management.png" alt="Kibana index management" width="60%"/>
+      <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-index-management.png" alt="Kibana index management" width="60%"/>
       * Discover (make sure to set time period to something like 'Last 15 minutes', as the static data is timestamped with insertion time):
-      <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/kibana-discover-static-data-loading.png" alt="Kibana index management" width="60%"/>
+      <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-discover-static-data-loading.png" alt="Kibana index management" width="60%"/>
 
 #### Writing events to Kafka
 * Job class: `org.mvrs.dspa.jobs.preparation.WriteEventsToKafkaJob`
