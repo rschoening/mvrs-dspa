@@ -11,13 +11,13 @@
 ## Setting up the development environment
 1. cd to parent directory for project, enter `git clone https://github.com/rschoening/mvrs-dspa.git`
 1. copy the csv test data directories `streams`and `tables` from `1k-users-sorted` or `10k-users-sorted` to the subdirectory `docker/data` of the repository
-1. set environment variable `MVRS_DSPA_DATA_DIR` to the absolute file URI to the repository subdirectory `docker/data` such that it is seen by IDEA (e.g. `export MVRS_DSPA_DATA_DIR=file:///dspa19/projectst/mvrs-dspa/docker/data` in `.profile`)
+1. set environment variable `MVRS_DSPA_DATA_DIR` to the absolute file URI to the repository subdirectory `docker/data` such that it is seen by IDEA (e.g. `export MVRS_DSPA_DATA_DIR=file:///dspa19/projects/mvrs-dspa/docker/data` in `.profile`)
 1. start IntelliJ IDEA -> "Import Project" (selecting `pom.xml` in `mvrs-dspa`), accepting all defaults. Unfortunately, during the import process the configured run configurations are deleted. To bring them back:
    1. close IDEA again
    1. cd to the project directory
    1. enter `git checkout -- .idea/runConfigurations` 
    1. start IDEA again and open the project
-   1. confirm that the run configurations (drop down list in upper right of IDEA window) are available:
+   1. confirm that the run configurations (drop down list in upper right of IDEA window) are available (order can differ):
    <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/idea-run-configurations.png" alt="IDEA run configurations" width="60%"/>
 1. In `Terminal` tab in IDEA: run `mvn clean package`
 
@@ -46,21 +46,39 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
       1. check again with `docker-compose ps`
 1. Import the dashboards in Kibana:
    1. open Kibana in the browser, at http://localhost:5602/
-   2. go to `Management`-> `Saved Objects` *TODO SCREENSHOT*
+   2. go to `Management`-> `Saved Objects`
    3. import `export.json` from `mvrs-dspa/docker/kibana`
-   4. go to `Index patterns` and *star* one of the listed index patterns. Any will do (otherwise the imported dashboards are not listed) *TODO SCREENSHOT*
+    <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/kibana-saved-objects-import.png" alt="Kibana import objects" width="60%"/>
+   4. go to `Index patterns` and *star* one of the listed index patterns. Any will do (otherwise the imported dashboards are not listed)
+   <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/kibana-index-patterns-star.png" alt="Kibana import objects" width="60%"/>
 
 ## Running the Flink jobs
 ### Overview
+* The data preparation and analytic jobs can be configured using the [application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf) file. The individual settings are explained in that file.
+* The analytic jobs depend on the data to have previously been loaded using the data preparation jobs. There are no dependencies between analytic jobs for different project tasks.
+* Note that restarting the Kafka container resets the topics. Also, when staring jobs that write to a Kafka topic, the topic is first deleted and recreated if it exists. Consequences are:
+  * after starting the docker container for Kafka, the data preparation job that writes events to Kafka must be re-run (the same is not true for the ElasticSearch indices, which are maintained across container restarts in a docker volume)
+  * when starting a job that writes to a Kafka topic, there should not be another job running that reads from the same topic.
+
 ### Data preparation
-The following two jobs must have been run prior to running any of the analytics jobs. Note that the events must be written to Kafka again after stopping and restarting the Kafka docker container, as this container in its current configuration resets the Kafka 
-topics on startup. On the other hand, the ElasticSearch indexes are maintained in a docker volume across restarts, so the static data
-does only need to be loaded once (unless the configuration for LSH hashing is changed see 'Recommendations' below).
+The following two jobs must have been run prior to running any of the analytics jobs. As noted above, the second of the jobs (writing to Kafka) needs to be re-run after restarting the Kafka container. The first job (writing static data to ElasticSearch) must be re-run after changing the LSH configuration relevant for the recommendations task, as the MinHash/LSH configuration in the prepared static data and the recommendation job must match for meaningful results.
+The two jobs terminate in less than a minute total, for the low-volume testdata.
 
 #### Loading static data into ElasticSearch
+* Inputs:
+  * csv files in testdata directory `tables` (location configured in `application.conf` and environment variable `MVRS_DSPA_DATA_DIR`)
+* Outputs:
+  * ElasticSearch indexes `mvrs-recommendation-person-features`, `mvrs-recommendation-forum-features`, `mvrs-recommendation-person-minhash`, `mvrs-recommendation-known-persons`, `mvrs-recommendation-lsh-buckets`
 * Job class: `org.mvrs.dspa.jobs.preparation.LoadStaticDataJob`
 * in IDEA, execute the run configuration `Preparation: load static tables (csv -> ElasticSearch)`
    * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
+   * The job can be re-run as needed. Output indices are deleted and recreated if they already exist.
+* Checking results:
+   * the load progress and final result can be observed in Kibana:
+      * Index management:
+      <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/kibana-index-management.png" alt="Kibana index management" width="60%"/>
+      * Discover (make sure to set time period to something like 'Last 15 minutes', as the static data is timestamped with insertion time):
+      <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/kibana-discover-static-data-loading.png" alt="Kibana index management" width="60%"/>
 
 #### Writing events to Kafka
 * Job class: `org.mvrs.dspa.jobs.preparation.WriteEventsToKafkaJob`
@@ -203,4 +221,4 @@ can be generated with mvn scala:doc
 * ElasticSearch docker (to check if online): http://localhost:9201
 
 ## Troubleshooting
-* [Troubleshooting page](https://github.com/rschoening/mvrs-dspa/blob/master/doc/Troubleshooting.md)
+* Some symptoms and solutions are listed [here](https://github.com/rschoening/mvrs-dspa/blob/master/doc/Troubleshooting.md)
