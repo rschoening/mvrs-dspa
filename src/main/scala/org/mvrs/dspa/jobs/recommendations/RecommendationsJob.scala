@@ -107,11 +107,12 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
     // add sink
     recommendations
       .process(new TimestampAssignerFunction[Recommendation]) // assign timestamp which was carried along by the context
+      .name("Assign timestamps to recommendations")
       .addSink(ElasticSearchIndexes.recommendations.createSink(recommendationsBatchSize))
       .name("ElasticSearch: recommendations")
 
     // example for how to monitor progress at a specific point in the pipeline
-    FlinkUtils.addProgressMonitor(candidatesWithoutInactiveUsers) { case (_, pi) => pi.isLate }
+    FlinkUtils.addProgressMonitor(recommendations) { case (_, pi) => pi.isLate }
 
     // trace the configured persons (output printed to console)
     tracePersons(tracedPersonIds)
