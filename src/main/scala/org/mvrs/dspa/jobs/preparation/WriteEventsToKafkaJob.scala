@@ -13,7 +13,7 @@ object WriteEventsToKafkaJob extends FlinkStreamingJob(
   parallelism = Some(1), // important to ensure defined order (controlled by randomDelay) in Kafka
   // (otherwise order is dependent on task/buffer scheduling, with out-of-orderness orders of magnitude greater
   // than what would normally be specified for randomDelay)
-  checkpointIntervalOverride = Some(0), // disable checkpointing for the load job - not fault-tolerant due to reordering step
+  checkpointIntervalOverride = Some(0), // disable checkpointing for the load job - not fault-tolerant due to reordering step (priority queue is not checkpointed)
 ) {
   def execute(): JobExecutionResult = {
     val noSpeedup = Some(0.0) // don't use speedup for writing events to kafka

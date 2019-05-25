@@ -11,7 +11,7 @@
 
 ## Setting up the development environment
 1. cd to parent directory for project, enter `git clone https://github.com/rschoening/mvrs-dspa.git`
-1. copy the csv test data directories `streams`and `tables` from `1k-users-sorted` or `10k-users-sorted` to the subdirectory `docker/data` of the repository
+1. copy the csv test data directories `streams`and `tables` from `1k-users-sorted` or `10k-users-sorted` to the subdirectory `docker/data` of the repository (it is recommended to start with `1k-users-sorted` for the initial environment setup)
 1. set environment variable `MVRS_DSPA_DATA_DIR` to the absolute file URI to the repository subdirectory `docker/data` such that it is visible for IDEA (e.g. `export MVRS_DSPA_DATA_DIR=file:///dspa19/projects/mvrs-dspa/docker/data` in `.profile`)
 1. start IntelliJ IDEA -> "Import Project" (selecting `pom.xml` in `mvrs-dspa`), accepting all defaults. Unfortunately, during the import process the configured run configurations are deleted. To bring them back:
    1. close IDEA again
@@ -20,7 +20,7 @@
    1. start IDEA again and open the project
    1. confirm that the run configurations (drop down list in upper right of IDEA window) are available (order can differ):
       <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/idea-run-configurations.png" alt="IDEA run configurations" width="60%"/>
-1. In `Terminal` tab in IDEA: run `mvn clean package`
+1. In `Terminal` tab in IDEA: run `mvn package`
 
 ## Setting up the runtime environment
 1. make sure that `dockerd` is running
@@ -82,17 +82,21 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * Checking results: the load progress and final result can be observed in Kibana:
    * Document counts on index management page:
      <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-index-management.png" alt="Kibana index management" width="60%"/>
-   * Discover page (make sure to set time period to something like 'Last 15 minutes', as the static data is timestamped with insertion time):
+   * `Discover` page (make sure to set time period to something like 'Last 15 minutes', as the static data is timestamped with insertion time):
    
-     <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-discover-static-data-loading.png" alt="Kibana index management" width="60%"/>
+     <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-discover-static-data-loading.png" alt="Kibana discover - static data" width="60%"/>
 
 #### Writing events to Kafka
+* Inputs:
+   * csv files in testdata directory `streams` (location configured in `application.conf` and environment variable `MVRS_DSPA_DATA_DIR`)
+* Outputs:
+   * Event topics in Kafka: `mvrs_comments`, `mvrs_likes`, `mvrs_posts`
 * Job class: `org.mvrs.dspa.jobs.preparation.WriteEventsToKafkaJob`
 * in IDEA, execute the run configuration `Preparation: load events (csv -> Kafka)`
    * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
 * Checking results: either by querying partition offsets using the Kafka CLI, or using the analytic jobs.
 
-##### NOTES
+##### Notes
   * To simulate out-of-order events, the value for `data.random-delay` in `application.conf` file can be modified prior to loading the events into Kafka. The random delay is used to parameterize a normal distribution of random delays, with a mean of 1/4 and standard deviation of 1/2 of the configured value, capping the distribution at that value (see `org.mvrs.dspa.utils.FlinkUtils.getNormalDelayMillis()`)  
   * The speedup factor (`data.speedup-factor` in `application.conf`) is only applied during the analytic jobs, not during data preparation.
   * To allow precise control over the ordering and lateness of events when reading from Kafka, the preparation job uses a single worker, and writes to a single Kafka partition. Doing otherwise would create additional sources of un-ordering that would not allow exact control of lateness/reordering based on defined values for `data.random-delay` and `data.max-out-of-orderness`. See also the discussion for `data.kafka-partition.count` in [application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf)
@@ -100,19 +104,19 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 ### Active post statistics
 #### Calculating post statistics
 * Inputs
-   * Kafka topics:
+   * Kafka topics: `mvrs_comments`, `mvrs_likes`, `mvrs_posts`
 * Outputs
-   * Kafka topic
-   * ElasticSearch index 
+   * Kafka topic: `mvrs_poststatistics`
+   * ElasticSearch index: `mvrs-active-post-statistics-postinfos`
+* Execution plan TODO
 * Job class: `org.mvrs.dspa.jobs.activeposts.ActivePostStatisticsJob`
 * in IDEA, execute the run configuration `Task 1.1: active post statistics (Kafka -> Kafka, post info: Kafka -> ElasticSearch)`
    * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
 * Checking results:
-  * run second job to write to ElasticSearch index
+  * View the incoming documents in `mvrs-active-post-statistics-postinfos` using the `Discover` page in Kibana (setting the time period to the start event time of the stream, i.e. February 2012 for the low-volume stream).
+  * run the following job to write the statistics to ElasticSearch ()
 #### Notes
-* speedup TODO
-* max-out-of-orderness
-* job-specific parameters
+* Job-specific configuration parameters are defined in `jobs.active-post-statistics` ([application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf))
 
 #### Writing post statistics results to ElasticSearch index
 * Inputs
@@ -120,16 +124,17 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
   * ElasticSearch index
 * Outputs
   * ElasticSearch index
+* Execution plan TODO
 * Job class: `org.mvrs.dspa.jobs.activeposts.WriteActivePostStatisticsToElasticSearchJob`
 * In IDEA, execute the run configuration `Task 1.2: active post statistics - (Kafka -> ElasticSearch) [NO UI]`
   * The run configuration does _not_ set the argument `local-with-ui`, to allow for parallel execution with previous task on local machine/minicluster.
 * Checking results:
-   * Kibana dashboard: ....
-   * click on tag etc.: filter!
-* TODO execution plan image
+   * Kibana dashboard: [\[DSPA\] Active post statistics](http://localhost:5602/app/kibana#/dashboard/a0af2f50-4f0f-11e9-acde-e1c8a6292b89)
+   * Make sure to set the time period (upper right) to the beginning of the stream (February 2012 for the low volume stream). A period of one week is recommended.
+   * TODO click on tag etc.: filter! --> remove again (upper left)
+
 #### Notes
-* speedup
-* job-specific parameters
+* Job-specific configuration parameters are defined in `jobs.active-post-statistics` ([application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf))
 
 ### Recommendations
 * Inputs (created by data preparation jobs, which have to be run before, see above): 
@@ -149,20 +154,28 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
    <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-dashboard-recommendations.png" alt="Kibana dashboard: recommendations" width="60%"/>
 
 #### Notes
-* speedup
-* max-out-of-orderness
-* job-specific parameters
+* Job-specific configuration parameters are defined in `jobs.recommendation` ([application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf))
 
 ### Unusual activity detection
-* Job class: `org.mvrs.dspa.jobs.clustering.UnusualActivityDetectionJob [local-with-ui]`
-* IDEA run configuration: `Task 3: unusual activity detection (Kafka -> ElasticSearch)`  (specified `local-with-ui` to launch the Flink dashboard UI)
-* Kibana dashboard: 
-   * Unusual activity detection: cluster metadata graph can have gaps since that visualization does not interpolate across buckets with nodata (which may result due to extending windows)
-* TODO execution plan image
+* Inputs
+   * Kafka topics: 
+   * Control parameter file
+* Outputs
+   * ElasticSearch indexes:
+      * Classification results
+      * Cluster metadata
+* Execution plan TODO
+* Job class: `org.mvrs.dspa.jobs.clustering.UnusualActivityDetectionJob`
+* In IDEA, execute the run configuration `Task 3: unusual activity detection (Kafka -> ElasticSearch)`
+   * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
+* Checking results:
+   * Kibana dashboard: [\[DSPA\] Unusual activity detection](http://localhost:5602/app/kibana#/dashboard/83a893d0-6989-11e9-ba9d-bb8bdc29536e)
+   * Make sure to set the time period (upper right) to the beginning of the stream (February 2012 for the low volume stream). A period of one week is recommended.
+
 #### Notes
-* speedup
-* max-out-of-orderness
-* job-specific parameters
+* Job-specific configuration parameters are defined in `jobs.activity-detection` ([application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf))
+* The labelling of clusters based on the control stream is currently only applied during the next cluster update. It would make more sense to apply these labels immediately for subsequent classifications. This would require connecting to the control stream twice, both on the cluster model update stream (for `k` and `decay`) and on the event classification stream (for the labels).
+* The cluster metadata graph can have gaps since the used Kibana visualization does not interpolate across buckets with nodata (which may result due to extending windows). With a time period of 7 days, this should not happen. Different, more advanced visualizations are available in Kibana that interpolate across empty buckets. 
 
 ## Solution overview
 ### Package structure
@@ -226,6 +239,8 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * run configurations: 
   * `ALL: integration tests (junit)`
   * `ALL: unit tests (scalatest)`
+### ElasticSearch indexes
+* The mappings, documents and queries used for these indexes are defined in the gateway classes in the `db` package. These classes can be accessed from the static registry `ElasticSearchIndexes.scala`. This simple data access scheme is shrink-wrapped for the needs of this project (recreation of indexes, access via Async I/O functions, streaming sinks or batch connectors).
 
 ## Addresses:
 * Flink lokal UI: http://localhost:8081
@@ -239,4 +254,4 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * ElasticSearch docker (to check if online): http://localhost:9201
 
 ## Troubleshooting
-* Some symptoms and solutions are listed [here](https://github.com/rschoening/mvrs-dspa/blob/master/doc/Troubleshooting.md)
+* Some possible problems and solutions are listed [here](https://github.com/rschoening/mvrs-dspa/blob/master/doc/Troubleshooting.md)
