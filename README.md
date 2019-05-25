@@ -94,7 +94,9 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * Job class: `org.mvrs.dspa.jobs.preparation.WriteEventsToKafkaJob`
 * in IDEA, execute the run configuration `Preparation: load events (csv -> Kafka)`
    * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
-* Checking results: either by querying partition offsets using the Kafka CLI, or using the analytic jobs.
+* Checking results: 
+   * Metrics in Flink Dashboard or Prometheus/Grafana
+   * Querying partition offsets using the Kafka CLI
 
 ##### Notes
   * To simulate out-of-order events, the value for `data.random-delay` in `application.conf` file can be modified prior to loading the events into Kafka. The random delay is used to parameterize a normal distribution of random delays, with a mean of 1/4 and standard deviation of 1/2 of the configured value, capping the distribution at that value (see `org.mvrs.dspa.utils.FlinkUtils.getNormalDelayMillis()`)  
