@@ -87,7 +87,7 @@ does only need to be loaded once (unless the configuration for LSH hashing is ch
   * ElasticSearch index with post features: `mvrs-mvrs-recommendation-post-features`
 * Job class: `org.mvrs.dspa.jobs.recommendations.RecommendationsJob [local-with-ui]`
 * IDEA run configuration: `Task 2: user recommendations (Kafka -> ElasticSearch)` (with argument `local-with-ui` to launch the Flink dashboard UI)
-* Kibana dashboard: [http://localhost:5602/app/kibana#/dashboard/7c230710-6855-11e9-9ba6-39d0e49adb7a \[DSPA\] Recommendations]
+* Kibana dashboard: [\[DSPA\] Recommendations](http://localhost:5602/app/kibana#/dashboard/7c230710-6855-11e9-9ba6-39d0e49adb7a )
 set date range to "last 15 minutes"
 * TODO execution plan image
 ### Unusual activity detection
