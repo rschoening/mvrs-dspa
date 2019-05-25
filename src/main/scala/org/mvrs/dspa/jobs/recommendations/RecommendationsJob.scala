@@ -7,9 +7,9 @@ import org.apache.flink.api.common.JobExecutionResult
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.db.ElasticSearchIndexes
-import org.mvrs.dspa.functions.CollectSetFunction
+import org.mvrs.dspa.functions.{CollectSetFunction, TimestampAssignerFunction}
 import org.mvrs.dspa.jobs.FlinkStreamingJob
-import org.mvrs.dspa.model.{CommentEvent, LikeEvent, PostEvent, PostFeatures}
+import org.mvrs.dspa.model._
 import org.mvrs.dspa.utils.elastic.ElasticSearchNode
 import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
 import org.mvrs.dspa.{Settings, streams}
@@ -101,11 +101,12 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
       filterToActiveUsers(candidatesWithoutKnownPersons, forumEvents, activeUsersTimeout)
 
     // calculate recommendation
-    val recommendations: DataStream[(Long, Seq[(Long, Double)])] =
+    val recommendations: DataStream[Recommendation] =
       recommendUsers(candidatesWithoutInactiveUsers, maxRecommendationCount, minRecommendationSimilarity)
 
     // add sink
     recommendations
+      .process(new TimestampAssignerFunction[Recommendation])
       .addSink(ElasticSearchIndexes.recommendations.createSink(recommendationsBatchSize))
       .name("ElasticSearch: recommendations")
 
@@ -166,7 +167,7 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
           .name("print")
 
         recommendations
-          .filter(t => personIds.contains(t._1))
+          .filter(t => personIds.contains(t.personId))
           .name("Filter: trace persons")
           .print("-> Resulting recommendation:".padTo(padLength, ' '))
           .name("print")
@@ -399,7 +400,7 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
                      maxCount: Int,
                      minSimilarity: Double)
                     (implicit esNodes: Seq[ElasticSearchNode],
-                     minHasher: MinHasher32): DataStream[(Long, Seq[(Long, Double)])] =
+                     minHasher: MinHasher32): DataStream[Recommendation] =
     FlinkUtils.asyncStream(
       candidates,
       new AsyncRecommendUsersFunction(

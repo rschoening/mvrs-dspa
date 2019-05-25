@@ -5,6 +5,7 @@ import java.util.Base64
 import com.twitter.algebird.{MinHashSignature, MinHasher, MinHasher32}
 import javax.annotation.Nonnegative
 import org.mvrs.dspa.Settings
+import org.mvrs.dspa.model.RecommendedPerson
 
 object RecommendationUtils {
   val tagPrefix = "T"
@@ -21,11 +22,11 @@ object RecommendationUtils {
               candidates: Seq[(Long, MinHashSignature)],
               minHasher: MinHasher32,
               n: Int,
-              minimumSimilarity: Double): Seq[(Long, Double)] = {
+              minimumSimilarity: Double): Seq[RecommendedPerson] = {
     candidates
-      .map { case (id, signature) => (id, minHasher.similarity(minHashSignature, signature)) }
-      .filter(t => t._2 >= minimumSimilarity)
-      .sortBy(-1 * _._2)
+      .map { case (id, signature) => RecommendedPerson(id, minHasher.similarity(minHashSignature, signature)) }
+      .filter(t => t.similarity >= minimumSimilarity)
+      .sortBy(-1 * _.similarity)
       .take(n)
   }
 

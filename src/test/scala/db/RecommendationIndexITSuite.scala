@@ -9,6 +9,7 @@ import org.junit.experimental.categories.Category
 import org.junit.{Ignore, Test}
 import org.mvrs.dspa.Settings
 import org.mvrs.dspa.db.RecommendationsIndex
+import org.mvrs.dspa.model.{Recommendation, RecommendedPerson}
 import org.mvrs.dspa.utils.elastic
 import org.scalatest.Assertions._
 
@@ -28,9 +29,9 @@ class RecommendationIndexITSuite extends AbstractTestBase {
 
     val lastId = 1000L
     val recommendedCount = 10
-    val generated: DataStream[(Long, scala.Seq[(Long, Double)])] = env
+    val generated: DataStream[(Recommendation, Long)] = env
       .generateSequence(1L, lastId)
-      .map(v => (v, (0L until recommendedCount).map(u => (u, similarity(u)))))
+      .map(v => (Recommendation(v, (0L until recommendedCount).map(u => RecommendedPerson(u, similarity(u)))), 1000L))
 
     generated.addSink(index.createSink(batchSize = 100))
 
