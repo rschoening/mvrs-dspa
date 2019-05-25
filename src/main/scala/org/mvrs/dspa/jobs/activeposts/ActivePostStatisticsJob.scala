@@ -74,15 +74,15 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
                        windowSize: Time, slide: Time, stateTtl: Time,
                        countPostAuthor: Boolean): DataStream[PostStatistics] = {
     val comments = commentsStream
-      .map(createEvent(_)).name("map: event record")
+      .map(createEvent(_)).name("Map -> event record")
       .keyBy(_.postId)
 
     val posts = postsStream
-      .map(createEvent(_)).name("map: event record")
+      .map(createEvent(_)).name("Map -> event record")
       .keyBy(_.postId)
 
     val likes = likesStream
-      .map(createEvent(_)).name("map: event record")
+      .map(createEvent(_)).name("Map -> event record")
       .keyBy(_.postId)
 
     posts
@@ -90,7 +90,7 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
       .keyBy(_.postId)
       .process(new PostStatisticsFunction(windowSize, slide, stateTtl, countPostAuthor))
       .name(
-        s"calculate post statistics " +
+        s"KeyedProcess: calculate post statistics " +
           s"(window: ${DateTimeUtils.formatDuration(windowSize.toMilliseconds)} / " +
           s"slide ${DateTimeUtils.formatDuration(slide.toMilliseconds)})"
       )
@@ -103,7 +103,7 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
       new AsyncForumTitleLookupFunction(
         ElasticSearchIndexes.forumFeatures.indexName,
         esNodes: _*)).name("Async I/O: look up forum title for post")
-      .map(t => createPostInfo(t._1, t._2)).name("map: post info record")
+      .map(t => createPostInfo(t._1, t._2)).name("Map -> post info record")
 
   private def createPostInfo(postEvent: PostEvent, forumTitle: String): PostInfo =
     PostInfo(

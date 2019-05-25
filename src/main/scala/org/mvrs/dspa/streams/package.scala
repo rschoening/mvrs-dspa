@@ -246,7 +246,7 @@ package object streams {
                        droppedRepliesStream: Boolean): (DataStream[CommentEvent], DataStream[RawCommentEvent]) = {
     val firstLevelComments =
       rawComments
-        .filter(_.replyToPostId.isDefined).name("filter: first-level comments")
+        .filter(_.replyToPostId.isDefined).name("Filter: first-level comments")
         .map(c =>
           CommentEvent(
             c.commentId,
@@ -259,12 +259,12 @@ package object streams {
             None,
             c.placeId
           )
-        )
+        ).name("Map -> CommentEvent")
         .keyBy(_.postId)
 
     val repliesBroadcast =
       rawComments
-        .filter(_.replyToPostId.isEmpty).name("filter: replies")
+        .filter(_.replyToPostId.isEmpty).name("Filter: replies")
         .broadcast()
 
     val outputTagDroppedReplies = new OutputTag[RawCommentEvent]("dropped replies")
@@ -273,7 +273,7 @@ package object streams {
 
     val rootedComments: DataStream[CommentEvent] = firstLevelComments
       .connect(repliesBroadcast)
-      .process(new BuildReplyTreeProcessFunction(outputTag)).name("reconstruct reply tree")
+      .process(new BuildReplyTreeProcessFunction(outputTag)).name("Reconstruct reply tree")
 
     val droppedReplies = rootedComments.getSideOutput(outputTagDroppedReplies)
 
@@ -290,7 +290,7 @@ package object streams {
                                            (implicit env: StreamExecutionEnvironment): DataStream[T] = {
 
     // NOTE: if watermark assigner is inserted BEFORE the SimpleScaledReplayFunction, then the AutoWatermarkInterval skips over
-    //       the wait times, i.e. the clock stops during waits due to backpressure, with regard to this interval
+    //       the wait times, i.e. the clock stops during waits due to back-pressure, with regard to this interval
     // An alternative would be to not block but use processing-time timers instead, however
     // 1) this would require the input stream to be keyed - at this point this should not be a requirement
     // 2) events would only be emitted at the arrival of watermarks (to trigger the timers), leading to an unexpectedly bursty stream
@@ -312,7 +312,7 @@ package object streams {
 
     if (speedupFactor == 0) stream
     else stream.map(new SimpleScaledReplayFunction[T](extractTime, speedupFactor))
-      .name(s"replay speedup (x $speedupFactor)")
+      .name(s"Replay speedup (x $speedupFactor)")
       .assignTimestampsAndWatermarks(assigner)
   }
 

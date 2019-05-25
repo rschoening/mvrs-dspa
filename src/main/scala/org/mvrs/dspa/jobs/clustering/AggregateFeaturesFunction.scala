@@ -6,6 +6,10 @@ import org.apache.flink.configuration.Configuration
 import org.apache.flink.streaming.api.functions.co.CoProcessFunction
 import org.apache.flink.util.Collector
 
+/**
+  *
+  * @param stateTtl
+  */
 class AggregateFeaturesFunction(stateTtl: Time) extends CoProcessFunction[FeaturizedEvent, (Long, Int), FeaturizedEvent] {
 
   private lazy val frequencyStateDescriptor: ValueStateDescriptor[Int] =

@@ -312,7 +312,7 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
     candidates
       .connect(broadcastActivePersons)
       .process(new FilterToActivePersonsFunction(activityTimeout))
-      .name("CoProcess: filter to active persons")
+      .name("BroadcastProcess: filter to active persons")
   }
 
   /**

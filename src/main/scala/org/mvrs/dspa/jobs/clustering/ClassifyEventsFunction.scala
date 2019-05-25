@@ -6,6 +6,10 @@ import org.apache.flink.util.Collector
 import org.mvrs.dspa.model
 import org.mvrs.dspa.model.{ClassifiedEvent, ClusterModel, Point}
 
+/**
+  *
+  * @param clusterStateDescriptor
+  */
 class ClassifyEventsFunction(clusterStateDescriptor: MapStateDescriptor[Int, (Long, Int, ClusterModel)])
   extends KeyedBroadcastProcessFunction[Long, FeaturizedEvent, (Long, Int, ClusterModel), ClassifiedEvent] {
 
