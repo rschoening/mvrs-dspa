@@ -79,16 +79,17 @@ does only need to be loaded once (unless the configuration for LSH hashing is ch
 * Kibana dashboard: ....
 * TODO execution plan image
 ### Recommendations
-* Inputs (created by data preparation jobs, see above): 
+* Inputs (created by data preparation jobs, which have to be run before, see above): 
   * Event topics in Kafka: `mvrs_comments`, `mvrs_likes`, `mvrs_posts`
   * ElasticSearch indexes with static data: `mvrs-recommendation-person-features`, `mvrs-recommendation-forum-features`, `mvrs-recommendation-person-minhash`, `mvrs-recommendation-known-persons`, `mvrs-recommendation-lsh-buckets`
 * Outputs (re-generated automatically when the job starts):
   * ElasticSearch index with recommendation documents: `mvrs-recommendations`
-  * ElasticSearch index with post features: `mvrs-mvrs-recommendation-post-features`
+  * ElasticSearch index with post features: `mvrs-recommendation-post-features`
 * Job class: `org.mvrs.dspa.jobs.recommendations.RecommendationsJob [local-with-ui]`
 * IDEA run configuration: `Task 2: user recommendations (Kafka -> ElasticSearch)` (with argument `local-with-ui` to launch the Flink dashboard UI)
-* Kibana dashboard: [\[DSPA\] Recommendations](http://localhost:5602/app/kibana#/dashboard/7c230710-6855-11e9-9ba6-39d0e49adb7a )
-set date range to "last 15 minutes"
+* Kibana dashboard: [\[DSPA\] Recommendations](http://localhost:5602/app/kibana#/dashboard/7c230710-6855-11e9-9ba6-39d0e49adb7a)
+  The recommendation documents are upserted by person id, and stored with the processing timestamp of the last update.
+  Note: set date range to "last 15 minutes"
 * TODO execution plan image
 ### Unusual activity detection
 * Job class: `org.mvrs.dspa.jobs.clustering.UnusualActivityDetectionJob [local-with-ui]`
