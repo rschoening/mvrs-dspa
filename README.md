@@ -51,52 +51,89 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
    4. go to `Index patterns` and *star* one of the listed index patterns. Any will do (otherwise the imported dashboards are not listed) *TODO SCREENSHOT*
 
 ## Running the Flink jobs
-NOTE: Kafka topics
-NOTE: ElasticSearch indices
-NOTE: Kibana dashboards
+### Overview
 ### Data preparation
 The following two jobs must have been run prior to running any of the analytics jobs. Note that the events must be written to Kafka again after stopping and restarting the Kafka docker container, as this container in its current configuration resets the Kafka 
 topics on startup. On the other hand, the ElasticSearch indexes are maintained in a docker volume across restarts, so the static data
 does only need to be loaded once (unless the configuration for LSH hashing is changed see 'Recommendations' below).
+
 #### Loading static data into ElasticSearch
-* Job class: `org.mvrs.dspa.jobs.preparation.LoadStaticDataJob [local-with-ui]`
-* IDEA run configuration: `Preparation: load static tables (csv -> ElasticSearch)` (with argument `local-with-ui` to launch the Flink dashboard UI)
+* Job class: `org.mvrs.dspa.jobs.preparation.LoadStaticDataJob`
+* in IDEA, execute the run configuration `Preparation: load static tables (csv -> ElasticSearch)`
+   * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
+
 #### Writing events to Kafka
-* Job class: `org.mvrs.dspa.jobs.preparation.WriteEventsToKafkaJob [local-with-ui]`
-* IDEA run configuration: `Preparation: load events (csv -> Kafka)` (with argument `local-with-ui` to launch the Flink dashboard UI)
-* NOTES
-  * out-of-orderness can be configured here -> events are reordered in Kafka (verify using ProgressMonitorFunction TODO set up jobs for this)
-  * no speedup (or infinite speedup) is applied. Speedup is of interest in analytic tasks
-  * writing is done on single worker, to single Kafka partition. Motivation: control out-of-orderness
-  * 
+* Job class: `org.mvrs.dspa.jobs.preparation.WriteEventsToKafkaJob`
+* in IDEA, execute the run configuration `Preparation: load events (csv -> Kafka)`
+   * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
+
+##### NOTES
+  * To simulate out-of-order events, the value for `data.random-delay` in `application.conf` file can be modified prior to loading the events into Kafka. The random delay is used to parameterize a normal distribution of random delays, with a mean of 1/4 and standard deviation of 1/2 of the configured value, capping the distribution at that value (see `org.mvrs.dspa.utils.FlinkUtils.getNormalDelayMillis()`)  
+  * The speedup factor (`data.speedup-factor` in `application.conf`) is only applied during the analytic jobs, not during data preparation.
+  * To allow precise control over the ordering and lateness of events when reading from Kafka, the preparation job uses a single worker, and writes to a single Kafka partition. Doing otherwise would create additional sources of un-ordering that would not allow exact control of lateness/reordering based on defined values for `data.random-delay` and `data.max-out-of-orderness`.
+
 ### Active post statistics
 #### Calculating post statistics
-* Job class: `org.mvrs.dspa.jobs.activeposts.ActivePostStatisticsJob [local-with-ui]`
-* IDEA run configuration: `Task 1.1: active post statistics (Kafka -> Kafka, post info: Kafka -> ElasticSearch)` (specified `local-with-ui` to launch the Flink dashboard UI)
+* Inputs
+   * Kafka topics:
+* Outputs
+   * Kafka topic
+   * ElasticSearch index 
+* Job class: `org.mvrs.dspa.jobs.activeposts.ActivePostStatisticsJob`
+* in IDEA, execute the run configuration `Task 1.1: active post statistics (Kafka -> Kafka, post info: Kafka -> ElasticSearch)`
+   * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
+* Checking results:
+  * run second job to write to ElasticSearch index
+#### Notes
+* speedup
+* max-out-of-orderness
+* job-specific parameters
+
 #### Writing post statistics results to ElasticSearch index
-* Job class: `org.mvrs.dspa.jobs.activeposts.WriteActivePostStatisticsToElasticSearchJob [local-with-ui]`
-* IDEA run configuration: `Task 1.2: active post statistics - (Kafka -> ElasticSearch) [NO UI]` (_without_ argument `local-with-ui`, to allow for parallel execution with previous task on local machine/minicluster, without conflict on Web UI port)
-* Kibana dashboard: ....
+* Inputs
+  * Kafka topic
+  * ElasticSearch index
+* Outputs
+  * ElasticSearch index
+* Job class: `org.mvrs.dspa.jobs.activeposts.WriteActivePostStatisticsToElasticSearchJob`
+* In IDEA, execute the run configuration `Task 1.2: active post statistics - (Kafka -> ElasticSearch) [NO UI]`
+  * The run configuration does _not_ set the argument `local-with-ui`, to allow for parallel execution with previous task on local machine/minicluster.
+* Checking results:
+   * Kibana dashboard: ....
 * TODO execution plan image
+#### Notes
+* speedup
+* max-out-of-orderness
+* job-specific parameters
+
 ### Recommendations
 * Inputs (created by data preparation jobs, which have to be run before, see above): 
-  * Event topics in Kafka: `mvrs_comments`, `mvrs_likes`, `mvrs_posts`
-  * ElasticSearch indexes with static data: `mvrs-recommendation-person-features`, `mvrs-recommendation-forum-features`, `mvrs-recommendation-person-minhash`, `mvrs-recommendation-known-persons`, `mvrs-recommendation-lsh-buckets`
+   * Event topics in Kafka: `mvrs_comments`, `mvrs_likes`, `mvrs_posts`
+   * ElasticSearch indexes with static data: `mvrs-recommendation-person-features`, `mvrs-recommendation-forum-features`, `mvrs-recommendation-person-minhash`, `mvrs-recommendation-known-persons`, `mvrs-recommendation-lsh-buckets`
 * Outputs (re-generated automatically when the job starts):
-  * ElasticSearch index with recommendation documents: `mvrs-recommendations`
-  * ElasticSearch index with post features: `mvrs-recommendation-post-features`
-* Job class: `org.mvrs.dspa.jobs.recommendations.RecommendationsJob [local-with-ui]`
-* IDEA run configuration: `Task 2: user recommendations (Kafka -> ElasticSearch)` (with argument `local-with-ui` to launch the Flink dashboard UI)
-* Kibana dashboard: [\[DSPA\] Recommendations](http://localhost:5602/app/kibana#/dashboard/7c230710-6855-11e9-9ba6-39d0e49adb7a)
-  The recommendation documents are upserted by person id, and stored with the processing timestamp of the last update.
-  Note: set date range to "last 15 minutes"
+   * ElasticSearch index with recommendation documents: `mvrs-recommendations`
+   * ElasticSearch index with post features: `mvrs-recommendation-post-features`
+* In IDEA, execute the run configuration `Task 2: user recommendations (Kafka -> ElasticSearch)` 
+   * Job class: `org.mvrs.dspa.jobs.recommendations.RecommendationsJob`
+   * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
+* Checking results:
+   * Kibana dashboard: [\[DSPA\] Recommendations](http://localhost:5602/app/kibana#/dashboard/7c230710-6855-11e9-9ba6-39d0e49adb7a)
 * TODO execution plan image
+#### Notes
+* speedup
+* max-out-of-orderness
+* job-specific parameters
+
 ### Unusual activity detection
 * Job class: `org.mvrs.dspa.jobs.clustering.UnusualActivityDetectionJob [local-with-ui]`
 * IDEA run configuration: `Task 3: unusual activity detection (Kafka -> ElasticSearch)`  (specified `local-with-ui` to launch the Flink dashboard UI)
 * Kibana dashboard: 
    * Unusual activity detection: cluster metadata graph can have gaps since that visualization does not interpolate across buckets with nodata (which may result due to extending windows)
 * TODO execution plan image
+#### Notes
+* speedup
+* max-out-of-orderness
+* job-specific parameters
 
 ## Solution overview
 ### Package structure
