@@ -174,9 +174,10 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
   }
 
   /**
+    * Outputs parse errors either to a text file sink, or to the standard output stream
     *
-    * @param errors
-    * @param outputPath
+    * @param errors     Input stream of error messages
+    * @param outputPath Path to the text file, or null if the standard output should be used
     */
   def outputErrors(errors: DataStream[String], outputPath: String): Unit =
     if (outputPath != null && !outputPath.trim.isEmpty)
@@ -189,9 +190,10 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
         .name("Print control parameter parse errors")
 
   /**
+    * Create the text file sink for parse errors
     *
-    * @param outputPath
-    * @return
+    * @param outputPath The path to the text file output
+    * @return File sink
     */
   def createParseErrorSink(outputPath: String): StreamingFileSink[String] = {
     StreamingFileSink
@@ -269,17 +271,21 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
   }
 
   /**
+    * Extend the feature vector of featurized events based on activity frequency information by person,
+    * from a second stream
     *
-    * @param eventFeaturesStream
-    * @param frequencyStream
-    * @param ignoreActivityOlderThan
-    * @param stateTtl
-    * @return
+    * @param eventFeaturesStream     The input stream of featurized events
+    * @param frequencyStream         The stream to connect with, containing activity frequency information by person
+    * @param ignoreActivityOlderThan A duration in event time to identify frequency results that are too old to be
+    *                                relevant.
+    * @param stateTtl                The time-to-live for the keyed state representing the latest known event/post
+    *                                frequency of the person.
+    * @return Stream of events with extended feature vector
     */
   def aggregateFeatures(eventFeaturesStream: DataStream[FeaturizedEvent],
                         frequencyStream: DataStream[(Long, Int)],
                         ignoreActivityOlderThan: Time,
-                        stateTtl: Time) =
+                        stateTtl: Time): DataStream[FeaturizedEvent] =
     eventFeaturesStream
       .keyBy(_.personId)
       .connect(frequencyStream.keyBy(_._1)) // both streams keyed on person id
@@ -287,6 +293,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
       .name("CoProcess: Aggregate features")
 
   /**
+    * TODO
     *
     * @param aggregatedFeaturesStream
     * @param controlParameters
@@ -332,6 +339,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
   }
 
   /**
+    * TODO
     *
     * @param aggregatedFeaturesStream
     * @param clusterModelStream
