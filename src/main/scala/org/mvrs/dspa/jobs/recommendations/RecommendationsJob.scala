@@ -111,7 +111,7 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
       .name("ElasticSearch: recommendations")
 
     // example for how to monitor progress at a specific point in the pipeline
-    FlinkUtils.addProgressMonitor(candidatesWithoutInactiveUsers) { case (_, progressInfo) => progressInfo.subtask == 0 && true || progressInfo.isLate }
+    FlinkUtils.addProgressMonitor(candidatesWithoutInactiveUsers) { case (_, pi) => pi.isLate }
 
     // trace the configured persons (output printed to console)
     tracePersons(tracedPersonIds)

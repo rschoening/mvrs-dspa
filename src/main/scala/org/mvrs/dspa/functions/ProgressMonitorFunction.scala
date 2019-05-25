@@ -323,3 +323,4 @@ object ProgressMonitorFunction {
 
   private def longDuration(millis: Long): String = DateTimeUtils.formatDuration(millis)
 }
+
