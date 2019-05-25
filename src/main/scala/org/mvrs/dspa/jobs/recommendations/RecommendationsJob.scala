@@ -104,15 +104,16 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
     val recommendations: DataStream[(Long, Seq[(Long, Double)])] =
       recommendUsers(candidatesWithoutInactiveUsers, maxRecommendationCount, minRecommendationSimilarity)
 
-    // trace the configured persons (output printed to console)
-    tracePersons(tracedPersonIds)
-
     // add sink
     recommendations
       .addSink(ElasticSearchIndexes.recommendations.createSink(recommendationsBatchSize))
       .name("ElasticSearch: recommendations")
 
-    FlinkUtils.printExecutionPlan()
+    // example for how to monitor progress at a specific point in the pipeline
+    FlinkUtils.addProgressMonitor(candidatesWithoutInactiveUsers) { case (_, progressInfo) => progressInfo.subtask == 0 && true || progressInfo.isLate }
+
+    // trace the configured persons (output printed to console)
+    tracePersons(tracedPersonIds)
 
     /**
       * Print trace information on the individual recommendation steps for a selected set of person ids, which can be
@@ -171,6 +172,8 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
           .name("print")
       }
     }
+
+    FlinkUtils.printExecutionPlan()
 
     env.execute("recommendations")
   }
