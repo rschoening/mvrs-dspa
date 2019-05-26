@@ -62,7 +62,7 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
 
 ## Running the Flink jobs
 ### Overview
-* The data preparation and analytic jobs can be configured using the [application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf) file. The individual settings are explained in that file.
+* The data preparation and analytic jobs can be configured using the [application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf) file. The individual settings are explained in that file. The current configuration can be used as is for the low-volume test datasets (1K). For the high-volume data, the speedup factor needs to be reduced.
 * The analytic jobs depend on the data to have previously been loaded using the data preparation jobs. There are no dependencies _between_ analytic jobs for different project tasks.
 * Note that restarting the Kafka container resets the topics. Also, when starting jobs that write to a Kafka topic, the topic is first deleted and recreated if it exists. Consequences are:
   * after starting the docker container for Kafka, the data preparation job that writes events to Kafka must be re-run (the same is _not_ true for the ElasticSearch indices, which are maintained across container restarts in a docker volume)
