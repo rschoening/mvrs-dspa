@@ -112,7 +112,7 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 
 ### General observations for analytic tasks
 * TODO reading from Kafka: speedup; jobs not terminating
-* TODO insert ProgressMonitor at end of all analytic jobs, mention here
+* Most of the analytic jobs print information about late events encountered in the final result to standard output. Late events can be simulated by setting `data.max-out-of-orderness` to a value smaller than `data.random-delay`.
 * TODO reading comments: contrary to the initial plan, the reply tree is reconstructed *after* reading from Kafka. Reason: this function was specifically built to run in parallel and to be fault-tolerant, both aspects are no longer relevant for the data loading into Kafka (to ensure defined bounds for out-of-orderness and lateness of events, as noted above). So to keep things interesting, the reply tree is assembled after reading from Kafka, and therefore as part of all analytic jobs.
 * On the other hand, it became apparent that the current implementation is not sufficient, as it relies on union list state to ensure that the mapping between comment ids and post ids is available on the respective workers after a recovery or rescale. Since a keyed function seems to not know the partitioning function, it cannot drop mapping entries for which it is not responsible (and the map can not be kept in keyed state, since it needs to be accessed from the broadcast stream also). So this implementation, while working well for the test data, should be replaced with a database-backed map, requiring a disassembly of the function logic in a subgraph dealing with asynchronous data access to ElasticSearch and persistence of newly found mappings.
 
@@ -129,7 +129,7 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
    * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
 * Checking results:
   * View the incoming documents in `mvrs-active-post-statistics-postinfos` using the `Discover` page in Kibana (setting the time range to the start event time of the stream, i.e. February 2012 for the low-volume stream).
-  * run the following job to write the statistics to ElasticSearch ()
+  * run the next job to write the statistics to ElasticSearch.
 #### Notes
 * Job-specific configuration parameters are defined in `jobs.active-post-statistics` ([application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf))
 * This job uses the `EXACTLY_ONCE` semantic for writing to Kafka. However not all the relevant Kafka settings have been revised and adjusted for this. The necessary Kafka configuration parameters can be set in the `docker-compose.yml` file (in the form `KAFKA_TRANSACTION_MAX_TIMEOUT_MS : 3600000`)
