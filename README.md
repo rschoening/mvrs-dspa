@@ -81,16 +81,16 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
 
 ## Running the Flink jobs
 ### Overview
-* The data preparation and analytic jobs can be configured using the [application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf) file. The individual settings are explained in that file. The current configuration can be used as is for the low-volume test datasets (1K). For the high-volume data, the speedup factor needs to be reduced.
+* The data preparation and analytic jobs can be configured using the [application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf) file. The individual settings are explained in that file. The current configuration can be used as-is for the low-volume test datasets (1K). For the high-volume data, the value for `data.speedup-factor` needs to be reduced (to 2500).
 * The analytic jobs depend on the data to have previously been loaded using the data preparation jobs. There are no dependencies _between_ analytic jobs for different project tasks.
-* Note that restarting the Kafka container resets the topics. Also, when starting jobs that write to a Kafka topic, the topic is first deleted and recreated if it exists. Consequences are:
+* Note that restarting the Kafka container deletes the topics. Also, when starting jobs that write to a Kafka topic, the topic is first deleted and recreated if it exists. Consequences are:
   * after starting the docker container for Kafka, the data preparation job that writes events to Kafka must be re-run (the same is _not_ true for the ElasticSearch indices, which are maintained across container restarts in a docker volume)
-  * when starting a job that writes to a Kafka topic, there should not be another job running that reads from the same topic, or the deletion will fail.
+  * when starting a job that writes to a Kafka topic, there should not be another job running that reads from the same topic, or the deletion will fail. This only affects the two jobs for active post statistics (the first of which writes to Kafka, from which the second reads)
 
 ### Data preparation
 The following two jobs must have been run prior to running any of the analytics jobs.
 * The first job (writing static data to ElasticSearch) must be re-run after changing the LSH configuration relevant for the recommendations task, as the MinHash/LSH configuration in the prepared static data and the recommendation job must match for meaningful results.
-* As noted above, the second of the jobs (writing to Kafka) needs to be re-run after restarting the Kafka container.
+* As noted above, the second of the jobs (writing the events to Kafka) needs to be re-run after restarting the Kafka container.
 
 The two jobs terminate in less than a minute total, for the low-volume testdata.
 
@@ -130,10 +130,10 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
   * To allow precise control over the ordering and lateness of events when reading from Kafka, the preparation job uses a single worker, and writes to a single Kafka partition. Doing otherwise would create additional sources of un-ordering that would not allow exact control of lateness/reordering based on defined values for `data.random-delay` and `data.max-out-of-orderness`. See also the discussion for `data.kafka-partition.count` in [application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf)
 
 ### General observations for analytic tasks
-* TODO reading from Kafka: speedup; jobs not terminating
+* The analytic jobs apply the speedup factor when reading from Kafka (`application.conf` contains comments on tested speedup factors).
 * Most of the analytic jobs print information about late events encountered in the final result to standard output. Late events can be simulated by setting `data.max-out-of-orderness` to a value smaller than `data.random-delay`.
-* TODO reading comments: contrary to the initial plan, the reply tree is reconstructed *after* reading from Kafka. Reason: this function was specifically built to run in parallel and to be fault-tolerant, both aspects are no longer relevant for the data loading into Kafka (to ensure defined bounds for out-of-orderness and lateness of events, as noted above). So to keep things interesting, the reply tree is assembled after reading from Kafka, and therefore as part of all analytic jobs.
-* On the other hand, it became apparent that the current implementation is not sufficient, as it relies on union list state to ensure that the mapping between comment ids and post ids is available on the respective workers after a recovery or rescale. Since a keyed function seems to not know the partitioning function, it cannot drop mapping entries for which it is not responsible (and the map can not be kept in keyed state, since it needs to be accessed from the broadcast stream also). So this implementation, while working well for the test data, should be replaced with a database-backed map, requiring a disassembly of the function logic in a subgraph dealing with asynchronous data access to ElasticSearch and persistence of newly found mappings.
+* Contrary to the initial plan, the reply tree is now reconstructed *after* reading from Kafka. Reason: this function was specifically built to run in parallel and to be fault-tolerant, both aspects are no longer relevant for the data loading into Kafka (to ensure defined bounds for out-of-orderness and lateness of events, as noted above). So to keep things interesting, the reply tree is assembled after reading from Kafka, and therefore as part of all analytic jobs.
+* ... and interesting it turned out to be, as I realized that the use of union list state for the comment-to-post mapping leads to full replication of the implicitly partitioned operator state on recovery/rescaling. The original plan was to deal with the unbounded state by partitioning it across machines, which breaks down after the first failure (as the function apparently cannot know which mappings it could discard). So this mapping should really be maintained in a central datastore, which would require disassembling the function logic into a subgraph dealing with asynchronous data access to ElasticSearch and persistence of newly found mappings. Being a bit more familiar with Async I/O functions and side outputs by now, this seems feasible though.
 
 ### Active post statistics
 #### Calculating post statistics
@@ -149,21 +149,21 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * Checking results:
   * View the incoming documents in `mvrs-active-post-statistics-postinfos` using the `Discover` page in Kibana (setting the time range to the start event time of the stream, i.e. February 2012 for the low-volume stream).
   * run the next job to write the statistics to ElasticSearch.
+  * unit test `jobs.activeposts.PostStatisticsFunctionITSuite`
 #### Notes
 * Job-specific configuration parameters are defined in `jobs.active-post-statistics` ([application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf))
-* This job uses the `EXACTLY_ONCE` semantic for writing to Kafka. However not all the relevant Kafka settings have been revised and adjusted for this. The necessary Kafka configuration parameters can be set in the `docker-compose.yml` file (in the form `KAFKA_TRANSACTION_MAX_TIMEOUT_MS : 3600000`)
-* TODO separate consumer group for reading posts that are to be written to ElasticSearch, to decouple the two pipelines (avoiding back-pressure on one pipeline to slow down the other, via the common Kafka consumer). These two pipelines are run in one job to keep the testing and evaluation process simple. I assume they would be run in separate jobs in a different context.
+* This job uses the `EXACTLY_ONCE` semantic for writing to Kafka. However not all the relevant Kafka settings have yet been revised and adjusted for this. The necessary Kafka configuration parameters can be set in the `docker-compose.yml` file (in the form `KAFKA_TRANSACTION_MAX_TIMEOUT_MS : 3600000`)
 
 #### Writing post statistics results to ElasticSearch index
 * Inputs (generated by previous job)
   * Kafka topic: `mvrs_poststatistics`
-  * ElasticSearch index: `mvrs-active-post-statistics`
+  * ElasticSearch index: `mvrs-active-post-statistics-postinfos`
 * Outputs
-  * ElasticSearch index
+  * ElasticSearch index: `mvrs-active-post-statistics`
 * [Execution plan](https://github.com/rschoening/mvrs-dspa/blob/master/doc/plans/poststatistics_to_es.pdf)
 * Job class: `org.mvrs.dspa.jobs.activeposts.WriteActivePostStatisticsToElasticSearchJob`
 * In IDEA, execute the run configuration `Task 1.2: active post statistics - (Kafka -> ElasticSearch) [NO UI]`
-  * The run configuration does _not_ set the argument `local-with-ui`, to allow for parallel execution with previous task on local machine/minicluster.
+  * The run configuration does _not_ set the argument `local-with-ui`, to allow for parallel execution with the previous task on local machine/minicluster.
 * Checking results:
    * Kibana dashboard: [\[DSPA\] Active post statistics](http://localhost:5602/app/kibana#/dashboard/a0af2f50-4f0f-11e9-acde-e1c8a6292b89)
    * Note that the "New posts per hour" gauge on the right is based on the `mvrs-active-post-statistics-postinfos` index populated by the previous job. All other visualizations on this dashboard are based on `mvrs-active-post-statistics` written by this job.
@@ -189,7 +189,7 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * Checking results:
    * Kibana dashboard: [\[DSPA\] Recommendations](http://localhost:5602/app/kibana#/dashboard/7c230710-6855-11e9-9ba6-39d0e49adb7a)
    * Make sure to set the time range (upper right) to the beginning of the stream (February 2012 for the low volume stream). All visualizations in Kibana depend on this time range.
-   * The recommendation documents are shown on the left and can be investigated in detail (expanding the document tree, displaying as JSON etc.). Note that old recommendations for a given person are continuously replaced by current ones. In a given time range, the number of documents will therefore diminish over time. Use the right-arrow next to the time range display to advance along with the tail of the stream. To look at a document in detail, it may be necessary to stop the stream, otherwise the document may be deleted at any time.
+   * The recommendation documents are shown on the left and can be investigated in detail (expanding the document tree, displaying as JSON etc.). Note that old recommendations for a given person are continuously replaced by current ones (upserts by person id). In a given time range, the number of documents will therefore diminish over time. Use the right-arrow next to the time range display to advance along with the tail of the stream. To look at a document in detail, it may be necessary to stop the stream, otherwise the document may be deleted quickly.
    <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-dashboard-recommendations.png" alt="Kibana dashboard: recommendations" width="60%"/>
 
 #### Notes
@@ -198,11 +198,12 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 ### Unusual activity detection
 * Inputs
    * Kafka topics: `mvrs_comments`, `mvrs_likes`, `mvrs_posts`
-   * Control parameter file
+   * Control parameter file: path set by `jobs.activity-detection.cluster-parameter-file-path` in [application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf)
 * Outputs
    * ElasticSearch indexes:
       * Classification results: `mvrs-activity-classification`
       * Cluster metadata: `mvrs-activity-cluster-metadata`
+      * Control parameter parse error messages: path text file output directory set by `jobs.activity-detection.cluster-parameter-file-parse-errors-path` in [application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf)
 * [Execution plan](https://github.com/rschoening/mvrs-dspa/blob/master/doc/plans/unusual_activity.pdf)
 * Job class: `org.mvrs.dspa.jobs.clustering.UnusualActivityDetectionJob`
 * In IDEA, execute the run configuration `Task 3: unusual activity detection (Kafka -> ElasticSearch)`
@@ -210,11 +211,13 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * Checking results:
    * Kibana dashboard: [\[DSPA\] Unusual activity detection](http://localhost:5602/app/kibana#/dashboard/83a893d0-6989-11e9-ba9d-bb8bdc29536e)
    * Make sure to set the time range (upper right) to the beginning of the stream (February 2012 for the low volume stream). A period of one week is recommended.
+   * The diagram of cluster changes is meant as an example, the displayed variables would have to be more carefully defined. But since the job anyway focuses on the streaming mechanisms and a decent streaming K-means implementation, but not on a valid approach from a data science perspective, not much time was spent on this.
+   * The cluster models and model change information can be investigated in the raw documents shown on the right.
+   * The cluster metadata graph can have gaps since the used Kibana visualization does not interpolate across buckets with nodata (which may result due to extending windows). With a time range of 7 days, this should not happen. Different, more advanced visualizations are available in Kibana that interpolate across empty buckets. 
 
 #### Notes
 * Job-specific configuration parameters are defined in `jobs.activity-detection` ([application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf))
 * The labelling of clusters based on the control stream is currently only applied during the next cluster update. It would make more sense to apply these labels immediately for subsequent classifications. This would require connecting to the control stream twice, both on the cluster model update stream (for `k` and `decay`) and on the event classification stream (for the labels).
-* The cluster metadata graph can have gaps since the used Kibana visualization does not interpolate across buckets with nodata (which may result due to extending windows). With a time range of 7 days, this should not happen. Different, more advanced visualizations are available in Kibana that interpolate across empty buckets. 
 
 ## Solution overview
 ### Package structure
@@ -268,6 +271,7 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * located in `mvrs-dspa/target/site/scaladoc`
 * generated with `mvn scala:doc`
 ### Unit tests
+* The plan was to have significantly more tests than what are there now. But time got short and it turned out that analysis of the end-to-end jobs (using metrics, Kibana, the progress monitor etc.) was more important, yielding unexpected findings I would never have looked for specifically in unit tests. 
 * Unit tests:
   * Scalatest
   * Naming convention: `...TestSuite`
