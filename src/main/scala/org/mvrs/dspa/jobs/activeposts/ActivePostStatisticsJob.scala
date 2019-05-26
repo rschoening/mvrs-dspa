@@ -9,6 +9,7 @@ import org.mvrs.dspa.jobs.FlinkStreamingJob
 import org.mvrs.dspa.model._
 import org.mvrs.dspa.streams.KafkaTopics
 import org.mvrs.dspa.utils.elastic.ElasticSearchNode
+import org.mvrs.dspa.utils.kafka.HashPartitioner
 import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
 import org.mvrs.dspa.{Settings, streams}
 
@@ -29,7 +30,7 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
     // implicits
     implicit val esNodes: Seq[ElasticSearchNode] = Settings.elasticSearchNodes
 
-    // (re)create elasticsearch index for post infos
+    // (re)create ElasticSearch index for post infos
     postInfoIndex.create()
 
     // consume events from kafka
@@ -38,33 +39,38 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
     val postsStream = streams.posts(kafkaConsumerGroup)
     val likesStream = streams.likes(kafkaConsumerGroup)
 
-    val postInfoStream = streams.posts(Some("active-post-statistics-postinfos")) // read using separate consumer group
+    // read posts again using separate consumer group (this could be in separate job)
+    val postInfoStream = streams.posts(Some("active-post-statistics-postinfos"))
 
-    // write post infos to elasticsearch, for lookup when writing post stats to elasticsearch
+    // write post infos to ElasticSearch, for lookup when writing post stats to ElasticSearch
     lookupForumFeatures(postInfoStream)
       .addSink(postInfoIndex.createSink(batchSize))
       .name(s"ElasticSearch: ${postInfoIndex.indexName}")
 
     // calculate post statistics
-    val statsStream = statisticsStream(
+    val statsStream: DataStream[PostStatistics] = statisticsStream(
       commentsStream, postsStream, likesStream,
       windowSize, windowSlide, stateTtl, countPostAuthor)
 
-    // write to kafka topic (key by post id to preserve order)
-    // TODO ensure that kafka partitioner picks up the key (KeyedSerializationSchema)
-    // TODO according to https://issues.apache.org/jira/browse/FLINK-9610 this is not sufficient though
+    // print progress information for any late events
+    FlinkUtils.addProgressMonitor(statsStream) { case (_, progressInfo) => progressInfo.isLate }
+
+    // write to kafka topic (partition by post id to preserve order by post. This is to avoid that when writing to
+    // ElasticSearch, older statistics records overwrite newer ones)
+    val kafkaPartitioner = new HashPartitioner[PostStatistics](_.postId.hashCode())
+
     FlinkUtils.writeToNewKafkaTopic(
       statsStream.keyBy(_.postId),
       KafkaTopics.postStatistics,
-      Settings.config.getInt("data.kafka-partition-count"),
-      None,
+      Settings.config.getInt("jobs.active-post-statistics.kafka-partition-count"),
+      Some(kafkaPartitioner),
       Settings.config.getInt("data.kafka-replica-count").toShort,
       semantic = Semantic.EXACTLY_ONCE
     )
 
     FlinkUtils.printExecutionPlan()
 
-    env.execute("write post statistics to kafka (and post info to ElasticSearch)")
+    env.execute("Write post statistics to kafka (and post info to ElasticSearch)")
   }
 
   //noinspection ConvertibleToMethodValue
@@ -128,6 +134,8 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
       e.timestamp
     )
 }
+
+
 
 
 
