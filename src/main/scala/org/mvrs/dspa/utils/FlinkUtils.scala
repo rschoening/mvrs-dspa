@@ -182,6 +182,7 @@ object FlinkUtils {
     *                          Kafka's default partitioner (round-robin) is used.
     * @param replicationFactor The replication factor for the topic
     * @param semantic          The write semantic used by Flink
+    * @param parallelism       Optional override of the default parallelism
     * @tparam E The record type
     * @return The stream sink
     */
@@ -190,9 +191,19 @@ object FlinkUtils {
                               numPartitions: Int = 5,
                               partitioner: Option[FlinkKafkaPartitioner[E]] = None,
                               replicationFactor: Short = 1,
-                              semantic: FlinkKafkaProducer.Semantic = Semantic.AT_LEAST_ONCE): DataStreamSink[E] = {
+                              semantic: FlinkKafkaProducer.Semantic = Semantic.AT_LEAST_ONCE,
+                              parallelism: Option[Int] = None): DataStreamSink[E] = {
+    // (re)create the topic
     topic.create(numPartitions, replicationFactor, overwrite = true)
-    stream.addSink(topic.producer(partitioner, semantic)).name(s"Kafka: ${topic.name}")
+
+    // add the producer/sink
+    val sink = stream
+      .addSink(topic.producer(partitioner, semantic))
+      .name(s"Kafka: ${topic.name}")
+
+    parallelism.foreach(sink.setParallelism) // apply parallelism if not None
+
+    sink
   }
 
   /**
