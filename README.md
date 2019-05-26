@@ -2,7 +2,7 @@
 
 ## Setup overview (details below)
 1. `git clone https://github.com/rschoening/mvrs-dspa.git`
-1. cd to `mvrs-dspa`, run `mvn package`
+1. cd to `mvrs-dspa`, run `mvn package` to produce `target/mvrs-dspa-1.0.jar` (to submit to Flink cluster, job classes per project task are listed below)
 1. copy csv test data to `mvrs-dspa/docker/data` (-> subdirectories `streams` and `tables`)
 1. set environment variable `MVRS_DSPA_DATA_DIR` to data directory path (e.g. `export MVRS_DSPA_DATA_DIR=file:///dspa19/projects/mvrs-dspa/docker/data` in `.profile`)
 1. import project (`pom.xml`) in IDEA using default settings, and restore the deleted run configurations using `git checkout -- .idea/runConfigurations`. Restart IDEA
@@ -10,6 +10,7 @@
    1. make sure that `dockerd` is running
    1. in `mvrs-dspa/docker` run `docker-compose up -d` (takes a while to download all images, first time only)
    1. check if all containers are up (see caveat below)
+1. import Kibana dashboards (`mvrs-dspa/docker/kibana/export.json`)
 1. in IDEA: run data preparation jobs 
    * `Preparation: load static tables (csv -> ElasticSearch)`
    * `Preparation: load events (csv -> Kafka)` (redo this after restarting docker containers)
@@ -33,38 +34,37 @@
 1. copy the csv test data directories `streams` and `tables` from `1k-users-sorted` or `10k-users-sorted` to the subdirectory `docker/data` of the repository (it is recommended to start with `1k-users-sorted` for the initial setup)
 1. set environment variable `MVRS_DSPA_DATA_DIR` to the absolute file URI to the repository subdirectory `docker/data` such that it is visible for IDEA (e.g. `export MVRS_DSPA_DATA_DIR=file:///dspa19/projects/mvrs-dspa/docker/data` in `.profile`)
 1. start IntelliJ IDEA -> "Import Project" (selecting `pom.xml` in `mvrs-dspa`), accepting all defaults. Unfortunately, during the import process the configured run configurations are deleted. To bring them back:
-   1. close IDEA again
+   1. close IDEA
    1. cd to the project directory
    1. enter `git checkout -- .idea/runConfigurations` 
-   1. start IDEA again and open the project
+   1. restart IDEA and open the project
    1. confirm that the run configurations (drop down list in upper right of IDEA window) are available (order can differ):
       <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/idea-run-configurations.png" alt="IDEA run configurations" width="60%"/>
-1. In `Terminal` tab in IDEA: run `mvn package` to produce `target/mvrs-dspa-1.0.jar`, which can be submitted to a Flink cluster (job classes per project task are listed below)
 
 ## Setting up the runtime environment
 1. make sure that `dockerd` is running
 1. cd to the repository: `mvrs-dspa/docker`
-1. as su, enter `docker-compose up -d`
+1. as privileged user, enter `docker-compose up -d`
 1. check that all containers were started successfully: enter `docker-compose ps` The following containers should be listed:
 ```
-            Name                       Command               State                         Ports                       
---------------------------------------------------------------------------------------------------------------------
-docker_elasticsearch_1   /usr/local/bin/docker-entr ...   Up      0.0.0.0:9201->9200/tcp, 9300/tcp                  
-docker_exporter_1        /bin/node_exporter               Up      0.0.0.0:9101->9100/tcp                            
-docker_grafana_1         /run.sh                          Up      0.0.0.0:3001->3000/tcp                            
-docker_jobmanager_1      /docker-entrypoint.sh jobm ...   Up      6123/tcp, 0.0.0.0:8082->8081/tcp, 9249/tcp        
-docker_kafka_1           start-kafka.sh                   Up      0.0.0.0:9092->9092/tcp, 9093/tcp                  
-docker_kibana_1          /usr/local/bin/kibana-docker     Up      0.0.0.0:5602->5601/tcp                            
-docker_prometheus_1      /bin/prometheus --config.f ...   Up      0.0.0.0:9091->9090/tcp                            
-docker_taskmanager_1     /docker-entrypoint.sh task ...   Up      6121/tcp, 6122/tcp, 6123/tcp, 8081/tcp, 9249/tcp  
-docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->2181/tcp, 22/tcp, 2888/tcp, 3888/tcp
+Name                    Command                         State  Ports                       
+----------------------------------------------------------------------------------------------------------------
+docker_elasticsearch_1  /usr/local/bin/docker-entr ...  Up    0.0.0.0:9201->9200/tcp, 9300/tcp                  
+docker_exporter_1       /bin/node_exporter              Up    0.0.0.0:9101->9100/tcp                            
+docker_grafana_1        /run.sh                         Up    0.0.0.0:3001->3000/tcp                            
+docker_jobmanager_1     /docker-entrypoint.sh jobm ...  Up    6123/tcp, 0.0.0.0:8082->8081/tcp, 9249/tcp        
+docker_kafka_1          start-kafka.sh                  Up    0.0.0.0:9092->9092/tcp, 9093/tcp                  
+docker_kibana_1         /usr/local/bin/kibana-docker    Up    0.0.0.0:5602->5601/tcp                            
+docker_prometheus_1     /bin/prometheus --config.f ...  Up    0.0.0.0:9091->9090/tcp                            
+docker_taskmanager_1    /docker-entrypoint.sh task ...  Up    6121/tcp, 6122/tcp, 6123/tcp, 8081/tcp, 9249/tcp  
+docker_zookeeper_1      /bin/sh -c /usr/sbin/sshd  ...  Up    0.0.0.0:2181->2181/tcp, 22/tcp, 2888/tcp, 3888/tcp
 ```
    * in case `docker_elasticsearch_1` is not listed:
       1. as su, enter `sysctl -w vm.max_map_count=262144` (see https://www.elastic.co/guide/en/elasticsearch/reference/6.7/vm-max-map-count.html).
       1. `docker-compose down`
       1. `docker-compose up -d`
       1. check again with `docker-compose ps`
-1. Import the dashboards in Kibana:
+5. Import the dashboards in Kibana:
    1. open Kibana in the browser, at http://localhost:5602/
    1. go to `Management`-> `Saved Objects`
    1. import `export.json` from `mvrs-dspa/docker/kibana`
@@ -73,10 +73,11 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
    1. go to `Index patterns` and *star* one of the listed index patterns. Any will do (otherwise the imported dashboards are not listed)
    
       <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-index-patterns-star.png" alt="Kibana import objects" width="60%"/>
-### A note on container configuration
+
+### Configuration files for container services
 * The Flink containers read the Flink config file from a volume mapped to the host machine: `mvrs-dspa/docker/flink/conf/flink-conf.yaml`
-* Prometheus similarly reads its configuration from a valuem mapped to a host directory: `mvrs-dspa/docker/prometheus/prometheus.yml`
-* A similar mapping could be made for ElasticSearch and Kibana (not currently needed)
+* Prometheus similarly reads its configuration from a volume mapped to a host directory: `mvrs-dspa/docker/prometheus/prometheus.yml`
+* A similar mapping could be made for ElasticSearch and Kibana configuration directories (not currently needed)
 * The Kafka container allows parameter customization via environment variables set in the `docker-compose.yml` file, which are translated to matching Kafka properties (dropping the `KAFKA_`-prefix and replacing `_` with `.`, e.g. `KAFKA_TRANSACTION_MAX_TIMEOUT_MS` -> `transaction.max.timeout.ms`)
 
 ## Running the Flink jobs
@@ -86,13 +87,13 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
 * Note that restarting the Kafka container deletes the topics. Also, when starting jobs that write to a Kafka topic, the topic is first deleted and recreated if it exists. Consequences are:
   * after starting the docker container for Kafka, the data preparation job that writes events to Kafka must be re-run (the same is _not_ true for the ElasticSearch indices, which are maintained across container restarts in a docker volume)
   * when starting a job that writes to a Kafka topic, there should not be another job running that reads from the same topic, or the deletion will fail. This only affects the two jobs for active post statistics (the first of which writes to Kafka, from which the second reads)
+* Most IDEA run configuration set the program argument `local-with-ui` to launch the Flink dashboard UI and publish metrics to Prometheus. This can be removed if multiple jobs should be run simultaneously (to avoid a port binding exception on startup).
 
 ### Data preparation
 The following two jobs must have been run prior to running any of the analytics jobs.
-* The first job (writing static data to ElasticSearch) must be re-run after changing the LSH configuration relevant for the recommendations task, as the MinHash/LSH configuration in the prepared static data and the recommendation job must match for meaningful results.
-* As noted above, the second of the jobs (writing the events to Kafka) needs to be re-run after restarting the Kafka container.
-
-The two jobs terminate in less than a minute total, for the low-volume testdata.
+* The first job (writing static data to ElasticSearch) must be re-run after changing the LSH configuration for the recommendations task (in [application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf)), as the MinHash/LSH configuration in the prepared static data and the recommendation job must match for correct results.
+* As noted above, the second job (writing the events to Kafka) needs to be re-run after restarting the Kafka container.
+* The two jobs terminate in less than a minute total, for the low-volume testdata.
 
 #### Loading static data into ElasticSearch
 * Inputs:
@@ -102,7 +103,6 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * [Execution plan](https://github.com/rschoening/mvrs-dspa/blob/master/doc/plans/load_static_tables.pdf)
 * Job class: `org.mvrs.dspa.jobs.preparation.LoadStaticDataJob`
 * in IDEA, execute the run configuration `Preparation: load static tables (csv -> ElasticSearch)`
-   * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
    * The job can be re-run as needed. Output indices are deleted and recreated if they already exist.
 * Checking results: the load progress and final result can be observed in Kibana:
    * Document counts on index management page:
@@ -119,7 +119,6 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * [Execution plan](https://github.com/rschoening/mvrs-dspa/blob/master/doc/plans/write_events_to_kafka.pdf)
 * Job class: `org.mvrs.dspa.jobs.preparation.WriteEventsToKafkaJob`
 * in IDEA, execute the run configuration `Preparation: load events (csv -> Kafka)`
-   * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
 * Checking results: 
    * Metrics in Flink Dashboard or Prometheus/Grafana
    * Querying partition offsets using the Kafka CLI
@@ -145,7 +144,6 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * [Execution plan](https://github.com/rschoening/mvrs-dspa/blob/master/doc/plans/poststatistics_to_kafka.pdf)
 * Job class: `org.mvrs.dspa.jobs.activeposts.ActivePostStatisticsJob`
 * in IDEA, execute the run configuration `Task 1.1: active post statistics (Kafka -> Kafka, post info: Kafka -> ElasticSearch)`
-   * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
 * Checking results:
   * View the incoming documents in `mvrs-active-post-statistics-postinfos` using the `Discover` page in Kibana (setting the time range to the start event time of the stream, i.e. February 2012 for the low-volume stream).
   * run the next job to write the statistics to ElasticSearch.
@@ -185,8 +183,7 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
    * ElasticSearch index with post features: `mvrs-recommendation-post-features`
 * [Execution plan](https://github.com/rschoening/mvrs-dspa/blob/master/doc/plans/recommendations.pdf)
 * In IDEA, execute the run configuration `Task 2: user recommendations (Kafka -> ElasticSearch)` 
-   * Job class: `org.mvrs.dspa.jobs.recommendations.RecommendationsJob`
-   * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
+* Job class: `org.mvrs.dspa.jobs.recommendations.RecommendationsJob`
 * Checking results:
    * Kibana dashboard: [\[DSPA\] Recommendations](http://localhost:5602/app/kibana#/dashboard/7c230710-6855-11e9-9ba6-39d0e49adb7a)
       * Make sure to set the time range (upper right) to the beginning of the stream (February 2012 for the low volume stream). All visualizations in Kibana depend on this time range.
@@ -209,7 +206,6 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * [Execution plan](https://github.com/rschoening/mvrs-dspa/blob/master/doc/plans/unusual_activity.pdf)
 * Job class: `org.mvrs.dspa.jobs.clustering.UnusualActivityDetectionJob`
 * In IDEA, execute the run configuration `Task 3: unusual activity detection (Kafka -> ElasticSearch)`
-   * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
 * Checking results:
    * Kibana dashboard: [\[DSPA\] Unusual activity detection](http://localhost:5602/app/kibana#/dashboard/83a893d0-6989-11e9-ba9d-bb8bdc29536e)
       * Make sure to set the time range (upper right) to the beginning of the stream (February 2012 for the low volume stream). A period of one week is recommended.
