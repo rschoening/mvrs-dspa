@@ -1,6 +1,7 @@
 package org.mvrs.dspa.jobs.preparation.measure
 
 import org.mvrs.dspa.model.RawCommentEvent
+import org.mvrs.dspa.utils.ParseUtils
 
 import scala.collection.mutable
 
@@ -16,7 +17,7 @@ object AnalyseComments extends App {
   // first pass: build dictionary comment id -> creation date
   using(scala.io.Source.fromFile(filePath))(source => {
     for (line <- source.getLines.drop(1)) {
-      val c = RawCommentEvent.parse(line)
+      val c = parse(line)
       dict += c.commentId -> c.timestamp
     }
   })
@@ -29,7 +30,7 @@ object AnalyseComments extends App {
 
     for (line <- source.getLines.drop(1)) {
 
-      val c = RawCommentEvent.parse(line)
+      val c = parse(line)
 
       if (c.replyToPostId.isEmpty) {
         // it's a reply to a comment
@@ -98,5 +99,24 @@ object AnalyseComments extends App {
     } finally {
       param.close()
     }
+
+  def parse(line: String): RawCommentEvent = {
+    // "id|personId|creationDate|locationIP|browserUsed|content|reply_to_postId|reply_to_commentId|placeId"
+
+    val tokens = line.split('|')
+
+    assert(tokens.length == 9)
+
+    RawCommentEvent(
+      commentId = tokens(0).toLong,
+      personId = tokens(1).toLong,
+      creationDate = ParseUtils.toUtcDate(tokens(2).trim),
+      locationIP = ParseUtils.toOptionalString(tokens(3)),
+      browserUsed = ParseUtils.toOptionalString(tokens(4)),
+      content = ParseUtils.toOptionalString(tokens(5)),
+      replyToPostId = ParseUtils.toOptionalLong(tokens(6)),
+      replyToCommentId = ParseUtils.toOptionalLong(tokens(7)),
+      placeId = tokens(8).trim.toInt)
+  }
 
 }
