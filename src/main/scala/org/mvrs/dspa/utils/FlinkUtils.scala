@@ -85,6 +85,13 @@ object FlinkUtils {
       TimeUnit.MILLISECONDS
     ) // TODO actual replay speed may be lower due to backpressure/slow source -> apply some factor to account for that? Or just let the caller reduce the speedup factor for this?
 
+  /**
+    * Create the stream execution environment, optionally with enabled metrics and web UI on the local minicluster
+    *
+    * @param localWithUI Indicates that the local minicluster environment with enabled metrics and web UI should be
+    *                    used. If ```false``` the default environment is returned, which may be local or remote.
+    * @return The execution environment
+    */
   def createStreamExecutionEnvironment(localWithUI: Boolean = false): StreamExecutionEnvironment = {
     if (localWithUI) {
       val config = new Configuration
@@ -100,6 +107,18 @@ object FlinkUtils {
     else StreamExecutionEnvironment.getExecutionEnvironment
   }
 
+  /**
+    * Create a remote stream execution environment
+    *
+    * @param host     The hostname of the Flink cluster
+    * @param port     The port of the Flink cluster
+    * @param jarFiles The JAR files with code that needs to be shipped to the cluster. If the program uses
+    *                 user-defined functions, user-defined input formats, or any libraries, those must be provided
+    *                 in the JAR files.
+    * @return The execution environment
+    * @note If a locally assembled job graph is submitted via this environment, all external dependencies
+    *       accessed by the job (paths, ports, addresses) must match between the local machine and the remote environment.
+    */
   def createRemoteStreamExecutionEnvironment(host: String, port: Int, jarFiles: String*): StreamExecutionEnvironment =
     StreamExecutionEnvironment.createRemoteEnvironment(host: String, port, jarFiles: _*)
 
@@ -113,10 +132,29 @@ object FlinkUtils {
   def createTypeInfoSerializationSchema[T: TypeInformation](implicit env: StreamExecutionEnvironment): TypeInformationSerializationSchema[T] =
     new TypeInformationSerializationSchema[T](createTypeInformation[T], env.getConfig)
 
+  /**
+    * Create the batch execution environment, optionally with the web UI launched for the local minicluster
+    *
+    * @param localWithUI Indicates that the local minicluster environment with enabled web UI should be
+    *                    used. If ```false``` the default environment is returned, which may be local or remote.
+    * @return The execution environment
+    */
   def createBatchExecutionEnvironment(localWithUI: Boolean = false): ExecutionEnvironment =
     if (localWithUI) ExecutionEnvironment.createLocalEnvironmentWithWebUI()
     else ExecutionEnvironment.getExecutionEnvironment
 
+  /**
+    * Create a remote batch execution environment
+    *
+    * @param host     The hostname of the Flink cluster
+    * @param port     The port of the Flink cluster
+    * @param jarFiles The JAR files with code that needs to be shipped to the cluster. If the program uses
+    *                 user-defined functions, user-defined input formats, or any libraries, those must be provided
+    *                 in the JAR files.
+    * @return The execution environment
+    * @note If a locally assembled job graph is submitted via this environment, all external dependencies
+    *       accessed by the job (paths, ports, addresses) must match between the local machine and the remote environment.
+    */
   def createRemoteBatchExecutionEnvironment(host: String, port: Int, jarFiles: String*): ExecutionEnvironment =
     ExecutionEnvironment.createRemoteEnvironment(host: String, port, jarFiles: _*)
 
@@ -140,8 +178,8 @@ object FlinkUtils {
     * @param stream            The stream to write to Kafka
     * @param topic             The topic
     * @param numPartitions     The number of partitions to create for the topic
-    * @param partitioner       The optional partitioner for writing to the Topic. If no partitioner is specified, Kafka's
-    *                          default partitioner (round-robin) is used.
+    * @param partitioner       The optional partitioner for writing to the Topic. If no partitioner is specified,
+    *                          Kafka's default partitioner (round-robin) is used.
     * @param replicationFactor The replication factor for the topic
     * @param semantic          The write semantic used by Flink
     * @tparam E The record type

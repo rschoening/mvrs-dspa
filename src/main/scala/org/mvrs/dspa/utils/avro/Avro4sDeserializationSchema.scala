@@ -5,8 +5,13 @@ import org.apache.avro.Schema
 import org.apache.flink.api.common.serialization.AbstractDeserializationSchema
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.scala.createTypeInformation
-import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner
-import org.apache.flink.streaming.util.serialization.KeyedDeserializationSchema
+
+/**
+  * Avro deserialization schema based on [[https://github.com/sksamuel/avro4s/blob/master/README.md avro4s]]
+  *
+  * @param schemaJSon The JSon string with the Avro schema for the type
+  * @tparam T The type to deserialize
+  */
 
 class Avro4sDeserializationSchema[T: Decoder : TypeInformation](schemaJSon: String)
   extends AbstractDeserializationSchema[T](createTypeInformation[T]) {
@@ -41,7 +46,17 @@ class Avro4sDeserializationSchema[T: Decoder : TypeInformation](schemaJSon: Stri
   }
 }
 
+/**
+  * Companion object
+  */
 object Avro4sDeserializationSchema {
+  /**
+    * Constructs a deserialization schema based on an implicit SchemaFor instance for the type
+    *
+    * @param schemaFor Implicit value for generating an Avro schema for a Scala or Java type
+    * @tparam T The type to deserialize
+    * @return The deserialization schema
+    */
   def apply[T: Decoder : TypeInformation](implicit schemaFor: SchemaFor[T]): Avro4sDeserializationSchema[T] =
     new Avro4sDeserializationSchema[T](schemaFor.schema.toString())
 }
