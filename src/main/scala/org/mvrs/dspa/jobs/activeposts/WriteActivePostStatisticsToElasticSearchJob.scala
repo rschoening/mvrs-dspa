@@ -24,13 +24,31 @@ object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob(ena
 
     val postStatisticsStream: DataStream[PostStatistics] = streams.postStatistics("move-post-statistics")
 
-    enrichPostStatistics(postStatisticsStream)
-      .disableChaining() // disable chaining to be able to observe back-pressure on preceding operators NOTE revise, see observations for recommendation job
-      .addSink(esIndex.createSink(batchSize))
+    val enrichedStream: DataStream[(PostStatistics, String, String)] = enrichPostStatistics(postStatisticsStream)
+
+    enrichedStream.addSink(esIndex.createSink(batchSize))
       .name(s"ElasticSearch: ${esIndex.indexName}")
-      .disableChaining()
 
     FlinkUtils.printExecutionPlan()
+
+    // print complete progress information for the statistics for a popular post (943850)
+    // - if data.random-delay (in application.conf) is < than the slide of the post statistics window, there should
+    //   never be any "behind" events, i.e. statistics for a given post must be strictly ordered by timestamp:
+    // -> in the progress monitor output:
+    //   - bn (time behind newest) must always be 'latest'
+    //   - bnc (behind events seen so far) must be 0
+    //   - bmx (maximum time behind newest seen so far) must be -
+    FlinkUtils.addProgressMonitor(enrichedStream.filter(_._1.postId == 943850), prefix = "POST")()
+
+    // Uncomment the line below to print progress information for any late events
+    //
+    //   Note that there will be late events, since we're reading from multiple partitions and due to the behavior of
+    //   the watermark emission (stopping the auto-interval clock during backpressure phases), the watermarks have to
+    //   be generated after the replay function, i.e. _not_ per partition.
+    //
+    //   However, these late events are no problem for the result in ElasticSearch.
+    //
+    // FlinkUtils.addProgressMonitor(enrichedStream, prefix = "LATE") { case (_, progressInfo) => progressInfo.isLate }
 
     // execute program
     env.execute("Move enriched post statistics from Kafka to ElasticSearch")
