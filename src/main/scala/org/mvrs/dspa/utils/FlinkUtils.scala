@@ -327,21 +327,26 @@ object FlinkUtils {
     * @param stream The stream to monitor
     * @param filter The condition under which to emit detailed progress information for an element
     * @param write  The write target (default: println)
+    * @param prefix Optional prefix to prepend to print output
     * @param name   The operator name
     * @tparam I The record type
     * @return The complete and untransformed input stream
     */
-  def addProgressMonitor[I: TypeInformation](stream: DataStream[I])
-                                            (filter: (I, ProgressInfo) => Boolean,
+  def addProgressMonitor[I: TypeInformation](stream: DataStream[I],
                                              write: String => Unit = println(_),
-                                             name: String = "Progress monitor"): DataStream[I] =
+                                             prefix: String = "",
+                                             name: String = "Progress monitor")
+                                            (filter: (I, ProgressInfo) => Boolean): DataStream[I] =
     stream.process(new ProgressMonitorFunction())
       .map { t: (I, ProgressInfo) => {
         if (filter(t._1, t._2)) {
 
           if (t._2.elementCount == 1 && t._2.subtask == 0) write(ProgressInfo.getSchemaInfo)
 
-          write(t._2.toString)
+          write(
+            if (prefix != null && prefix.length > 0) s"$prefix: ${t._2.toString}"
+            else t._2.toString
+          )
         }
 
         t._1
