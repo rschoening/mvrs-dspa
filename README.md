@@ -20,11 +20,11 @@
    1. start IDEA again and open the project
    1. confirm that the run configurations (drop down list in upper right of IDEA window) are available (order can differ):
       <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/idea-run-configurations.png" alt="IDEA run configurations" width="60%"/>
-1. In `Terminal` tab in IDEA: run `mvn package`
+1. In `Terminal` tab in IDEA: run `mvn package` to produce `target/mvrs-dspa-1.0.jar`, which can be submitted to a Flink cluster (job classes per project task are listed below)
 
 ## Setting up the runtime environment
 1. make sure that `dockerd` is running
-1. cd to the repository: `mvrs-dspa\docker`
+1. cd to the repository: `mvrs-dspa/docker`
 1. as su, enter `docker-compose up -d`
 1. check that all containers were started successfully: enter `docker-compose ps` The following containers should be listed:
 ```
@@ -59,7 +59,7 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
 ### Overview
 * The data preparation and analytic jobs can be configured using the [application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf) file. The individual settings are explained in that file.
 * The analytic jobs depend on the data to have previously been loaded using the data preparation jobs. There are no dependencies _between_ analytic jobs for different project tasks.
-* Note that restarting the Kafka container resets the topics. Also, when staring jobs that write to a Kafka topic, the topic is first deleted and recreated if it exists. Consequences are:
+* Note that restarting the Kafka container resets the topics. Also, when starting jobs that write to a Kafka topic, the topic is first deleted and recreated if it exists. Consequences are:
   * after starting the docker container for Kafka, the data preparation job that writes events to Kafka must be re-run (the same is _not_ true for the ElasticSearch indices, which are maintained across container restarts in a docker volume)
   * when starting a job that writes to a Kafka topic, there should not be another job running that reads from the same topic, or the deletion will fail.
 
@@ -106,7 +106,8 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
   * To allow precise control over the ordering and lateness of events when reading from Kafka, the preparation job uses a single worker, and writes to a single Kafka partition. Doing otherwise would create additional sources of un-ordering that would not allow exact control of lateness/reordering based on defined values for `data.random-delay` and `data.max-out-of-orderness`. See also the discussion for `data.kafka-partition.count` in [application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf)
 
 ### General observations for analytic tasks
-* TODO reading from Kafka: speedup
+* TODO reading from Kafka: speedup; jobs not terminating
+* TODO insert ProgressMonitor at end of all analytic jobs, mention here
 * TODO reading comments: contrary to the initial plan, the reply tree is reconstructed *after* reading from Kafka. Reason: this function was specifically built to run in parallel and to be fault-tolerant, both aspects are no longer relevant for the data loading into Kafka (to ensure defined bounds for out-of-orderness and lateness of events, as noted above). So to keep things interesting, the reply tree is assembled after reading from Kafka, and therefore as part of all analytic jobs.
 * On the other hand, it became apparent that the current implementation is not sufficient, as it relies on union list state to ensure that the mapping between comment ids and post ids is available on the respective workers after a recovery or rescale. Since a keyed function seems to not know the partitioning function, it cannot drop mapping entries for which it is not responsible (and the map can not be kept in keyed state, since it needs to be accessed from the broadcast stream also). So this implementation, while working well for the test data, should be replaced with a database-backed map, requiring a disassembly of the function logic in a subgraph dealing with asynchronous data access to ElasticSearch and persistence of newly found mappings.
 
@@ -170,12 +171,12 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 
 ### Unusual activity detection
 * Inputs
-   * Kafka topics: 
+   * Kafka topics: `mvrs_comments`, `mvrs_likes`, `mvrs_posts`
    * Control parameter file
 * Outputs
    * ElasticSearch indexes:
-      * Classification results
-      * Cluster metadata
+      * Classification results: `mvrs-activity-classification`
+      * Cluster metadata: `mvrs-activity-cluster-metadata`
 * [Execution plan](https://github.com/rschoening/mvrs-dspa/blob/master/doc/plans/unusual_activity.pdf)
 * Job class: `org.mvrs.dspa.jobs.clustering.UnusualActivityDetectionJob`
 * In IDEA, execute the run configuration `Task 3: unusual activity detection (Kafka -> ElasticSearch)`
