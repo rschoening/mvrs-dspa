@@ -7,8 +7,11 @@ import org.mvrs.dspa.model
 import org.mvrs.dspa.model.{ClassifiedEvent, ClusterModel, Point}
 
 /**
+  * Classifies featurized events based on the current cluster model, delivered on a broadcast stream.
   *
-  * @param clusterStateDescriptor
+  * @param clusterStateDescriptor The broadcast state descriptor for storing the cluster model
+  * @note the function only emits events that it could classify, i.e. events that arrive before the first cluster model
+  *       becomes available are dropped.
   */
 class ClassifyEventsFunction(clusterStateDescriptor: MapStateDescriptor[Int, (Long, Int, ClusterModel)])
   extends KeyedBroadcastProcessFunction[Long, FeaturizedEvent, (Long, Int, ClusterModel), ClassifiedEvent] {
@@ -20,10 +23,8 @@ class ClassifyEventsFunction(clusterStateDescriptor: MapStateDescriptor[Int, (Lo
 
     val clusterState = state.get(0)
 
-    // TODO check cause for gaps in classified events - are there really no comments?
-
     if (clusterState == null) {
-      // no clusters yet, cannot classify
+      // no clusters yet, cannot classify -> drop the event
     }
     else out.collect(
       model.ClassifiedEvent(

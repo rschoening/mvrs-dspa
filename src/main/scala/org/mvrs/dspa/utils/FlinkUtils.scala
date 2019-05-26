@@ -132,6 +132,7 @@ object FlinkUtils {
   def readCsv[T: ClassTag](path: String)
                           (implicit env: ExecutionEnvironment, typeInformation: TypeInformation[T]): DataSet[T] =
     env.readCsvFile[T](path, fieldDelimiter = "|", ignoreFirstLine = true)
+      .name(path)
 
   /**
     * Shorthand for creating a new Kafka topic and writing a given stream to it.
@@ -299,11 +300,22 @@ object FlinkUtils {
     group.gauge[T, ScalaGauge[T]](name, ScalaGauge[T](() => getValue()))
 
   /**
-    * Prints the current job execution plan to the default output.
+    * Prints the current streaming job execution plan to the default output.
     *
     * @param env The stream execution environment.
     */
   def printExecutionPlan()(implicit env: StreamExecutionEnvironment): Unit = {
+    println("\nexecution plan:")
+    println(env.getExecutionPlan)
+    println()
+  }
+
+  /**
+    * Prints the current batch job execution plan to the default output.
+    *
+    * @param env The batch execution environment.
+    */
+  def printBatchExecutionPlan()(implicit env: ExecutionEnvironment): Unit = {
     println("\nexecution plan:")
     println(env.getExecutionPlan)
     println()

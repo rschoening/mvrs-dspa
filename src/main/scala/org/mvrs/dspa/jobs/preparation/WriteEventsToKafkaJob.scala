@@ -42,6 +42,8 @@ object WriteEventsToKafkaJob extends FlinkStreamingJob(
       Settings.config.getInt("data.kafka-replica-count").toShort
     )
 
+    FlinkUtils.printExecutionPlan()
+
     env.execute("Import all events from csv file to Kafka")
   }
 }

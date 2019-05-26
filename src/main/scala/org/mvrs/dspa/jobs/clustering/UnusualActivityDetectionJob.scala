@@ -80,19 +80,15 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
         eventFeaturesStream, frequencyStream,
         ignoreActivityOlderThan, FlinkUtils.getTtl(frequencyWindowSize, speedupFactor))
 
-    // cluster combined features (on a single worker) in a custom window:
+    // cluster combined features (on a single worker, parallelizable if needed) in a custom window:
     // - tumbling window of configured size
     // - ... but never exceeding maximum event count (early firing)
     // - ... and making sure that there is a minimum number of events (extending the window if needed)
-
-    // if to be parallelized: distribute points randomly, cluster subsets, merge resulting clusters as in
-    // 7.6.4 of "Mining of massive datasets"
-
     val (clusterModelStream: DataStream[(Long, Int, ClusterModel)], clusterMetadata: DataStream[ClusterMetadata]) =
-      updateClusterModel(
-        aggregatedFeaturesStream, controlParameters,
-        defaultK, defaultDecay,
-        clusterWindowSize, minClusterElementCount, maxClusterElementCount)
+    updateClusterModel(
+      aggregatedFeaturesStream, controlParameters,
+      defaultK, defaultDecay,
+      clusterWindowSize, minClusterElementCount, maxClusterElementCount)
 
     // classify (in parallel) events with aggregated features based on broadcasted cluster model
     val classifiedEvents: DataStream[ClassifiedEvent] = classifyEvents(aggregatedFeaturesStream, clusterModelStream)
@@ -293,21 +289,40 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
       .name("CoProcess: Aggregate features")
 
   /**
-    * TODO
+    * Updates a cluster model by collecting feature vectors for events in a tumbling window (which may be extended or
+    * fire early, based on minimum/maximum vectors for clustering), applying K-Means to the feature vectors at the end
+    * of the window (using the previous model as initial centroids), and doing a weighted combination of the new
+    * cluster model with the previous model (applying a decay factor to reduce the weight of the previous model)
     *
-    * @param aggregatedFeaturesStream
-    * @param controlParameters
-    * @param k
-    * @param decay
-    * @param windowSize
-    * @param minElementCount
-    * @param maxElementCount
-    * @return
+    * @param aggregatedFeaturesStream The stream of featurized events (posts and comments, features derived from text
+    *                                 content, and the frequency of previous activity of the author of the event)
+    * @param controlParameters        A stream of control parameters for parameterizing the clustering (k, decay) and
+    *                                 to label the resulting clusters for easier interpretation
+    * @param k                        initial value for number of clusters (can be altered via control stream)
+    * @param decay                    initial value for decay factor, applied to cluster weights of preceding cluster
+    *                                 model; a value of 1.0 results in equal per-point weight of old and new cluster;
+    *                                 a value of 0.0 ignores the old cluster weight and sets the output weight to the
+    *                                 number of points from the current window that were assigned to the cluster.
+    * @param windowSize               the event time size of the tumbling window at the end of which the cluster model
+    *                                 is updated
+    * @param minElementCount          the minimum element count for updating the cluster model. If not enough elements
+    *                                 arrived within the window size, the window is extended until the minimum value
+    *                                 is reached.
+    * @param maxElementCount          the maximum element count for an update of the cluster model. If this number of
+    *                                 elements is reached, the cluster model is updated and emitted, and a new regular
+    *                                 window is initiated (count-based early firing)
+    * @return Pair of streams: updated cluster models as (timestamp, point count, new cluster model), and metadata on
+    *         the cluster model update (weight difference, centroid movement, k difference)
+    * @note         The clustering is currently done on a single worker. This could be parallelized if needed:
+    *               1. distribute points randomly to multiple workers
+    *               2. cluster subsets independently
+    *               3. merge resulting clusters as outlined in 7.6.4 of "Mining of massive datasets"
     */
   def updateClusterModel(aggregatedFeaturesStream: DataStream[FeaturizedEvent],
                          controlParameters: DataStream[ClusteringParameter],
                          k: Int, decay: Double, windowSize: Time,
-                         minElementCount: Int, maxElementCount: Int): (DataStream[(Long, Int, ClusterModel)], DataStream[ClusterMetadata]) = {
+                         minElementCount: Int,
+                         maxElementCount: Int): (DataStream[(Long, Int, ClusterModel)], DataStream[ClusterMetadata]) = {
     val clusterParametersBroadcastStateDescriptor =
       new MapStateDescriptor[String, ClusteringParameter](
         "cluster-parameters",
@@ -339,11 +354,12 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
   }
 
   /**
-    * TODO
+    * Broadcasts the updated cluster models to multiple workers that consume the stream of featurized events and
+    * classify them by mapping them to the closest cluster centroid, producing an output stream of classified events
     *
-    * @param aggregatedFeaturesStream
-    * @param clusterModelStream
-    * @return
+    * @param aggregatedFeaturesStream The input stream of featurized events
+    * @param clusterModelStream       The input stream of new cluster models
+    * @return Stream of classified events
     */
   def classifyEvents(aggregatedFeaturesStream: DataStream[FeaturizedEvent],
                      clusterModelStream: DataStream[(Long, Int, ClusterModel)]): DataStream[ClassifiedEvent] = {

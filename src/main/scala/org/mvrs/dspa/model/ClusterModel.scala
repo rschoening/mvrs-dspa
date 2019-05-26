@@ -1,7 +1,7 @@
 package org.mvrs.dspa.model
 
 /**
-  * A collection of clusters
+  * A collection of clusters that can be updated based on a previous model, to be used for classifying feature vectors
   *
   */
 final case class ClusterModel(clusters: Vector[Cluster]) {
