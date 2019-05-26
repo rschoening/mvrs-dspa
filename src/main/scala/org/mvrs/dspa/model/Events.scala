@@ -7,6 +7,9 @@ import kantan.csv.{CellDecoder, RowDecoder}
 import org.mvrs.dspa.model.EventType.EventType
 import org.mvrs.dspa.utils.ParseUtils
 
+/**
+  * Minimum event representation
+  */
 case class Event(eventType: EventType, postId: Long, personId: Long, timestamp: Long)
 
 object EventType extends Enumeration {
@@ -14,21 +17,33 @@ object EventType extends Enumeration {
   val Post, Comment, Reply, Like = Value
 }
 
+/**
+  * An event having a creation date, represented also as a timestamp value in milliseconds since the epoch
+  */
 sealed trait TimestampedEvent {
   val creationDate: Date
   val timestamp: Long = creationDate.toInstant.toEpochMilli
 }
 
+/**
+  * An event related to a forum post
+  */
 sealed trait ForumEvent extends TimestampedEvent {
   val personId: Long
   val postId: Long
 }
 
+/**
+  * Event of a person liking a post
+  */
 final case class LikeEvent(personId: Long,
                            creationDate: Date,
                            postId: Long) extends ForumEvent {
 }
 
+/**
+  * Event of a person creating a new post
+  */
 final case class PostEvent(postId: Long,
                            personId: Long,
                            creationDate: Date,
@@ -42,6 +57,9 @@ final case class PostEvent(postId: Long,
                            placeId: Int) extends ForumEvent {
 }
 
+/**
+  * Event of a person commenting on a post, either directly, or by replying to an existing comment or reply
+  */
 final case class CommentEvent(commentId: Long,
                               personId: Long,
                               creationDate: Date,
@@ -54,6 +72,10 @@ final case class CommentEvent(commentId: Long,
   val isReply: Boolean = replyToCommentId.isDefined
 }
 
+/**
+  * The raw comment event information available in the input data, which in case of replies references the post
+  * indirectly, via the parent replies to the initial comment, which references the post directly.
+  */
 final case class RawCommentEvent(commentId: Long,
                                  personId: Long,
                                  creationDate: Date,
@@ -66,54 +88,41 @@ final case class RawCommentEvent(commentId: Long,
 }
 
 object RawCommentEvent {
+  /**
+    * [[https://nrinaudo.github.io/kantan.csv/ Kantan-csv]]
+    * decoder for decoding raw comments from lines in the test data format
+    *
+    * @return row decoder
+    */
   def csvDecoder: RowDecoder[RawCommentEvent] = {
     // "id|personId|creationDate|locationIP|browserUsed|content|reply_to_postId|reply_to_commentId|placeId"
     //    implicit val dateDecoder: Decoder[String, Date, DecodeError, codecs.type] = ParseUtils.dateDecoder
     import org.mvrs.dspa.utils.ParseUtils.utcDateDecoder
     RowDecoder.decoder(0, 1, 2, 3, 4, 5, 6, 7, 8)(RawCommentEvent.apply)
   }
-
-  def parse(line: String): RawCommentEvent = {
-    // "id|personId|creationDate|locationIP|browserUsed|content|reply_to_postId|reply_to_commentId|placeId"
-
-    val tokens = line.split('|')
-
-    assert(tokens.length == 9)
-
-    RawCommentEvent(
-      commentId = tokens(0).toLong,
-      personId = tokens(1).toLong,
-      creationDate = ParseUtils.toUtcDate(tokens(2).trim),
-      locationIP = ParseUtils.toOptionalString(tokens(3)),
-      browserUsed = ParseUtils.toOptionalString(tokens(4)),
-      content = ParseUtils.toOptionalString(tokens(5)),
-      replyToPostId = ParseUtils.toOptionalLong(tokens(6)),
-      replyToCommentId = ParseUtils.toOptionalLong(tokens(7)),
-      placeId = tokens(8).trim.toInt)
-  }
 }
 
 object LikeEvent {
+  /**
+    * [[https://nrinaudo.github.io/kantan.csv/ Kantan-csv]]
+    * decoder for decoding likes from lines in the test data format
+    *
+    * @return row decoder
+    */
   def csvDecoder: RowDecoder[LikeEvent] = {
     // Person.id|Post.id|creationDate
     import ParseUtils.utcDateDecoder
     RowDecoder.decoder(0, 2, 1)(LikeEvent.apply)
   }
-
-  def parse(line: String): LikeEvent = {
-    // Person.id|Post.id|creationDate
-    val tokens = line.split('|')
-
-    assert(tokens.length == 3)
-
-    LikeEvent(
-      personId = tokens(0).toLong,
-      postId = tokens(1).toLong,
-      creationDate = ParseUtils.toUtcDate(tokens(2).trim))
-  }
 }
 
 object PostEvent {
+  /**
+    * [[https://nrinaudo.github.io/kantan.csv/ Kantan-csv]]
+    * decoder for decoding post events from lines in the test data format
+    *
+    * @return row decoder
+    */
   def csvDecoder: RowDecoder[PostEvent] = {
     // id|personId|creationDate|imageFile|locationIP|browserUsed|language|content|tags|forumId|placeId
     import ParseUtils.utcDateDecoder
@@ -121,27 +130,7 @@ object PostEvent {
     RowDecoder.decoder(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)(PostEvent.apply)
   }
 
-  def parse(line: String): PostEvent = {
-    // id|personId|creationDate|imageFile|locationIP|browserUsed|language|content|tags|forumId|placeId
-    val tokens = line.split('|')
-
-    assert(tokens.length == 11)
-
-    PostEvent(
-      postId = tokens(0).toLong,
-      personId = tokens(1).toLong,
-      creationDate = ParseUtils.toUtcDate(tokens(2).trim),
-      imageFile = ParseUtils.toOptionalString(tokens(3)),
-      locationIP = ParseUtils.toOptionalString(tokens(4)),
-      browserUsed = ParseUtils.toOptionalString(tokens(5)),
-      language = ParseUtils.toOptionalString(tokens(6)),
-      content = ParseUtils.toOptionalString(tokens(7)),
-      tags = ParseUtils.toSet(tokens(8)),
-      forumId = tokens(9).toLong,
-      placeId = tokens(10).trim.toInt)
-  }
-
-  private def toSet(str: String) = {
+  private def toSet(str: String): Either[TypeError, Set[Int]] = {
     try Right(ParseUtils.toSet(str))
     catch {
       case e: Exception => Left(new TypeError(e.getMessage))

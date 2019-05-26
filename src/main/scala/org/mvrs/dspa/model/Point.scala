@@ -2,6 +2,10 @@ package org.mvrs.dspa.model
 
 import java.lang.Math.{pow, sqrt}
 
+/**
+  * Feature vector used for K-means clustering
+  *
+  */
 final case class Point(features: Vector[Double]) {
 
   def distanceTo(that: Point): Double = sqrt(squaredDistanceTo(that))

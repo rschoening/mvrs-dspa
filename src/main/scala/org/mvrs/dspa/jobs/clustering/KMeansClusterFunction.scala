@@ -333,7 +333,7 @@ object KMeansClusterFunction {
     val newClustersWithDifferences: Vector[(Cluster, Vector[Double], Double, Double)] =
       newClusterModel.clusters.map(
         cluster => prevByIndex.get(cluster.index) match {
-          // return tuple (cluster, difference vector, difference vector length)
+          // return tuple (cluster, difference vector, difference vector length, weight difference)
           case Some(prevCluster) =>
             val diff = (cluster.centroid - prevCluster.centroid).features
             (
