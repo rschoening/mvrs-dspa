@@ -22,27 +22,33 @@ import scala.util.Random
 /**
   * Keyed process function to collect featurized events and periodically update and emit the cluster model.
   *
-  * @param k                           initial value for number of clusters (can be altered via control stream)
-  * @param decay                       initial value for decay factor, applied to cluster weights of preceding cluster model;
-  *                                    a value of 1.0 results in equal per-point weight of old and new cluster; a value of 0.0
-  *                                    ignores the old cluster weight and sets the output weight to the number of points from the
-  *                                    current window that were assigned to the cluster.
-  * @param windowSize                  the event time size of the tumbling window at the end of which the cluster model is updated
-  * @param minElementCount             the minimum element count for updating the cluster model. If not enough elements
-  *                                    arrived within the window size, the window is extended until the minimum value is reached.
-  * @param maxElementCount             the maximum element count for an update of the cluster model. If this number of elements is
-  *                                    reached, the cluster model is updated and emitted, and a new regular window is initiated
-  *                                    (count-based early firing)
-  * @param broadcastStateDescriptor    the state descriptor for the cluster parameter broadcast state
-  * @param outputTagClusters           the output tag for the cluster parameters side output stream
-  * @param includeLateElementsInWindow indicates if elements with event times prior to the current window should be
+  * @param k                           Initial value for number of clusters (can be altered via control stream)
+  * @param decay                       Initial value for decay factor, applied to cluster weights of preceding
+  *                                    cluster model; a value of 1.0 results in equal per-point weight of old and
+  *                                    new cluster; a value of 0.0
+  *                                    ignores the old cluster weight and sets the output weight to the number of
+  *                                    points from the current window that were assigned to the cluster.
+  * @param windowSize                  The event time size of the tumbling window at the end of which the cluster
+  *                                    model is updated
+  * @param minElementCount             The minimum element count for updating the cluster model. If not enough elements
+  *                                    arrived within the window size, the window is extended until the minimum value
+  *                                    is reached.
+  * @param maxElementCount             The maximum element count for an update of the cluster model. If this number of
+  *                                    elements is reached, the cluster model is updated and emitted, and a new regular
+  *                                    window is initiated (count-based early firing)
+  * @param broadcastStateDescriptor    The state descriptor for the cluster parameter broadcast state
+  * @param outputTagClusters           The output tag for the cluster parameters side output stream
+  * @param includeLateElementsInWindow Indicates if elements with event times prior to the current window should be
   *                                    included (true) or discarded (false)
+  * @param random                      The optional random number generator for cluster centroids. Default: seeded
+  *                                    with nanoTime
   */
 class KMeansClusterFunction(@Nonnegative k: Int, @Nonnegative decay: Double = 0.9,
                             windowSize: Time, @Nonnegative minElementCount: Int, @Nonnegative maxElementCount: Int,
                             broadcastStateDescriptor: MapStateDescriptor[String, ClusteringParameter],
                             outputTagClusters: Option[OutputTag[ClusterMetadata]] = None,
-                            includeLateElementsInWindow: Boolean = true)
+                            includeLateElementsInWindow: Boolean = true,
+                            random: Random = new Random())
   extends KeyedBroadcastProcessFunction[Int, Vector[Double], ClusteringParameter, (Long, Int, ClusterModel)] {
   require(k > 1, s"invalid k: $k")
   require(windowSize.toMilliseconds > 0, s"invalid window size: $windowSize")
@@ -240,7 +246,7 @@ class KMeansClusterFunction(@Nonnegative k: Int, @Nonnegative decay: Double = 0.
     else {
       val previousModel = Option(clusterState.value())
 
-      val newClusterModel = cluster(points, previousModel, params)
+      val newClusterModel = cluster(points, previousModel, params, random)
 
       out.collect((timestamp, points.size, newClusterModel))
 
@@ -287,8 +293,6 @@ class KMeansClusterFunction(@Nonnegative k: Int, @Nonnegative decay: Double = 0.
   * Companion object
   */
 object KMeansClusterFunction {
-  implicit private val random: Random = new Random()
-
   /**
     * calculate cluster model based on new points, the previous model and the decay factor
     *
@@ -297,7 +301,7 @@ object KMeansClusterFunction {
     * @param params        parameters for the cluster operation
     * @return the new cluster model
     */
-  def cluster(points: Seq[Point], previousModel: Option[ClusterModel], params: Parameters): ClusterModel = {
+  def cluster(points: Seq[Point], previousModel: Option[ClusterModel], params: Parameters, random: Random): ClusterModel = {
     val initialCentroids: Seq[(Point, (Int, Double))] =
       previousModel
         .map(_.clusters.map(c => (c.centroid, (c.index, c.weight))))
@@ -309,7 +313,7 @@ object KMeansClusterFunction {
 
     val clusters =
       KMeansClustering
-        .buildClusters(points, initialCentroids, params.k)
+        .buildClusters(points, initialCentroids, params.k)(random)
         .map { case (centroid, (index, weight)) => Cluster(index, centroid, weight, params.label(index)) }
 
     previousModel

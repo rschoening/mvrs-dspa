@@ -21,6 +21,7 @@ import org.mvrs.dspa.{Settings, streams}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
+import scala.util.Random
 
 /**
   * Streaming job for unusual activity detection (DSPA Task #3)
@@ -108,9 +109,14 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     // write cluster parameter parse errors to text file sink
     outputErrors(controlParameterParseErrors, clusterParameterParseErrorsOutputPath)
 
+    // print progress information for any late classification results
+    FlinkUtils.addProgressMonitor(classifiedEvents, prefix = "CLEV") { case (_, progressInfo) => progressInfo.isLate }
+    // ... and cluster metadata
+    FlinkUtils.addProgressMonitor(clusterMetadata, prefix = "META") { case (_, progressInfo) => progressInfo.isLate }
+
     FlinkUtils.printExecutionPlan()
 
-    env.execute()
+    env.execute("Classify events")
   }
 
   /**
@@ -344,8 +350,9 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
           new KMeansClusterFunction(
             k, decay, windowSize, minElementCount, maxElementCount,
             clusterParametersBroadcastStateDescriptor,
-            Some(outputTagClusterMetadata)))
-        .name("KeyedBroadcastProcess: update cluster model")
+            Some(outputTagClusterMetadata),
+            random = new Random(137)) // use fixed seed to get deterministic seed points for clusters
+        ).name("KeyedBroadcastProcess: update cluster model")
         .setParallelism(1)
 
     val clusterMetadata: DataStream[ClusterMetadata] = clusters.getSideOutput(outputTagClusterMetadata)
