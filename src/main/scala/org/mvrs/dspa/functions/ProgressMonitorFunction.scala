@@ -8,6 +8,24 @@ import org.apache.flink.util.Collector
 import org.mvrs.dspa.functions.ProgressMonitorFunction.ProgressInfo
 import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
 
+/**
+  * Process function that attaches progress information to records of an input stream, emitting tuples
+  * (input element, progress information). See [[org.mvrs.dspa.functions.ProgressMonitorFunction.ProgressInfo]] for
+  * documentation of the recorded progress parameters.
+  *
+  * === Flink metrics ===
+  * - elementCounter: counter of records seen so far
+  * - noWatermarkCounter: counter of records received before the first watermark
+  * - behindNewestCounter: counter of records with a timestamp < the maximum timestamp received at that time
+  * - lateElementsCounter: counter of records with timestamp behind the current watermark
+  * - watermarkAdvancedCounter: counter of observed advancements of the watermark time
+  * - watermarkAdvancedPerSecond: meter of observed watermark advancements
+  * - watermarkIncrementHistogram: histogram of the event time increment for observed watermark advancements
+  * - latenessHistogram: histogram of event time difference of late events relative to the watermark
+  * - behindNewestHistogram: histogram of event time difference of "behind" events to the maximum event time seen so far
+  *
+  * @tparam I The type of input record
+  */
 class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)] {
   // metrics
   @transient private var elementCounter: Counter = _

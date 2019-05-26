@@ -6,6 +6,9 @@ import com.sksamuel.avro4s._
 import org.apache.avro.Schema
 import org.apache.flink.api.common.typeinfo.TypeInformation
 
+/**
+  * Utilities for avro serde based on [[https://github.com/sksamuel/avro4s/blob/master/README.md avro4s]]
+  */
 object AvroUtils {
   implicit val dateSchemaFor: DateSchemaFor = new DateSchemaFor
   implicit val dateEncoder: DateEncoder = new DateEncoder

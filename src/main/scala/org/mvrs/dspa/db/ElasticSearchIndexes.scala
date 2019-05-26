@@ -2,6 +2,9 @@ package org.mvrs.dspa.db
 
 import org.mvrs.dspa.Settings
 
+/**
+  * static registry of ElasticSearch indexes used in the project
+  */
 object ElasticSearchIndexes {
   private val nodes = Settings.elasticSearchNodes
 
