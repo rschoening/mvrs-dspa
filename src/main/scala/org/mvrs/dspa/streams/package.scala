@@ -6,8 +6,8 @@ import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.streaming.api.scala.{DataStream, OutputTag, StreamExecutionEnvironment, createTypeInformation}
 import org.mvrs.dspa.functions.{ReplayedCsvFileSourceFunction, SimpleScaledReplayFunction}
 import org.mvrs.dspa.model._
-import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.utils.kafka.KafkaTopic
+import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
 
 /**
   * Methods for reading the test data event streams, from the test data csv files or from Kafka.
@@ -145,7 +145,7 @@ package object streams {
         watermarkInterval,
         minimumWatermarkEmitIntervalMillis = 1
       )
-    ).name(s"$filePath")
+    ).name(getCsvSourceFunctionName(filePath, speedupFactor, randomDelay))
   }
 
   def commentsFromCsv(filePath: String,
@@ -173,7 +173,7 @@ package object streams {
         watermarkInterval,
         minimumWatermarkEmitIntervalMillis = 1
       )
-    ).name(s"$filePath")
+    ).name(getCsvSourceFunctionName(filePath, speedupFactor, randomDelay))
   }
 
   def postsFromCsv(filePath: String,
@@ -193,7 +193,7 @@ package object streams {
         watermarkInterval,
         minimumWatermarkEmitIntervalMillis = 1
       )
-    ).name(s"$filePath (speedup: x $speedupFactor; randomDelay: $randomDelay)")
+    ).name(getCsvSourceFunctionName(filePath, speedupFactor, randomDelay))
   }
 
   def rawCommentsFromKafka(consumerGroup: String,
@@ -280,6 +280,12 @@ package object streams {
     (rootedComments, droppedReplies)
   }
 
+  private def getCsvSourceFunctionName(filePath: String, speedupFactor: Double, randomDelay: Time): String =
+    s"$filePath (speedup: x $speedupFactor; " +
+      s"randomDelay: ${
+        if (randomDelay.toMilliseconds == 0) "0"
+        else DateTimeUtils.formatDuration(randomDelay.toMilliseconds)
+      })"
 
   private def fromKafka[T: TypeInformation](topic: KafkaTopic[T],
                                             consumerGroup: String,
