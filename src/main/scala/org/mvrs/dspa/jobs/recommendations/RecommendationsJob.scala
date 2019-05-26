@@ -111,8 +111,8 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
       .addSink(ElasticSearchIndexes.recommendations.createSink(recommendationsBatchSize))
       .name("ElasticSearch: recommendations")
 
-    // example for how to monitor progress at a specific point in the pipeline
-    FlinkUtils.addProgressMonitor(recommendations) { case (_, pi) => pi.isLate }
+    // print progress information for any late events
+    FlinkUtils.addProgressMonitor(recommendations) { case (_, progressInfo) => progressInfo.isLate }
 
     // trace the configured persons (output printed to console)
     tracePersons(tracedPersonIds)
@@ -177,7 +177,7 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
 
     FlinkUtils.printExecutionPlan()
 
-    env.execute("recommendations")
+    env.execute("Recommendations")
   }
 
   /**
