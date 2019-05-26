@@ -350,8 +350,11 @@ object KMeansClusterFunction {
         }
       )
 
-    val avgVectorDifference = newClustersWithDifferences.map { case (_, _, length, _) => length }.sum / newClustersWithDifferences.size
-    val avgWeightDifference = newClustersWithDifferences.map { case (_, _, _, weight) => weight }.sum / newClustersWithDifferences.size
+    val lengths = newClustersWithDifferences.map { case (_, _, length, _) => length }.filter(!_.isNaN)
+    val weights = newClustersWithDifferences.map { case (_, _, _, weight) => weight }.filter(!_.isNaN)
+
+    val avgVectorDifference = if (lengths.isEmpty) 0 else lengths.sum / lengths.size
+    val avgWeightDifference = if (weights.isEmpty) 0 else weights.sum / weights.size
     val kDifference = newClusterModel.clusters.size - previousModel.map(_.clusters.size).getOrElse(0)
 
     ClusterMetadata(
@@ -362,7 +365,6 @@ object KMeansClusterFunction {
       kDifference
     )
   }
-
 
   /**
     * Cluster parameters
