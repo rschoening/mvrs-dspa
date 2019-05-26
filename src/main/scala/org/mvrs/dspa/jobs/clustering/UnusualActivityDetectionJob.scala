@@ -132,6 +132,10 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     val inputFormat = new TextInputFormat(new Path(controlFilePath))
     inputFormat.setNumSplits(1)
 
+    // TODO after recovery, no watermark is emitted, causing downstream operators to stall.
+    // This affects the cluster model update operator. Restarts only after a fake edit in the file...
+    // This is probably a general problem for such a control stream -> research possible solutions
+
     env
       .readFile(inputFormat, controlFilePath, FileProcessingMode.PROCESS_CONTINUOUSLY, updateInterval)
       .name(s"Control parameters: $controlFilePath")
