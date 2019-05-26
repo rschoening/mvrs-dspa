@@ -75,6 +75,7 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
   * csv files in testdata directory `tables` (location configured in `application.conf` and environment variable `MVRS_DSPA_DATA_DIR`)
 * Outputs:
   * ElasticSearch indexes `mvrs-recommendation-person-features`, `mvrs-recommendation-forum-features`, `mvrs-recommendation-person-minhash`, `mvrs-recommendation-known-persons`, `mvrs-recommendation-lsh-buckets`
+* [Execution plan](https://github.com/rschoening/mvrs-dspa/blob/master/doc/plans/load_static_tables.pdf)
 * Job class: `org.mvrs.dspa.jobs.preparation.LoadStaticDataJob`
 * in IDEA, execute the run configuration `Preparation: load static tables (csv -> ElasticSearch)`
    * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
@@ -91,6 +92,7 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
    * csv files in testdata directory `streams` (location configured in `application.conf` and environment variable `MVRS_DSPA_DATA_DIR`)
 * Outputs:
    * Event topics in Kafka: `mvrs_comments`, `mvrs_likes`, `mvrs_posts`
+* [Execution plan](https://github.com/rschoening/mvrs-dspa/blob/master/doc/plans/write_events_to_kafka.pdf)
 * Job class: `org.mvrs.dspa.jobs.preparation.WriteEventsToKafkaJob`
 * in IDEA, execute the run configuration `Preparation: load events (csv -> Kafka)`
    * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
