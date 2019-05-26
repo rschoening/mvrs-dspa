@@ -54,6 +54,11 @@ docker_zookeeper_1       /bin/sh -c /usr/sbin/sshd  ...   Up      0.0.0.0:2181->
    1. go to `Index patterns` and *star* one of the listed index patterns. Any will do (otherwise the imported dashboards are not listed)
    
       <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-index-patterns-star.png" alt="Kibana import objects" width="60%"/>
+### A note on container configuration
+* The Flink containers read the Flink config file from a volume mapped to the host machine: `mvrs-dspa/docker/flink/conf/flink-conf.yaml`
+* Prometheus similarly reads its configuration from a valuem mapped to a host directory: `mvrs-dspa/docker/prometheus/prometheus.yml`
+* A similar mapping could be made for ElasticSearch and Kibana (not currently needed)
+* The Kafka container allows parameter customization via environment variables set in the `docker-compose.yml` file, which are translated to matching Kafka properties (dropping the `KAFKA_`-prefix and replacing `_` with `.`, e.g. `KAFKA_TRANSACTION_MAX_TIMEOUT_MS` -> `transaction.max.timeout.ms`)
 
 ## Running the Flink jobs
 ### Overview

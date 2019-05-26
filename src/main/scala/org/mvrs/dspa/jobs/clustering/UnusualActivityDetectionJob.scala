@@ -143,7 +143,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
       .assignTimestampsAndWatermarks(
       FlinkUtils.timeStampExtractor[String](
         Time.seconds(0),
-        _ => Long.MaxValue)) // fake timestamp at MaxValue; required for downstream timers
+        _ => System.currentTimeMillis())) // fake timestamp -- (WAS Long.MaxValue - check if this solves the stalling) --; required for downstream timers
   }
 
   /**
