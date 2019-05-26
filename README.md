@@ -182,8 +182,8 @@ The following two jobs must have been run prior to running any of the analytics 
    * ElasticSearch index with recommendation documents: `mvrs-recommendations`
    * ElasticSearch index with post features: `mvrs-recommendation-post-features`
 * [Execution plan](https://github.com/rschoening/mvrs-dspa/blob/master/doc/plans/recommendations.pdf)
-* In IDEA, execute the run configuration `Task 2: user recommendations (Kafka -> ElasticSearch)` 
 * Job class: `org.mvrs.dspa.jobs.recommendations.RecommendationsJob`
+* In IDEA, execute the run configuration `Task 2: user recommendations (Kafka -> ElasticSearch)` 
 * Checking results:
    * Kibana dashboard: [\[DSPA\] Recommendations](http://localhost:5602/app/kibana#/dashboard/7c230710-6855-11e9-9ba6-39d0e49adb7a)
       * Make sure to set the time range (upper right) to the beginning of the stream (February 2012 for the low volume stream). All visualizations in Kibana depend on this time range.
