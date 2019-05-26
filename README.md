@@ -125,7 +125,7 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
    * Querying partition offsets using the Kafka CLI
 
 ##### Notes
-  * To simulate out-of-order events, the value for `data.random-delay` in `application.conf` file can be modified prior to loading the events into Kafka. The random delay is used to parameterize a normal distribution of random delays, with a mean of 1/4 and standard deviation of 1/2 of the configured value, capping the distribution at that value (see `org.mvrs.dspa.utils.FlinkUtils.getNormalDelayMillis()`)  
+  * To simulate out-of-order events, the value for `data.random-delay` in `application.conf` file can be modified prior to loading the events into Kafka. The random delay is used to parameterize a normal distribution of delays, with a mean of 1/4 and standard deviation of 1/2 of the configured value, capping the distribution at that value (see `org.mvrs.dspa.utils.FlinkUtils.getNormalDelayMillis()`)  
   * The speedup factor (`data.speedup-factor` in `application.conf`) is only applied during the analytic jobs, not during data preparation.
   * To allow precise control over the ordering and lateness of events when reading from Kafka, the preparation job uses a single worker, and writes to a single Kafka partition. Doing otherwise would create additional sources of un-ordering that would not allow exact control of lateness/reordering based on defined values for `data.random-delay` and `data.max-out-of-orderness`. See also the discussion for `data.kafka-partition.count` in [application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf)
 
@@ -149,7 +149,8 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * Checking results:
   * View the incoming documents in `mvrs-active-post-statistics-postinfos` using the `Discover` page in Kibana (setting the time range to the start event time of the stream, i.e. February 2012 for the low-volume stream).
   * run the next job to write the statistics to ElasticSearch.
-  * unit test `jobs.activeposts.PostStatisticsFunctionITSuite`
+  * Integration tests in `jobs.activeposts.PostStatisticsFunctionITSuite`
+
 #### Notes
 * Job-specific configuration parameters are defined in `jobs.active-post-statistics` ([application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf))
 * This job uses the `EXACTLY_ONCE` semantic for writing to Kafka. However not all the relevant Kafka settings have yet been revised and adjusted for this. The necessary Kafka configuration parameters can be set in the `docker-compose.yml` file (in the form `KAFKA_TRANSACTION_MAX_TIMEOUT_MS : 3600000`)
@@ -166,10 +167,10 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
   * The run configuration does _not_ set the argument `local-with-ui`, to allow for parallel execution with the previous task on local machine/minicluster.
 * Checking results:
    * Kibana dashboard: [\[DSPA\] Active post statistics](http://localhost:5602/app/kibana#/dashboard/a0af2f50-4f0f-11e9-acde-e1c8a6292b89)
-   * Note that the "New posts per hour" gauge on the right is based on the `mvrs-active-post-statistics-postinfos` index populated by the previous job. All other visualizations on this dashboard are based on `mvrs-active-post-statistics` written by this job.
-   * The table on the left aggregates all statistics records for a post within the time range of the dashboard, and shows the maximum values observed in any of the contained 12-hour windows, sorting by the maximum number of distinct persons. The raw statistics documents in `mvrs-active-post-statistics` can be viewed on `Discover` (top left, below Kibana logo).
-   * Make sure to set the time range (upper right) to the beginning of the stream (February 2012 for the low volume stream). A period of one week is recommended.
-   * When clicking on a tag in the tag cloud (or some other parts of visualizations), a persistent filter is defined. These filters are displayed on the top-left of the dashboard and can be removed again.
+      * Note that the "New posts per hour" gauge on the right is based on the `mvrs-active-post-statistics-postinfos` index populated by the previous job. All other visualizations on this dashboard are based on `mvrs-active-post-statistics` written by this job.
+      * The table on the left aggregates all statistics records for a post within the time range of the dashboard, and shows the maximum values observed in any of the contained 12-hour windows, sorting by the maximum number of distinct persons. The raw statistics documents in `mvrs-active-post-statistics` can be viewed on `Discover` (top left, below Kibana logo).
+      * Make sure to set the time range (upper right) to the beginning of the stream (February 2012 for the low volume stream). A period of one week is recommended.
+      * When clicking on a tag in the tag cloud (or some other parts of visualizations), a persistent filter is defined. These filters are displayed on the top-left of the dashboard and can be removed again.
 
 #### Notes
 * Job-specific configuration parameters are defined in `jobs.active-post-statistics` ([application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf))
@@ -188,9 +189,10 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
    * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
 * Checking results:
    * Kibana dashboard: [\[DSPA\] Recommendations](http://localhost:5602/app/kibana#/dashboard/7c230710-6855-11e9-9ba6-39d0e49adb7a)
-   * Make sure to set the time range (upper right) to the beginning of the stream (February 2012 for the low volume stream). All visualizations in Kibana depend on this time range.
-   * The recommendation documents are shown on the left and can be investigated in detail (expanding the document tree, displaying as JSON etc.). Note that old recommendations for a given person are continuously replaced by current ones (upserts by person id). In a given time range, the number of documents will therefore diminish over time. Use the right-arrow next to the time range display to advance along with the tail of the stream. To look at a document in detail, it may be necessary to stop the stream, otherwise the document may be deleted quickly.
-   <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-dashboard-recommendations.png" alt="Kibana dashboard: recommendations" width="60%"/>
+      * Make sure to set the time range (upper right) to the beginning of the stream (February 2012 for the low volume stream). All visualizations in Kibana depend on this time range.
+      * The recommendation documents are shown on the left and can be investigated in detail (expanding the document tree, displaying as JSON etc.). Note that old recommendations for a given person are continuously replaced by current ones (upserts by person id). In a given time range, the number of documents will therefore diminish over time. Use the right-arrow next to the time range display to advance along with the tail of the stream. To look at a document in detail, it may be necessary to stop the stream, otherwise the document may be deleted quickly.
+      <img src="https://github.com/rschoening/mvrs-dspa/blob/master/doc/images/kibana-dashboard-recommendations.png" alt="Kibana dashboard: recommendations" width="60%"/>
+   * Unit and integration tests in test package `jobs.recommendations`
 
 #### Notes
 * Job-specific configuration parameters are defined in `jobs.recommendation` ([application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf))
@@ -210,10 +212,11 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
    * The run configuration sets the program argument `local-with-ui` to launch the Flink dashboard UI. This can be removed if multiple jobs should be run simultaneously.
 * Checking results:
    * Kibana dashboard: [\[DSPA\] Unusual activity detection](http://localhost:5602/app/kibana#/dashboard/83a893d0-6989-11e9-ba9d-bb8bdc29536e)
-   * Make sure to set the time range (upper right) to the beginning of the stream (February 2012 for the low volume stream). A period of one week is recommended.
-   * The diagram of cluster changes is meant as an example, the displayed variables would have to be more carefully defined. But since the job anyway focuses on the streaming mechanisms and a decent streaming K-means implementation, but not on a valid approach from a data science perspective, not much time was spent on this.
-   * The cluster models and model change information can be investigated in the raw documents shown on the right.
-   * The cluster metadata graph can have gaps since the used Kibana visualization does not interpolate across buckets with nodata (which may result due to extending windows). With a time range of 7 days, this should not happen. Different, more advanced visualizations are available in Kibana that interpolate across empty buckets. 
+      * Make sure to set the time range (upper right) to the beginning of the stream (February 2012 for the low volume stream). A period of one week is recommended.
+      * The diagram of cluster changes is meant as an example, the displayed variables would have to be more carefully defined. But since the job anyway focuses on the streaming mechanisms and a decent streaming K-means implementation, but not on a valid approach from a data science perspective, not much time was spent on this.
+      * The cluster models and model change information can be investigated in the raw documents shown on the right.
+      * The cluster metadata graph can have gaps since the used Kibana visualization does not interpolate across buckets with nodata (which may result due to extending windows). With a time range of 7 days, this should not happen. Different, more advanced visualizations are available in Kibana that interpolate across empty buckets. 
+   * Unit tests for the K-Means implementation, cluster model management and control parameter parsing in test package `jobs.clustering`
 
 #### Notes
 * Job-specific configuration parameters are defined in `jobs.activity-detection` ([application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf))
@@ -260,18 +263,21 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
    └─ site                                  │
    │  └─ scaladoc                           │ scaladoc site generated with mvn scala:doc
    │        index.html                      │
-   │  mvrs-dspa-1.0.jar                     │ the fat jar that can be submitted to a Flink cluster, built by mvn package
+   │  mvrs-dspa-1.0.jar                     │ the fat jar that can be submitted to a Flink cluster, built by 'mvn package'
 ```
+
 ### Configuration
 * `mvrs-dspa/src/main/resources/application.conf`
   * Based on https://github.com/lightbend/config/blob/master/README.md
   * Settings are documented in the file
   * Settings can be overridden at runtime using various mechanisms (see https://github.com/lightbend/config/blob/master/README.md#overview) 
+
 ### Scaladoc
-* located in `mvrs-dspa/target/site/scaladoc`
-* generated with `mvn scala:doc`
+* can be generated with `mvn scala:doc`
+* written to `mvrs-dspa/target/site/scaladoc`
+
 ### Unit tests
-* The plan was to have significantly more tests than what are there now. But time got short and it turned out that analysis of the end-to-end jobs (using metrics, Kibana, the progress monitor etc.) was more important, yielding unexpected findings I would never have looked for specifically in unit tests. 
+* The plan was to have significantly more tests than what are there now. But time got short and it turned out that analysis of the end-to-end jobs (using metrics, Kibana, the progress monitor etc.) was more important, yielding unexpected findings I would never have looked for specifically in unit tests.
 * Unit tests:
   * Scalatest
   * Naming convention: `...TestSuite`
@@ -282,19 +288,20 @@ The two jobs terminate in less than a minute total, for the low-volume testdata.
 * IDEA run configurations: 
   * `ALL: integration tests (junit)`
   * `ALL: unit tests (scalatest)`
+
 ### ElasticSearch indexes
 * The mappings, documents and queries used for these indexes are defined in the gateway classes in the `db` package. These classes can be accessed from the static registry `ElasticSearchIndexes.scala`.
 
 ## Addresses:
-* Flink lokal UI: http://localhost:8081
-* Flink docker: http://localhost:8082
-* Kibana docker: http://localhost:5602
+* Flink minicluster dashboard (when running jobs using the provided run configurations in IDEA): http://localhost:8081
+* Flink "remote" cluster dashboard (docker): http://localhost:8082
+* Kibana (docker): http://localhost:5602
   * Active post statistics: http://localhost:5602/app/kibana#/dashboard/a0af2f50-4f0f-11e9-acde-e1c8a6292b89
   * Recommendations: http://localhost:5602/app/kibana#/dashboard/7c230710-6855-11e9-9ba6-39d0e49adb7a
   * Activity detection: http://localhost:5602/app/kibana#/dashboard/83a893d0-6989-11e9-ba9d-bb8bdc29536e
-* Prometheus docker: http://localhost:9091
-* Grafana docker: http://localhost:3001 (no dashboards delivered as part of solution; initial login with admin/admin, then change pwd)
-* ElasticSearch docker (to check if online): http://localhost:9201
+* Prometheus (docker): http://localhost:9091
+* Grafana (docker): http://localhost:3001 (no dashboards delivered as part of solution; initial login with admin/admin, then change pwd)
+* ElasticSearch (docker, for status check): http://localhost:9201
 
 ## Troubleshooting
 * Some possible problems and solutions are listed [here](https://github.com/rschoening/mvrs-dspa/blob/master/doc/Troubleshooting.md)
