@@ -428,4 +428,19 @@ object FlinkUtils {
       )
     println(sep)
   }
+
+  /**
+    * Asserts that all operators have defined uids (important to ensure compatible savepoints after code changes)
+    *
+    * @env: The stream execution environment
+    **/
+  def assertNoUndefinedOperatorUids()(implicit env: StreamExecutionEnvironment): Unit =
+    env.getStreamGraph.getStreamNodes.iterator().asScala
+      .foreach(
+        op => assert(
+          op.getTransformationUID != null,
+          s"no uid defined for operator ${op.getOperatorName} (${op.getId})"
+        )
+      )
+
 }
