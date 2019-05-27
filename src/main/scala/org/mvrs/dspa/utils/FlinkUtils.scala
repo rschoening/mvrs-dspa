@@ -403,4 +403,29 @@ object FlinkUtils {
       }
       }.name(name)
 
+  /**
+    * Print operator names, ids and uids for the entire stream graph. Can be called prior to executing a graph
+    * to review the defined operator names and uids
+    *
+    * @env: The stream execution environment
+    */
+  def printOperatorNames()(implicit env: StreamExecutionEnvironment): Unit = {
+    val idPadding = 6
+    val uidPadding = 40
+    val sep = "-" * 160
+
+    println(sep)
+    println(" id".padTo(idPadding, ' ') + "| operator uid".padTo(uidPadding, ' ') + "| operator name")
+    println(sep)
+
+    env.getStreamGraph.getStreamNodes.iterator().asScala
+      .foreach(
+        op => println(
+          s" ${op.getId}".padTo(idPadding, ' ') +
+            s"| ${Option(op.getTransformationUID).getOrElse("-")}".padTo(uidPadding, ' ') +
+            s"| ${op.getOperatorName}"
+        )
+      )
+    println(sep)
+  }
 }
