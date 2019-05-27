@@ -387,6 +387,7 @@ object FlinkUtils {
                                              name: String = "Progress monitor")
                                             (filter: (I, ProgressInfo) => Boolean = (_: I, _: ProgressInfo) => true): DataStream[I] =
     stream.process(new ProgressMonitorFunction())
+      .name("Process: attach progress information")
       .map { t: (I, ProgressInfo) => {
         if (filter(t._1, t._2)) {
 
