@@ -1,4 +1,4 @@
-# DSPA 2019 semester project
+# [DSPA 2019](https://www.systems.ethz.ch/node/1413) Semester project solution
 
 ## Setup overview (details below)
 1. `git clone https://github.com/rschoening/mvrs-dspa.git`
