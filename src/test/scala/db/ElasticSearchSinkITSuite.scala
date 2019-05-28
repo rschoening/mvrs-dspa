@@ -3,8 +3,8 @@ package db
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala.{StreamExecutionEnvironment, _}
 import org.apache.flink.test.util.AbstractTestBase
-import org.junit.{Ignore, Test}
 import org.junit.experimental.categories.Category
+import org.junit.{Ignore, Test}
 import org.mvrs.dspa.Settings
 import org.mvrs.dspa.db.ActivePostStatisticsIndex
 import org.mvrs.dspa.model.PostStatistics
