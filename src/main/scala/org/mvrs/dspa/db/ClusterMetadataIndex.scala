@@ -12,16 +12,18 @@ import scala.collection.JavaConverters._
 class ClusterMetadataIndex(indexName: String, esNode: ElasticSearchNode*)
   extends ElasticSearchIndexSink[ClusterMetadata](indexName, esNode: _*) {
 
-  override protected def getDocumentId(record: ClusterMetadata): String = s"${record.timestamp}"
+  override protected def getDocumentId(record: ClusterMetadata): String =
+    s"${record.timestamp}" // NOTE timestamp not deterministic on retried attempts - should use sequence# ("ith model")
 
-  override protected def createDocument(record: ClusterMetadata): Map[String, Any] = Map[String, Any](
-    "timestamp" -> record.timestamp,
-    "k" -> record.clusters.size,
-    "kDifference" -> record.kDifference,
-    "averageDistance" -> record.averageVectorDistance,
-    "averageWeightDifference" -> record.averageWeightDifference,
-    "clusters" -> record.clusters.map(createNestedDocument).toList.asJava,
-  )
+  override protected def createDocument(record: ClusterMetadata): Map[String, Any] =
+    Map(
+      "timestamp" -> record.timestamp,
+      "k" -> record.clusters.size,
+      "kDifference" -> record.kDifference,
+      "averageDistance" -> record.averageVectorDistance,
+      "averageWeightDifference" -> record.averageWeightDifference,
+      "clusters" -> record.clusters.map(createNestedDocument).toList.asJava,
+    )
 
   override protected def createFields(): Iterable[FieldDefinition] =
     Iterable(
