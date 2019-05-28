@@ -10,7 +10,7 @@ class PostInfoIndex(indexName: String, nodes: ElasticSearchNode*)
   override protected def getDocumentId(record: PostInfo): String = record.postId.toString
 
   override protected def createDocument(record: PostInfo): Map[String, Any] =
-    Map[String, Any](
+    Map(
       "personId" -> record.personId,
       "forumId" -> record.forumId,
       "forumTitle" -> record.forumTitle,

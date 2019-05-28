@@ -12,7 +12,7 @@ class PostFeaturesIndex(indexName: String, nodes: ElasticSearchNode*)
   override protected def getDocumentId(record: PostFeatures): String = record.postId.toString
 
   override protected def createDocument(record: PostFeatures): Map[String, Any] =
-    Map[String, Any](
+    Map(
       "personId" -> record.personId,
       "features" -> record.features.asJava,
       "timestamp" -> record.timestamp,

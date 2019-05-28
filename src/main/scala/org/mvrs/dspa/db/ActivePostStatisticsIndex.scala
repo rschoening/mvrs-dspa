@@ -8,10 +8,11 @@ import org.mvrs.dspa.utils.elastic.{ElasticSearchIndexSink, ElasticSearchNode}
 class ActivePostStatisticsIndex(indexName: String, nodes: ElasticSearchNode*)
   extends ElasticSearchIndexSink[(PostStatistics, String, String)](indexName, nodes: _*) {
 
-  override protected def getDocumentId(record: (PostStatistics, String, String)): String = s"${record._1.postId}#${record._1.time}"
+  override protected def getDocumentId(record: (PostStatistics, String, String)): String =
+    s"${record._1.postId}#${record._1.time}"
 
   override protected def createDocument(record: (PostStatistics, String, String)): Map[String, Any] =
-    Map[String, Any](
+    Map(
       "postId" -> record._1.postId,
       "content" -> record._2,
       "forumTitle" -> record._3,
