@@ -2,7 +2,7 @@ package org.mvrs.dspa.db
 
 import com.sksamuel.elastic4s.http.ElasticDsl.{dateField, doubleField, intField, keywordField, longField}
 import com.sksamuel.elastic4s.mappings.FieldDefinition
-import org.mvrs.dspa.model.ClassifiedEvent
+import org.mvrs.dspa.model.{ClassifiedEvent, EventType}
 import org.mvrs.dspa.utils.elastic.{ElasticSearchIndexSink, ElasticSearchNode}
 
 import scala.collection.JavaConverters._
@@ -10,7 +10,7 @@ import scala.collection.JavaConverters._
 class ActivityClassificationIndex(indexName: String, esNode: ElasticSearchNode*)
   extends ElasticSearchIndexSink[ClassifiedEvent](indexName, esNode: _*) {
 
-  override protected def getDocumentId(record: ClassifiedEvent): String = s"${record.eventId}"
+  override protected def getDocumentId(record: ClassifiedEvent): String = s"${record.eventId}#${getKeySuffix(record)}"
 
   override protected def createDocument(record: ClassifiedEvent): Map[String, Any] = Map[String, Any](
     "personId" -> record.personId,
@@ -34,6 +34,13 @@ class ActivityClassificationIndex(indexName: String, esNode: ElasticSearchNode*)
       doubleField(name = "clusterCentroid").index(false),
       dateField("timestamp")
     )
+
+  private def getKeySuffix(record: ClassifiedEvent) = record.eventType match {
+    case EventType.Comment => "c"
+    case EventType.Like => "l"
+    case EventType.Post => "p"
+    case EventType.Reply => "r"
+  }
 }
 
 
