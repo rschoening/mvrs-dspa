@@ -416,9 +416,9 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
       // TODO how to scale/normalize features?
       // TODO do this in windowing function to allow normalization/standardization?
 
-      buffer += 10 * tokens.map(_.toLowerCase()).distinct.size / tokens.size // proportion of distinct words
-      buffer += tokens.count(_.forall(_.isUpper)) / tokens.size // % of all-UPPERCASE words
-      buffer += tokens.count(_.length == 4) / tokens.size // % of four-letter words
+      buffer += 10 * tokens.map(_.toLowerCase()).distinct.size.toDouble / tokens.size // proportion of distinct words
+      buffer += tokens.count(_.forall(_.isUpper)).toDouble / tokens.size // % of all-UPPERCASE words
+      buffer += tokens.count(_.length == 4).toDouble / tokens.size // % of four-letter words
     }
   }
 
