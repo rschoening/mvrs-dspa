@@ -115,6 +115,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     FlinkUtils.addProgressMonitor(clusterMetadata, prefix = "META") { case (_, progressInfo) => progressInfo.isLate }
 
     FlinkUtils.printExecutionPlan()
+    FlinkUtils.printOperatorNames()
 
     env.execute("Classify events")
   }

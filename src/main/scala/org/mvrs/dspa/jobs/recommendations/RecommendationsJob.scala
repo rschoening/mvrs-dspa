@@ -176,6 +176,7 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
     }
 
     FlinkUtils.printExecutionPlan()
+    FlinkUtils.printOperatorNames()
 
     env.execute("Recommendations")
   }

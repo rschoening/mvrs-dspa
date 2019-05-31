@@ -19,7 +19,6 @@ abstract class ElasticSearchIndex(val indexName: String, nodes: ElasticSearchNod
     *                  the method succeeds without changing the index
     * @param shards    the number of shards (partitions)
     * @param replicas  the number of replicas (0 = no second replica, each shard stored on only one node)
-    *
     * @note if (replicas + 1) is larger than the number of nodes in the cluster, the index will appear
     *       with status 'yellow' (not fully replicated)
     */

@@ -387,6 +387,7 @@ object FlinkUtils {
                                              name: String = "Progress monitor")
                                             (filter: (I, ProgressInfo) => Boolean = (_: I, _: ProgressInfo) => true): DataStream[I] =
     stream.process(new ProgressMonitorFunction())
+      .name("Process: attach progress information")
       .map { t: (I, ProgressInfo) => {
         if (filter(t._1, t._2)) {
 
@@ -401,5 +402,45 @@ object FlinkUtils {
         t._1
       }
       }.name(name)
+
+  /**
+    * Print operator names, ids and uids for the entire stream graph. Can be called prior to executing a graph
+    * to review the defined operator names and uids
+    *
+    * @env: The stream execution environment
+    */
+  def printOperatorNames()(implicit env: StreamExecutionEnvironment): Unit = {
+    val idPadding = 6
+    val uidPadding = 40
+    val sep = "-" * 160
+
+    println(sep)
+    println(" id".padTo(idPadding, ' ') + "| operator uid".padTo(uidPadding, ' ') + "| operator name")
+    println(sep)
+
+    env.getStreamGraph.getStreamNodes.iterator().asScala
+      .foreach(
+        op => println(
+          s" ${op.getId}".padTo(idPadding, ' ') +
+            s"| ${Option(op.getTransformationUID).getOrElse("-")}".padTo(uidPadding, ' ') +
+            s"| ${op.getOperatorName}"
+        )
+      )
+    println(sep)
+  }
+
+  /**
+    * Asserts that all operators have defined uids (important to ensure compatible savepoints after code changes)
+    *
+    * @env: The stream execution environment
+    **/
+  def assertNoUndefinedOperatorUids()(implicit env: StreamExecutionEnvironment): Unit =
+    env.getStreamGraph.getStreamNodes.iterator().asScala
+      .foreach(
+        op => assert(
+          op.getTransformationUID != null,
+          s"no uid defined for operator ${op.getOperatorName} (${op.getId})"
+        )
+      )
 
 }

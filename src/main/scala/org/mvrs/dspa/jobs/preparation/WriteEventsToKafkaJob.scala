@@ -43,6 +43,7 @@ object WriteEventsToKafkaJob extends FlinkStreamingJob(
     )
 
     FlinkUtils.printExecutionPlan()
+    FlinkUtils.printOperatorNames()
 
     env.execute("Import all events from csv file to Kafka")
   }

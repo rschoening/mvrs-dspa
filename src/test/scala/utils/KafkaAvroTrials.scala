@@ -11,10 +11,10 @@ import org.apache.flink.test.util.AbstractTestBase
 import org.junit.experimental.categories.Category
 import org.junit.{Ignore, Test}
 import org.mvrs.dspa.Settings
+import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.utils.avro.AvroUtils
 import org.mvrs.dspa.utils.avro.AvroUtils.{DateDecoder, DateEncoder, DateSchemaFor}
 import org.mvrs.dspa.utils.kafka.{KafkaCluster, KafkaTopic}
-import org.mvrs.dspa.utils.FlinkUtils
 
 @Category(Array(classOf[categories.KafkaTests]))
 class KafkaAvroTrials extends AbstractTestBase {
