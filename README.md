@@ -196,7 +196,7 @@ The following two jobs must have been run prior to running any of the analytics 
 
 ### Unusual activity detection
 * Inputs
-   * Kafka topics: `mvrs_comments`, `mvrs_likes`, `mvrs_posts`
+   * Kafka topics: `mvrs_comments`, `mvrs_posts`
    * Control parameter file: path set by `jobs.activity-detection.cluster-parameter-file-path` in [application.conf](https://github.com/rschoening/mvrs-dspa/blob/master/src/main/resources/application.conf)
 * Outputs
    * ElasticSearch indexes:
