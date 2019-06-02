@@ -69,7 +69,39 @@ final case class CommentEvent(commentId: Long,
                               postId: Long,
                               replyToCommentId: Option[Long],
                               placeId: Int) extends ForumEvent {
+
+  def this(c: RawCommentEvent, postId: Long) =
+    this(
+      c.commentId,
+      c.personId,
+      c.creationDate,
+      c.locationIP,
+      c.browserUsed,
+      c.content,
+      postId,
+      c.replyToCommentId,
+      c.placeId
+    )
+
   val isReply: Boolean = replyToCommentId.isDefined
+}
+
+/**
+  * Companion object
+  */
+object CommentEvent {
+  def apply(c: RawCommentEvent, postId: Long): CommentEvent =
+    CommentEvent(
+      c.commentId,
+      c.personId,
+      c.creationDate,
+      c.locationIP,
+      c.browserUsed,
+      c.content,
+      postId,
+      c.replyToCommentId,
+      c.placeId
+    )
 }
 
 /**
