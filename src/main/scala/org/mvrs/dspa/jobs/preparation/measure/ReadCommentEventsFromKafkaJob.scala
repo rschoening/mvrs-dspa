@@ -16,7 +16,12 @@ object ReadCommentEventsFromKafkaJob extends FlinkStreamingJob(enableGenericType
     env.getConfig.setAutoWatermarkInterval(1L)
 
     streams
-      .commentsFromKafka("testConsumer", 0, Time.minutes(0)).startNewChain()
+      .commentsFromKafka(
+        "testConsumer",
+        0,
+        Time.minutes(0),
+        lookupParentPostId = replies => replies.map(Left(_)))._1
+      .startNewChain()
       .process(new ProgressMonitorFunction[CommentEvent]())
       .map(_._2)
       .filter(p => p.isLate || p.elementCount % 25000 == 0)

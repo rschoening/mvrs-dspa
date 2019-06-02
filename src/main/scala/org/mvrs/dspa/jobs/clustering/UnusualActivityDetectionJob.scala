@@ -14,7 +14,7 @@ import org.apache.flink.streaming.api.functions.source.FileProcessingMode
 import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.jobs.FlinkStreamingJob
-import org.mvrs.dspa.model._
+import org.mvrs.dspa.model.{PostMapping, _}
 import org.mvrs.dspa.utils.elastic.ElasticSearchNode
 import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
 import org.mvrs.dspa.{Settings, streams}
@@ -55,10 +55,17 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     // (re)create ElasticSearch indexes for classification results and cluster metadata
     ElasticSearchIndexes.classification.create()
     ElasticSearchIndexes.clusterMetadata.create()
+    ElasticSearchIndexes.postMappings.create()
 
     // consume comments and posts from Kafka
     val kafkaConsumerGroup = Some("activity-detection")
-    val comments: DataStream[CommentEvent] = streams.comments(kafkaConsumerGroup)
+    val (comments: DataStream[CommentEvent], postMappings: DataStream[PostMapping]) =
+      streams.comments(
+        kafkaConsumerGroup,
+        lookupParentPostId = replies => streams.lookupParentPostId(
+          replies, ElasticSearchIndexes.postMappings, Settings.elasticSearchNodes: _*)
+      )
+
     val posts: DataStream[PostEvent] = streams.posts(kafkaConsumerGroup)
 
     // read raw control file lines
@@ -105,6 +112,8 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     clusterMetadata
       .addSink(ElasticSearchIndexes.clusterMetadata.createSink(clusterMetadataBatchSize))
       .name(s"ElasticSearch: ${ElasticSearchIndexes.clusterMetadata.indexName}")
+
+    postMappings.addSink(ElasticSearchIndexes.postMappings.createSink(100, Some(100)))
 
     // write cluster parameter parse errors to text file sink
     outputErrors(controlParameterParseErrors, clusterParameterParseErrorsOutputPath)

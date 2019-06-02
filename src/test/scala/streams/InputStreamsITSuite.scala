@@ -150,7 +150,11 @@ class InputStreamsITSuite extends AbstractTestBase {
     val startTime = System.currentTimeMillis()
 
     streams
-      .commentsFromCsv(TestUtils.getResourceURIPath("/streams/comments.csv"), 10000000)
+      .commentsFromCsv(
+        TestUtils.getResourceURIPath("/streams/comments.csv"),
+        10000000,
+        lookupParentPostId = replies => replies.map(Left(_))
+      )._1
       .map(e => (e.postId, 1))
       .keyBy(_._1)
       .timeWindow(Time.days(30))
@@ -184,7 +188,10 @@ class InputStreamsITSuite extends AbstractTestBase {
     val startTime = System.currentTimeMillis()
 
     streams
-      .commentsFromCsv(TestUtils.getResourceURIPath("/streams/comments.csv"))
+      .commentsFromCsv(
+        TestUtils.getResourceURIPath("/streams/comments.csv"),
+        lookupParentPostId = replies => replies.map(Left(_))
+      )._1
       .map(e => (e.postId, 1))
       .addSink(new CounterSink[(Long, Int)])
 
@@ -220,7 +227,10 @@ class InputStreamsITSuite extends AbstractTestBase {
 
     CollectionSink.values.clear()
     streams
-      .commentsFromCsv(TestUtils.getResourceURIPath("/streams/comments.csv"), watermarkInterval = 100)
+      .commentsFromCsv(
+        TestUtils.getResourceURIPath("/streams/comments.csv"), watermarkInterval = 100,
+        lookupParentPostId = replies => replies.map(Left(_))
+      )._1
       .map(e => (e.commentId, 1))
       .addSink(new CollectionSink())
 

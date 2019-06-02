@@ -3,9 +3,11 @@ package org.mvrs.dspa
 import kantan.csv.RowDecoder
 import org.apache.flink.api.common.time.Time
 import org.apache.flink.api.common.typeinfo.TypeInformation
+import org.apache.flink.streaming.api.functions.async.AsyncFunction
 import org.apache.flink.streaming.api.scala.{DataStream, OutputTag, StreamExecutionEnvironment, createTypeInformation}
 import org.mvrs.dspa.functions.{ReplayedCsvFileSourceFunction, SimpleScaledReplayFunction}
 import org.mvrs.dspa.model._
+import org.mvrs.dspa.utils.elastic.{ElasticSearchIndex, ElasticSearchNode}
 import org.mvrs.dspa.utils.kafka.KafkaTopic
 import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
 
@@ -47,13 +49,16 @@ package object streams {
     * @param env                   the implicit stream execution environment
     * @return stream of comments with assigned post ids, i.e. after reply tree reconstruction
     */
-  def comments(kafkaConsumerGroup: Option[String] = None, speedupFactorOverride: Option[Double] = None)
-              (implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] =
+  def comments(kafkaConsumerGroup: Option[String] = None,
+               speedupFactorOverride: Option[Double] = None,
+               lookupParentPostId: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]])
+              (implicit env: StreamExecutionEnvironment): (DataStream[CommentEvent], DataStream[PostMapping]) =
     kafkaConsumerGroup.map(
       commentsFromKafka(
         _,
         getSpeedupFactor(speedupFactorOverride),
-        getMaxOutOfOrderness
+        getMaxOutOfOrderness,
+        lookupParentPostId
       )
     ).getOrElse(
       commentsFromCsv(
@@ -61,6 +66,7 @@ package object streams {
         getSpeedupFactor(speedupFactorOverride),
         getRandomDelay,
         csvWatermarkInterval,
+        lookupParentPostId
       )
     )
 
@@ -151,9 +157,13 @@ package object streams {
   def commentsFromCsv(filePath: String,
                       speedupFactor: Double = 0,
                       randomDelay: Time = Time.milliseconds(0),
-                      watermarkInterval: Long = 10000)
-                     (implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] = {
-    resolveReplyTree(rawCommentsFromCsv(filePath, speedupFactor, randomDelay, watermarkInterval))
+                      watermarkInterval: Long = 10000,
+                      lookupParentPostId: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]])
+                     (implicit env: StreamExecutionEnvironment): (DataStream[CommentEvent], DataStream[PostMapping]) = {
+    resolveReplyTree(
+      rawCommentsFromCsv(filePath, speedupFactor, randomDelay, watermarkInterval),
+      lookupParentPostId = lookupParentPostId
+    )
   }
 
   def likesFromCsv(filePath: String,
@@ -204,9 +214,13 @@ package object streams {
 
   def commentsFromKafka(consumerGroup: String,
                         speedupFactor: Double = 0,
-                        maxOutOfOrderness: Time = Time.milliseconds(0))
-                       (implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] =
-    resolveReplyTree(fromKafka(KafkaTopics.comments, consumerGroup, _.timestamp, speedupFactor, maxOutOfOrderness))
+                        maxOutOfOrderness: Time = Time.milliseconds(0),
+                        lookupParentPostId: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]])
+                       (implicit env: StreamExecutionEnvironment): (DataStream[CommentEvent], DataStream[PostMapping]) =
+    resolveReplyTree(
+      fromKafka(KafkaTopics.comments, consumerGroup, _.timestamp, speedupFactor, maxOutOfOrderness),
+      lookupParentPostId = lookupParentPostId
+    )
 
   def postStatisticsFromKafka(consumerGroup: String,
                               speedupFactor: Double = 0,
@@ -226,8 +240,12 @@ package object streams {
                     (implicit env: StreamExecutionEnvironment): DataStream[LikeEvent] =
     fromKafka(KafkaTopics.likes, consumerGroup, _.timestamp, speedupFactor, maxOutOfOrderness)
 
-  def resolveReplyTree(rawComments: DataStream[RawCommentEvent]): DataStream[CommentEvent] =
-    resolveReplyTree(rawComments, droppedRepliesStream = false)._1
+  def resolveReplyTree(rawComments: DataStream[RawCommentEvent],
+                       lookupParentPostId: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]]):
+  (DataStream[CommentEvent], DataStream[PostMapping]) =
+    resolveReplyTree(rawComments, droppedRepliesStream = false, lookupParentPostId) match {
+      case (commentEvents, _, newPostMappings) => (commentEvents, newPostMappings)
+    }
 
   /**
     * Transforms the stream of raw comments into comments with resolved reference to the post
@@ -243,41 +261,68 @@ package object streams {
     *         { @code droppedRepliesStream}
     */
   def resolveReplyTree(rawComments: DataStream[RawCommentEvent],
-                       droppedRepliesStream: Boolean): (DataStream[CommentEvent], DataStream[RawCommentEvent]) = {
+                       droppedRepliesStream: Boolean,
+                       lookupParentPostId: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]]):
+  (DataStream[CommentEvent], DataStream[RawCommentEvent], DataStream[PostMapping]) = {
     val firstLevelComments =
       rawComments
         .filter(_.replyToPostId.isDefined).name("Filter: first-level comments")
-        .map(c =>
-          CommentEvent(
-            c.commentId,
-            c.personId,
-            c.creationDate,
-            c.locationIP,
-            c.browserUsed,
-            c.content,
-            c.replyToPostId.get,
-            None,
-            c.placeId
-          )
-        ).name("Map -> CommentEvent")
+        .map(c => new CommentEvent(c, c.replyToPostId.get))
+        .name("Map -> CommentEvent")
         .keyBy(_.postId)
 
-    val repliesBroadcast =
+    val replies =
       rawComments
-        .filter(_.replyToPostId.isEmpty).name("Filter: replies")
+        .filter(_.replyToPostId.isEmpty)
+        .name("Filter: replies")
+
+    val lookupResults: DataStream[Either[RawCommentEvent, CommentEvent]] = lookupParentPostId(replies)
+
+    val repliesBroadcast =
+      lookupResults
+        .filter(_.isLeft)
+        .map(_.left.get)
         .broadcast()
 
     val outputTagDroppedReplies = new OutputTag[RawCommentEvent]("dropped replies")
+    val outputTagNewPostMappings = new OutputTag[PostMapping](id = "newly resolved comments")
 
-    val outputTag = if (droppedRepliesStream) Some(outputTagDroppedReplies) else None
+    val allResolvedComments =
+      firstLevelComments
+        .union(
+          lookupResults
+            .filter(_.isRight)
+            .map(_.right.get))
 
-    val rootedComments: DataStream[CommentEvent] = firstLevelComments
-      .connect(repliesBroadcast)
-      .process(new BuildReplyTreeProcessFunction(outputTag)).name("Reconstruct reply tree")
+    val rootedComments: DataStream[CommentEvent] =
+      allResolvedComments
+        .keyBy(_.postId)
+        .connect(repliesBroadcast)
+        .process(new BuildReplyTreeProcessFunction(
+          if (droppedRepliesStream) Some(outputTagDroppedReplies) else None,
+          outputTagNewPostMappings))
+        .name("Reconstruct reply tree")
+
+    // emit NEWLY resolved replies on side output --> sink to mapping index
 
     val droppedReplies = rootedComments.getSideOutput(outputTagDroppedReplies)
+    val newPostMappings: DataStream[PostMapping] = rootedComments.getSideOutput(outputTagNewPostMappings)
 
-    (rootedComments, droppedReplies)
+    (rootedComments, droppedReplies, newPostMappings)
+  }
+
+  def lookupParentPostId(replies: DataStream[RawCommentEvent],
+                         postMappings: ElasticSearchIndex,
+                         nodes: ElasticSearchNode*): DataStream[Either[RawCommentEvent, CommentEvent]] = {
+    val cacheLookupFunction: AsyncFunction[RawCommentEvent, Either[RawCommentEvent, CommentEvent]] =
+      new AsyncPostMappingLookupFunction(
+        postMappings.indexName,
+        postMappings.typeName,
+        nodes: _*
+      )
+
+    // try to get the post by looking up in the index
+    FlinkUtils.asyncStream(replies, cacheLookupFunction)
   }
 
   private def getCsvSourceFunctionName(filePath: String, speedupFactor: Double, randomDelay: Time): String =

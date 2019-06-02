@@ -10,7 +10,7 @@ import org.apache.flink.streaming.api.functions.co.KeyedBroadcastProcessFunction
 import org.apache.flink.streaming.api.scala.{OutputTag, createTypeInformation}
 import org.apache.flink.util.Collector
 import org.mvrs.dspa.jobs.clustering.KMeansClusterFunction
-import org.mvrs.dspa.model.{CommentEvent, RawCommentEvent}
+import org.mvrs.dspa.model.{CommentEvent, PostMapping, RawCommentEvent}
 import org.mvrs.dspa.streams.BuildReplyTreeProcessFunction._
 import org.mvrs.dspa.utils.FlinkUtils
 import org.slf4j.LoggerFactory
@@ -24,7 +24,8 @@ import scala.collection.mutable
   *
   * @param outputTagDroppedReplies optional output tag for dropped replies
   */
-class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[RawCommentEvent]])
+class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[RawCommentEvent]],
+                                    outputTagResolvedReplies: OutputTag[PostMapping])
   extends KeyedBroadcastProcessFunction[Long, CommentEvent, RawCommentEvent, CommentEvent]
     with CheckpointedFunction {
 
@@ -102,8 +103,9 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
 
     // process all replies that were waiting for this comment (recursively)
     processWaitingChildren(
-      firstLevelComment.commentId, firstLevelComment.timestamp, postId,
-      out, reportDropped(_, ctx.output(_, _)))
+      firstLevelComment.commentId, firstLevelComment.timestamp, postId, out,
+      reportDropped(_, ctx.output(_, _)),
+      emitNewlyResolved(_, ctx.output(_, _)))
 
     // advance the stored watermarks. If the minimum watermarks have advanced, then check for
     // dangling replies that can now be evicted
@@ -148,11 +150,11 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
 
         val minimumValidTimestamp = if (replyBeforeParent) Long.MaxValue else reply.timestamp
 
-        processWaitingChildren(reply.commentId, minimumValidTimestamp, postReference.postId,
-          out, reportDropped(_, ctx.output(_, _)))
+        processWaitingChildren(reply.commentId, minimumValidTimestamp, postReference.postId, out,
+          reportDropped(_, ctx.output(_, _)), emitNewlyResolved(_, ctx.output(_, _)))
 
         if (replyBeforeParent) drop(reply, reportDropped(_, ctx.output(_, _)))
-        else emit(createComment(reply, postReference.postId), out)
+        else emit(createComment(reply, postReference.postId), out, emitNewlyResolved(_, ctx.output(_, _)))
 
       case None => rememberDanglingReply(reply) // cache for later evaluation, globally in this operator/worker
     }
@@ -234,13 +236,14 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     }
   }
 
-  private def emit(resolvedReply: CommentEvent, out: Collector[CommentEvent]): Unit = {
+  private def emit(resolvedReply: CommentEvent, out: Collector[CommentEvent], emitNewlyResolved: CommentEvent => Unit): Unit = {
     // remember comment -> post mapping
     postForComment(resolvedReply.commentId) = PostReference(resolvedReply.postId, resolvedReply.timestamp)
 
     danglingReplies.remove(resolvedReply.commentId) // remove resolved replies from operator state
 
     out.collect(resolvedReply) // emit the resolved replies
+    emitNewlyResolved(resolvedReply)
 
     resolvedReplyCount.inc()
   }
@@ -256,13 +259,14 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
 
   private def processWaitingChildren(commentId: Long, earliestValidTimestamp: Long, postId: Long,
                                      collector: Collector[CommentEvent],
-                                     reportDropped: RawCommentEvent => Unit) = {
+                                     reportDropped: RawCommentEvent => Unit,
+                                     emitNewlyResolved: CommentEvent => Unit) = {
     getDescendants(commentId, earliestValidTimestamp, getWaitingReplies) match {
       case Nil => // no replies
 
       case replies => replies.foreach {
         case (reply: RawCommentEvent, valid: Boolean) =>
-          if (valid) emit(createComment(reply, postId), collector)
+          if (valid) emit(createComment(reply, postId), collector, emitNewlyResolved)
           else drop(reply, reportDropped)
       }
         danglingReplies.remove(commentId)
@@ -272,6 +276,10 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   private def reportDropped(reply: RawCommentEvent,
                             output: (OutputTag[RawCommentEvent], RawCommentEvent) => Unit): Unit =
     outputTagDroppedReplies.foreach(output(_, reply))
+
+  private def emitNewlyResolved(commentEvent: CommentEvent,
+                                output: (OutputTag[PostMapping], PostMapping) => Unit): Unit =
+    output(outputTagResolvedReplies, PostMapping(commentEvent.commentId, commentEvent.postId))
 
   private def evictDanglingReplies(minimumWatermark: Long,
                                    out: Collector[CommentEvent],

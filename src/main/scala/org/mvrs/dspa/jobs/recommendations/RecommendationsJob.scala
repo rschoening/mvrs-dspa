@@ -9,7 +9,7 @@ import org.apache.flink.streaming.api.scala._
 import org.mvrs.dspa.db.ElasticSearchIndexes
 import org.mvrs.dspa.functions.{CollectSetFunction, TimestampAssignerFunction}
 import org.mvrs.dspa.jobs.FlinkStreamingJob
-import org.mvrs.dspa.model._
+import org.mvrs.dspa.model.{PostMapping, _}
 import org.mvrs.dspa.utils.elastic.ElasticSearchNode
 import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}
 import org.mvrs.dspa.{Settings, streams}
@@ -39,6 +39,7 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
     // (re)create the indexes for post features and recommendations
     ElasticSearchIndexes.postFeatures.create()
     ElasticSearchIndexes.recommendations.create() // person-id -> List[(person-id, similarity)]
+    ElasticSearchIndexes.postMappings.create()
 
     // ---------------------------------------------------------------------------------------------
     // Pipeline 1: read post events, look up forum features, write combined post features to Kafka
@@ -70,7 +71,12 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
 
     // read input streams from Kafka
     val kafkaConsumerGroup: Option[String] = Some("recommendations")
-    val commentsStream: DataStream[CommentEvent] = streams.comments(kafkaConsumerGroup)
+    val (commentsStream: DataStream[CommentEvent], postMappings: DataStream[PostMapping]) =
+      streams.comments(
+        kafkaConsumerGroup,
+        lookupParentPostId = replies => streams.lookupParentPostId(
+          replies, ElasticSearchIndexes.postMappings, Settings.elasticSearchNodes: _*)
+      )
     val postsStream: DataStream[PostEvent] = streams.posts(kafkaConsumerGroup)
     val likesStream: DataStream[LikeEvent] = streams.likes(kafkaConsumerGroup)
 
@@ -110,6 +116,8 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
       .name("Assign timestamps to recommendations")
       .addSink(ElasticSearchIndexes.recommendations.createSink(recommendationsBatchSize))
       .name("ElasticSearch: recommendations")
+
+    postMappings.addSink(ElasticSearchIndexes.postMappings.createSink(100, Some(100)))
 
     // print progress information for any late events
     FlinkUtils.addProgressMonitor(recommendations) { case (_, progressInfo) => progressInfo.isLate }

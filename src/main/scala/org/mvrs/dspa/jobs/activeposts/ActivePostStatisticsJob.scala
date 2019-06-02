@@ -26,16 +26,21 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
     val batchSize = Settings.config.getInt("jobs.active-post-statistics.post-info-elasticsearch-batch-size")
     val stateTtl = FlinkUtils.getTtl(windowSize, Settings.config.getInt("data.speedup-factor"))
     val postInfoIndex = ElasticSearchIndexes.postInfos
+    val postMappingsIndex = ElasticSearchIndexes.postMappings
 
     // implicits
     implicit val esNodes: Seq[ElasticSearchNode] = Settings.elasticSearchNodes
 
     // (re)create ElasticSearch index for post infos
     postInfoIndex.create()
+    postMappingsIndex.create()
 
     // consume events from kafka
     val kafkaConsumerGroup = Some("active-post-statistics")
-    val commentsStream = streams.comments(kafkaConsumerGroup)
+    val (commentsStream, postMappings) = streams.comments(
+      kafkaConsumerGroup,
+      lookupParentPostId = replies => streams.lookupParentPostId(
+        replies, postMappingsIndex, Settings.elasticSearchNodes: _*))
     val postsStream = streams.posts(kafkaConsumerGroup)
     val likesStream = streams.likes(kafkaConsumerGroup)
 
@@ -67,6 +72,8 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
       Settings.config.getInt("data.kafka-replica-count").toShort,
       semantic = Semantic.EXACTLY_ONCE
     )
+
+    postMappings.addSink(postMappingsIndex.createSink(100, Some(100)))
 
     FlinkUtils.printExecutionPlan()
     FlinkUtils.printOperatorNames()
