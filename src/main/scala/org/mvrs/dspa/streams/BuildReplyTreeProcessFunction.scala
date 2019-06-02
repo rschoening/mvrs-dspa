@@ -35,7 +35,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   //   which might become too slow if many keys are active
   @transient private lazy val danglingReplies = mutable.Map[Long, mutable.Set[RawCommentEvent]]()
 
-  // TODO persist to ElasticSearch, use as cache (then no longer in operator state)
+  // TODO add timestamp to support ttl-based eviction
   @transient private lazy val postForComment: mutable.Map[Long, PostReference] = mutable.Map()
 
   @transient private var danglingRepliesListState: ListState[Map[Long, Set[RawCommentEvent]]] = _
