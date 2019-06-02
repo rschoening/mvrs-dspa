@@ -21,4 +21,5 @@ object ElasticSearchIndexes {
   val personMinHashes = new PersonMinHashIndex("mvrs-recommendation-person-minhash", nodes: _*)
   val knownPersons = new KnownUsersIndex("mvrs-recommendation-known-persons", nodes: _*)
   val lshBuckets = new PersonBucketsIndex("mvrs-recommendation-lsh-buckets", nodes: _*)
+  val postMappings = new PostMappingIndex("mvrs-post-for-comment", nodes: _*)
 }
