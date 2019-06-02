@@ -11,7 +11,7 @@ import scala.collection.JavaConverters._
 abstract class ElasticSearchIndexSink[T](indexName: String, nodes: ElasticSearchNode*)
   extends ElasticSearchIndex(indexName, nodes: _*) {
 
-  def createSink(batchSize: Int): ElasticsearchSink[T] = {
+  def createSink(batchSize: Int, bulkFlushInterval: Option[Long] = None): ElasticsearchSink[T] = {
     require(batchSize > 0, s"invalid batch size: $batchSize")
 
     val builder = new ElasticsearchSink.Builder[T](
@@ -35,6 +35,7 @@ abstract class ElasticSearchIndexSink[T](indexName: String, nodes: ElasticSearch
 
     // configuration for the bulk requests
     builder.setBulkFlushMaxActions(batchSize)
+    bulkFlushInterval.foreach(builder.setBulkFlushInterval)
 
     builder.build()
   }
