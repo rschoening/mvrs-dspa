@@ -18,10 +18,12 @@ class AsyncEnrichPostStatisticsFunction(postInfosIndexName: String, nodes: Elast
   // - simple replay function biased if event are out of order?
 
 
-  override protected def getCacheValue(input: PostStatistics, output: (PostStatistics, String, String)): PostInfos =
-    PostInfos(
-      output._2, // content
-      output._3, // forum title
+  override protected def getCacheValue(input: PostStatistics, output: (PostStatistics, String, String)): Option[PostInfos] =
+    Some(
+      PostInfos(
+        output._2, // content
+        output._3, // forum title
+      )
     )
 
   override protected def toOutput(input: PostStatistics, cachedValue: PostInfos): (PostStatistics, String, String) =

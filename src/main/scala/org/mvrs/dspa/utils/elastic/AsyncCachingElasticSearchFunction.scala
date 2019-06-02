@@ -79,9 +79,9 @@ abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: Ty
     *
     * @param input  the input element
     * @param output the output element
-    * @return the value to cache, which must be serializable
+    * @return the optional value to cache, which must be serializable
     */
-  protected def getCacheValue(input: IN, output: OUT): V
+  protected def getCacheValue(input: IN, output: OUT): Option[V]
 
   /**
     * Derives the output element based on the input element and the corresponding cached value, in case of a cache hit.
@@ -155,15 +155,17 @@ abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: Ty
     }
   }
 
-  private def unpack(response: Response[R], input: IN): Option[OUT] = {
+  private def unpack(response: Response[R], input: IN): Option[OUT] =
     unpackResponse(response, input) match {
       case result@Some(output) =>
-        cache.put(getCacheKey(input), Some(getCacheValue(input, output)), ttl)
+        getCacheValue(input, output) match {
+          case Some(value) => cache.put(getCacheKey(input), Some(value), ttl)
+          case None => // don't cache
+        }
         result
 
       case result@None =>
         if (cacheEmptyResponse) cache.put(getCacheKey(input), None, ttl)
         result
     }
-  }
 }

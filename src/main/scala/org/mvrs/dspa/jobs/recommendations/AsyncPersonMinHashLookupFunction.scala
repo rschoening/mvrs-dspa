@@ -18,9 +18,10 @@ class AsyncPersonMinHashLookupFunction(personFeaturesIndex: String, personFeatur
     *
     * @param input  the input element
     * @param output the output element
-    * @return the value to cache, which must be serializable
+    * @return the optional value to cache, which must be serializable
     */
-  override protected def getCacheValue(input: ForumEvent, output: (Long, MinHashSignature)): MinHashSignature = output._2
+  override protected def getCacheValue(input: ForumEvent, output: (Long, MinHashSignature)): Option[MinHashSignature] =
+    Some(output._2)
 
   /**
     * Derives the output element based on the input element and the corresponding cached value, in case of a cache hit.

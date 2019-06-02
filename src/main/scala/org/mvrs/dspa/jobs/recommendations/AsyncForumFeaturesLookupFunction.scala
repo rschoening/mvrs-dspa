@@ -25,7 +25,8 @@ class AsyncForumFeaturesLookupFunction(forumFeaturesIndex: String, nodes: Elasti
     * @param output the output element
     * @return the value to cache, which must be serializable
     */
-  override protected def getCacheValue(input: PostEvent, output: (PostEvent, Set[String])): Set[String] = output._2
+  override protected def getCacheValue(input: PostEvent, output: (PostEvent, Set[String])): Option[Set[String]] =
+    Some(output._2)
 
   /**
     * Derives the output element based on the input element and the corresponding cached value, in case of a cache hit.
