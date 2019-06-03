@@ -68,7 +68,15 @@ class AsyncPostMappingLookupFunction(postMappingIndex: String, postMappingType: 
                                         input: RawCommentEvent): Option[Either[RawCommentEvent, CommentEvent]] =
     response.result match {
       case r if !r.found => Some(Left(input))
-      case r@_ => Some(Right(CommentEvent(input, r.sourceAsMap("postId").asInstanceOf[Long])))
+      case r@_ =>
+        Some(
+          Right(
+            CommentEvent(
+              input,
+              r.sourceAsMap("postId").asInstanceOf[Integer].toLong // casting to Long directly fails
+            )
+          )
+        )
     }
 }
 
