@@ -13,11 +13,6 @@ import scala.concurrent.Future
 class AsyncEnrichPostStatisticsFunction(postInfosIndexName: String, nodes: ElasticSearchNode*)
   extends AsyncCachingElasticSearchFunction[PostStatistics, (PostStatistics, String, String), PostInfos, SearchResponse](_.postId.toString, nodes) {
 
-  // TODO investigate slower-than-expected ingress rate in elasticsearch
-  // - backpressure from elasticsearch?
-  // - simple replay function biased if event are out of order?
-
-
   override protected def getCacheValue(input: PostStatistics, output: (PostStatistics, String, String)): Option[PostInfos] =
     Some(
       PostInfos(
@@ -62,6 +57,9 @@ class AsyncEnrichPostStatisticsFunction(postInfosIndexName: String, nodes: Elast
   }
 }
 
+/**
+  * Companion object
+  */
 object AsyncEnrichPostStatisticsFunction {
 
   case class PostInfos(content: String, forumTitle: String)

@@ -249,7 +249,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   }
 
   private def drop(reply: RawCommentEvent, report: RawCommentEvent => Unit): Unit = {
-    // NOTE all replies waiting for this must have been processed FIRSTs
+    // NOTE all replies waiting for this must have been processed FIRST
     postForComment(reply.commentId) = PostReference(Long.MinValue, Long.MaxValue)
 
     danglingReplies.remove(reply.commentId)
@@ -260,7 +260,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   private def processWaitingChildren(commentId: Long, earliestValidTimestamp: Long, postId: Long,
                                      collector: Collector[CommentEvent],
                                      reportDropped: RawCommentEvent => Unit,
-                                     emitNewlyResolved: CommentEvent => Unit) = {
+                                     emitNewlyResolved: CommentEvent => Unit): Unit = {
     getDescendants(commentId, earliestValidTimestamp, getWaitingReplies) match {
       case Nil => // no replies
 
@@ -332,6 +332,9 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   private def debug(msg: => String): Unit = if (LOG.isDebugEnabled) LOG.debug(msg)
 }
 
+/**
+  * Companion object
+  */
 object BuildReplyTreeProcessFunction {
 
   def getWithChildren(replies: Iterable[RawCommentEvent],
