@@ -280,8 +280,8 @@ package object streams {
 
     val repliesBroadcast =
       lookupResults
-        .filter(_.isLeft)
-        .map(_.left.get)
+        .filter(_.isLeft).name("Filter: unresolved replies")
+        .map(_.left.get).name("Map -> RawCommentEvent")
         .broadcast()
 
     val outputTagDroppedReplies = new OutputTag[RawCommentEvent]("dropped replies")
@@ -291,8 +291,9 @@ package object streams {
       firstLevelComments
         .union(
           lookupResults
-            .filter(_.isRight)
-            .map(_.right.get))
+            .filter(_.isRight).name("Filter: resolved replies")
+            .map(_.right.get).name("Map -> CommentEvent")
+        )
 
     val rootedComments: DataStream[CommentEvent] =
       allResolvedComments
@@ -322,7 +323,9 @@ package object streams {
       )
 
     // try to get the post by looking up in the index
-    FlinkUtils.asyncStream(replies, cacheLookupFunction)
+    FlinkUtils
+      .asyncStream(replies, cacheLookupFunction)
+      .name("Async I/O: look up post for comment")
   }
 
   private def getCsvSourceFunctionName(filePath: String, speedupFactor: Double, randomDelay: Time): String =
