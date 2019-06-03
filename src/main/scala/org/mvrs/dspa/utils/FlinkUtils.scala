@@ -18,6 +18,7 @@ import org.apache.flink.streaming.api.datastream.{AsyncDataStream, DataStreamSin
 import org.apache.flink.streaming.api.functions.AssignerWithPeriodicWatermarks
 import org.apache.flink.streaming.api.functions.async.AsyncFunction
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor
+import org.apache.flink.streaming.api.graph.StreamNode
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer.Semantic
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner
@@ -410,7 +411,7 @@ object FlinkUtils {
     * @param env The stream execution environment
     */
   def printOperatorNames()(implicit env: StreamExecutionEnvironment): Unit = {
-    env.getStreamGraph.getStreamNodes.iterator().asScala.toList match {
+    getStreamNodes match {
       case Nil => println("no operators")
       case nodes =>
         val idTitle = "id"
@@ -434,6 +435,7 @@ object FlinkUtils {
               s"| ${op.getOperatorName}"
           )
         )
+
         println(sep)
     }
   }
@@ -444,12 +446,14 @@ object FlinkUtils {
     * @param env The stream execution environment
     **/
   def assertNoUndefinedOperatorUids()(implicit env: StreamExecutionEnvironment): Unit =
-    env.getStreamGraph.getStreamNodes.iterator().asScala
-      .foreach(
-        op => assert(
-          op.getTransformationUID != null,
-          s"no uid defined for operator ${op.getOperatorName} (${op.getId})"
-        )
+    getStreamNodes.foreach(
+      op => assert(
+        op.getTransformationUID != null,
+        s"no uid defined for operator ${op.getOperatorName} (${op.getId})"
       )
+    )
+
+  private def getStreamNodes()(implicit env: StreamExecutionEnvironment): List[StreamNode] =
+    env.getStreamGraph.getStreamNodes.iterator().asScala.toList
 
 }
