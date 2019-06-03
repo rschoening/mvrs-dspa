@@ -407,32 +407,41 @@ object FlinkUtils {
     * Print operator names, ids and uids for the entire stream graph. Can be called prior to executing a graph
     * to review the defined operator names and uids
     *
-    * @env: The stream execution environment
+    * @param env The stream execution environment
     */
   def printOperatorNames()(implicit env: StreamExecutionEnvironment): Unit = {
-    val idPadding = 6
-    val uidPadding = 40
-    val sep = "-" * 160
+    env.getStreamGraph.getStreamNodes.iterator().asScala.toList match {
+      case Nil => println("no operators")
+      case nodes =>
+        val idTitle = "id"
+        val uidTitle = "operator uid"
+        val opName = "operator name"
 
-    println(sep)
-    println(" id".padTo(idPadding, ' ') + "| operator uid".padTo(uidPadding, ' ') + "| operator name")
-    println(sep)
+        val idLength = (idTitle :: nodes.map(_.getId.toString)).map(_.length).max
+        val uidLength = (uidTitle :: nodes.map(n => Option(n.getTransformationUID).getOrElse(" "))).map(_.length).max
+        val nameLength = (opName :: nodes.map(n => Option(n.getOperatorName).getOrElse(" "))).map(_.length).max
 
-    env.getStreamGraph.getStreamNodes.iterator().asScala
-      .foreach(
-        op => println(
-          s" ${op.getId}".padTo(idPadding, ' ') +
-            s"| ${Option(op.getTransformationUID).getOrElse("-")}".padTo(uidPadding, ' ') +
-            s"| ${op.getOperatorName}"
+        val sep = "-" * (idLength + uidLength + nameLength + 7)
+
+        println(sep)
+        println((" " + idTitle).padTo(idLength + 2, ' ') + "| " + uidTitle.padTo(uidLength + 1, ' ') + "| " + opName)
+        println(sep)
+
+        nodes.foreach(
+          op => println(
+            s" ${op.getId}".padTo(idLength + 2, ' ') +
+              s"| ${Option(op.getTransformationUID).getOrElse("-")}".padTo(uidLength + 3, ' ') +
+              s"| ${op.getOperatorName}"
+          )
         )
-      )
-    println(sep)
+        println(sep)
+    }
   }
 
   /**
     * Asserts that all operators have defined uids (important to ensure compatible savepoints after code changes)
     *
-    * @env: The stream execution environment
+    * @param env The stream execution environment
     **/
   def assertNoUndefinedOperatorUids()(implicit env: StreamExecutionEnvironment): Unit =
     env.getStreamGraph.getStreamNodes.iterator().asScala
