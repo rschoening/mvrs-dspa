@@ -18,8 +18,9 @@ import scala.concurrent.Future
   */
 class AsyncPostMappingLookupFunction(postMappingIndex: String, postMappingType: String, nodes: ElasticSearchNode*)
   extends AsyncCachingElasticSearchFunction[RawCommentEvent, Either[RawCommentEvent, CommentEvent], Long, GetResponse](
-    _.commentId.toString, nodes, cacheEmptyResponse = false) {
-
+    _.replyToCommentId.get.toString,
+    nodes,
+    cacheEmptyResponse = false) {
 
   /**
     * Derives the value to cache based on the input element and retrieved output element, in case of a cache miss.
@@ -53,7 +54,7 @@ class AsyncPostMappingLookupFunction(postMappingIndex: String, postMappingType: 
     */
   override protected def executeQuery(client: ElasticClient, input: RawCommentEvent): Future[Response[GetResponse]] =
     client.execute {
-      get(input.toString) from postMappingIndex / postMappingType
+      get(input.replyToCommentId.get.toString) from postMappingIndex / postMappingType
     }
 
   /**
