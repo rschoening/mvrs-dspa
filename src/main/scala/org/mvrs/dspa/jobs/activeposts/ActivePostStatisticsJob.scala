@@ -73,7 +73,9 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
       semantic = Semantic.EXACTLY_ONCE
     )
 
-    postMappings.addSink(postMappingsIndex.createSink(100, Some(100)))
+    postMappings
+      .addSink(postMappingsIndex.createSink(100, Some(100)))
+      .name(s"ElasticSearch: ${postMappingsIndex.indexName}")
 
     FlinkUtils.printExecutionPlan()
     FlinkUtils.printOperatorNames()
