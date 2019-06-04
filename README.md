@@ -1,15 +1,15 @@
 # [DSPA 2019](https://www.systems.ethz.ch/node/1413) Semester project solution
 
-The project implements three stream analysis tasks in the backend of a hypothetical social network, using [Apache Flink](https://flink.apache.org/), with events read from [Apache Kafka](https://kafka.apache.org/), storing results in [ElasticSearch](https://www.elastic.co/products/elasticsearch) and displaying them in [Kibana](https://www.elastic.co/products/kibana) dashboards. Implemented with [Scala](https://www.scala-lang.org/).
+The project implements three stream analysis tasks in the backend of a hypothetical social network, using [Apache Flink](https://flink.apache.org/), with events read from [Apache Kafka](https://kafka.apache.org/), storing results in [ElasticSearch](https://www.elastic.co/products/elasticsearch) and displaying them in [Kibana](https://www.elastic.co/products/kibana) dashboards. Written in Scala.
 ### Active post statistics using a space-optimized custom window
-<img src="https://raw.githubusercontent.com/rschoening/mvrs-dspa/master/doc/images/poststatistics-sketch.png" width="43%" style="padding-right:15px">&nbsp;<img src="https://raw.githubusercontent.com/rschoening/mvrs-dspa/master/doc/images/kibana-dashboard-activeposts.png" width="50%">
+<img src="https://raw.githubusercontent.com/rschoening/mvrs-dspa/master/doc/images/poststatistics-sketch.png" width="45%" style="padding-right:15px">&nbsp;<img src="https://raw.githubusercontent.com/rschoening/mvrs-dspa/master/doc/images/kibana-dashboard-activeposts.png" width="52%">
 
 ### Friend recommendation using LSH (Locality Sensitive Hashing)
 Based on [Mining of Massive Datasets](http://infolab.stanford.edu/~ullman/mmds/book.pdf) (Leskovec, Rajaraman, Ullman), and using Twitter's [algebird](https://github.com/twitter/algebird) library.<p>
-<img src="https://raw.githubusercontent.com/rschoening/mvrs-dspa/master/doc/images/recommendations-sketch.png" width="43%" style="padding-right:15px">&nbsp;<img src="https://raw.githubusercontent.com/rschoening/mvrs-dspa/master/doc/images/kibana-dashboard-recommendations-2.png" width="50%">
+<img src="https://raw.githubusercontent.com/rschoening/mvrs-dspa/master/doc/images/recommendations-sketch.png" width="45%" style="padding-right:15px">&nbsp;<img src="https://raw.githubusercontent.com/rschoening/mvrs-dspa/master/doc/images/kibana-dashboard-recommendations-2.png" width="52%">
 ### Unusual activity detection
 This uses a streaming K-Means implementation, even if an unsupervised approach is probably not adequate for detecting unusual behaviour. But with the randomly generated test data, trying to select the best model for the task seemed not worthwhile. On the other hand, K-Means provided a simple enough example to explore the mechanisms for both training and inference of a ML model on streams.<p> 
-<img src="https://raw.githubusercontent.com/rschoening/mvrs-dspa/master/doc/images/unusual-activity-sketch.png" width="43%" style="padding-right:15px">&nbsp;<img src="https://raw.githubusercontent.com/rschoening/mvrs-dspa/master/doc/images/kibana-dashboard-clustering.png" width="50%">
+<img src="https://raw.githubusercontent.com/rschoening/mvrs-dspa/master/doc/images/unusual-activity-sketch.png" width="45%" style="padding-right:15px">&nbsp;<img src="https://raw.githubusercontent.com/rschoening/mvrs-dspa/master/doc/images/kibana-dashboard-clustering.png" width="52%">
 
 ## Setup overview (details below)
 1. `git clone https://github.com/rschoening/mvrs-dspa.git`
@@ -312,3 +312,16 @@ The following two jobs must have been run prior to running any of the analytics 
 
 ## Troubleshooting
 * Some possible problems and solutions are listed [here](https://github.com/rschoening/mvrs-dspa/blob/master/doc/Troubleshooting.md)
+
+## Libraries
+* [algebird](https://github.com/twitter/algebird)
+* [elastic4s](https://github.com/sksamuel/elastic4s)
+* [avro4s](https://github.com/sksamuel/avro4s)
+* [kantan.csv](https://nrinaudo.github.io/kantan.csv/)
+* [scalatest](http://www.scalatest.org/)
+* [lightbend config](https://github.com/lightbend/config)
+* [google guava](https://github.com/google/guava)
+* [read typeclass](https://github.com/ChristopherDavenport/read)
+* [scalacache](https://github.com/cb372/scalacache)
+* [caffeine](https://github.com/ben-manes/caffeine)
+
