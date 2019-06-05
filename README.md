@@ -275,7 +275,7 @@ The following two jobs must have been run prior to running any of the analytics 
 
 ### Configuration
 * `mvrs-dspa/src/main/resources/application.conf`
-  * Based on https://github.com/lightbend/config/blob/master/README.md
+  * Based on https://github.com/lightbend/config
   * Settings are documented in the file
   * Settings can be overridden at runtime using various mechanisms (see https://github.com/lightbend/config/blob/master/README.md#overview) 
 
