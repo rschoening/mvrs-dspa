@@ -84,6 +84,14 @@ abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: Ty
   protected def getCacheValue(input: IN, output: OUT): Option[V]
 
   /**
+    * Give the subclass a chance to directly derive the output from the input
+    *
+    * @param input the input element
+    * @return the output element to emit if direct conversion is possible, otherwise None
+    */
+  protected def toOutput(input: IN): Option[OUT] = None
+
+  /**
     * Derives the output element based on the input element and the corresponding cached value, in case of a cache hit.
     *
     * @param input       the input element
@@ -110,31 +118,38 @@ abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: Ty
     */
   protected def unpackResponse(response: Response[R], input: IN): Option[OUT]
 
-  final override def asyncInvoke(client: ElasticClient,
-                                 input: IN,
-                                 resultFuture: ResultFuture[OUT]): Unit =
-    cache.get(getCacheKey(input)) match {
-      case Some(value) => // cache hit
-        cacheHits.inc()
-        cacheHitsPerSecond.markEvent()
+  override def asyncInvoke(client: ElasticClient,
+                           input: IN,
+                           resultFuture: ResultFuture[OUT]): Unit =
+    toOutput(input) match {
+      case Some(output) => // direct conversion possible: add to cache and complete the future
+        cache.put(getCacheKey(input), getCacheValue(input, output), ttl)
+        resultFuture.complete(List(output).asJava)
 
-        resultFuture.complete(
-          value.map(v => List(toOutput(input, v)))
-            .getOrElse(Nil)
-            .asJava)
+      case None => // no direct conversion possible; try to get from cache, else execute the query
+        cache.get(getCacheKey(input)) match {
+          case Some(value) => // cache hit
+            cacheHits.inc()
+            cacheHitsPerSecond.markEvent()
 
-      case None => // cache miss
-        cacheMisses.inc()
-        cacheMissesPerSecond.markEvent()
+            resultFuture.complete(
+              value.map(v => List(toOutput(input, v)))
+                .getOrElse(Nil)
+                .asJava)
 
-        executeQuery(client, input).onComplete {
-          case Success(response) => resultFuture.complete(
-            unpack(response, input)
-              .map(List(_))
-              .getOrElse(Nil)
-              .asJava)
+          case None => // cache miss
+            cacheMisses.inc()
+            cacheMissesPerSecond.markEvent()
 
-          case Failure(exception) => resultFuture.completeExceptionally(exception)
+            executeQuery(client, input).onComplete {
+              case Success(response) => resultFuture.complete(
+                unpack(response, input)
+                  .map(List(_))
+                  .getOrElse(Nil)
+                  .asJava)
+
+              case Failure(exception) => resultFuture.completeExceptionally(exception)
+            }
         }
     }
 

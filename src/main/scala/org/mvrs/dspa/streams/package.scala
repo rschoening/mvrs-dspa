@@ -51,8 +51,8 @@ package object streams {
     */
   def comments(kafkaConsumerGroup: Option[String] = None,
                speedupFactorOverride: Option[Double] = None,
-               lookupParentPostId: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]],
-               postMappingTtl: Option[Time])
+               lookupParentPostId: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]] = noOpPreResolve,
+               postMappingTtl: Option[Time] = None)
               (implicit env: StreamExecutionEnvironment): (DataStream[CommentEvent], DataStream[PostMapping]) =
     kafkaConsumerGroup.map(
       commentsFromKafka(
@@ -161,12 +161,12 @@ package object streams {
                       speedupFactor: Double = 0,
                       randomDelay: Time = Time.milliseconds(0),
                       watermarkInterval: Long = 10000,
-                      lookupParentPostId: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]],
-                      postMappingTtl: Option[Time])
+                      preResolve: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]] = noOpPreResolve,
+                      postMappingTtl: Option[Time] = None)
                      (implicit env: StreamExecutionEnvironment): (DataStream[CommentEvent], DataStream[PostMapping]) = {
     resolveReplyTree(
       rawCommentsFromCsv(filePath, speedupFactor, randomDelay, watermarkInterval),
-      lookupParentPostId = lookupParentPostId,
+      preResolve = preResolve,
       postMappingTtl = postMappingTtl
     )
   }
@@ -220,12 +220,12 @@ package object streams {
   def commentsFromKafka(consumerGroup: String,
                         speedupFactor: Double = 0,
                         maxOutOfOrderness: Time = Time.milliseconds(0),
-                        lookupParentPostId: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]],
-                        postMappingTtl: Option[Time])
+                        preResolve: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]] = noOpPreResolve,
+                        postMappingTtl: Option[Time] = None)
                        (implicit env: StreamExecutionEnvironment): (DataStream[CommentEvent], DataStream[PostMapping]) =
     resolveReplyTree(
       fromKafka(KafkaTopics.comments, consumerGroup, _.timestamp, speedupFactor, maxOutOfOrderness),
-      lookupParentPostId = lookupParentPostId,
+      preResolve = preResolve,
       postMappingTtl = postMappingTtl
     )
 
@@ -248,10 +248,10 @@ package object streams {
     fromKafka(KafkaTopics.likes, consumerGroup, _.timestamp, speedupFactor, maxOutOfOrderness)
 
   def resolveReplyTree(rawComments: DataStream[RawCommentEvent],
-                       lookupParentPostId: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]],
+                       preResolve: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]],
                        postMappingTtl: Option[Time]):
   (DataStream[CommentEvent], DataStream[PostMapping]) =
-    resolveReplyTree(rawComments, droppedRepliesStream = false, lookupParentPostId, postMappingTtl) match {
+    resolveReplyTree(rawComments, droppedRepliesStream = false, preResolve, postMappingTtl) match {
       case (commentEvents, _, newPostMappings) => (commentEvents, newPostMappings)
     }
 
@@ -270,42 +270,28 @@ package object streams {
     */
   def resolveReplyTree(rawComments: DataStream[RawCommentEvent],
                        droppedRepliesStream: Boolean,
-                       lookupParentPostId: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]],
-                       postMappingTtl: Option[Time]):
+                       preResolve: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]] = noOpPreResolve,
+                       postMappingTtl: Option[Time] = None):
   (DataStream[CommentEvent], DataStream[RawCommentEvent], DataStream[PostMapping]) = {
-    val firstLevelComments =
-      rawComments
-        .filter(_.replyToPostId.isDefined).name("Filter: first-level comments")
-        .map(c => new CommentEvent(c, c.replyToPostId.get))
-        .name("Map -> CommentEvent")
-        .keyBy(_.postId)
-
-    val replies =
-      rawComments
-        .filter(_.replyToPostId.isEmpty)
-        .name("Filter: replies")
-
-    val lookupResults: DataStream[Either[RawCommentEvent, CommentEvent]] = lookupParentPostId(replies)
+    // try to resolve post mappings based on individual comments
+    val preResolved: DataStream[Either[RawCommentEvent, CommentEvent]] = preResolve(rawComments)
 
     val repliesBroadcast =
-      lookupResults
+      preResolved
         .filter(_.isLeft).name("Filter: unresolved replies")
         .map(_.left.get).name("Map -> RawCommentEvent")
         .broadcast()
 
+    val resolvedComments =
+      preResolved
+        .filter(_.isRight).name("Filter: resolved replies")
+        .map(_.right.get).name("Map -> CommentEvent")
+
     val outputTagDroppedReplies = new OutputTag[RawCommentEvent]("dropped replies")
     val outputTagNewPostMappings = new OutputTag[PostMapping](id = "newly resolved comments")
 
-    val allResolvedComments =
-      firstLevelComments
-        .union(
-          lookupResults
-            .filter(_.isRight).name("Filter: resolved replies")
-            .map(_.right.get).name("Map -> CommentEvent")
-        )
-
     val rootedComments: DataStream[CommentEvent] =
-      allResolvedComments
+      resolvedComments
         .keyBy(_.postId)
         .connect(repliesBroadcast)
         .process(new BuildReplyTreeProcessFunction(
@@ -314,13 +300,20 @@ package object streams {
           postMappingTtl))
         .name("Reconstruct reply tree")
 
-    // emit NEWLY resolved replies on side output --> sink to mapping index
-
     val droppedReplies = rootedComments.getSideOutput(outputTagDroppedReplies)
-    val newPostMappings: DataStream[PostMapping] = rootedComments.getSideOutput(outputTagNewPostMappings)
+
+    // emit NEWLY resolved replies on side output --> sink to mapping index
+    val newPostMappings: DataStream[PostMapping] =
+      rootedComments.getSideOutput(outputTagNewPostMappings)
 
     (rootedComments, droppedReplies, newPostMappings)
   }
+
+  def noOpPreResolve(stream: DataStream[RawCommentEvent]): DataStream[Either[RawCommentEvent, CommentEvent]] =
+    stream.map(raw => raw.replyToPostId match {
+      case Some(postId) => Right(CommentEvent(raw, postId))
+      case None => Left(raw)
+    })
 
   def lookupParentPostId(replies: DataStream[RawCommentEvent],
                          postMappings: ElasticSearchIndex,

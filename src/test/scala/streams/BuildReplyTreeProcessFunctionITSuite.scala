@@ -252,9 +252,7 @@ class BuildReplyTreeProcessFunctionITSuite extends AbstractTestBase {
 
     val (rootedStream, droppedStream, mappingsStream) =
       streams.resolveReplyTree(stream,
-        droppedRepliesStream = true,
-        lookupParentPostId = replies => replies.map(Left(_)),
-        postMappingTtl = None
+        droppedRepliesStream = true
       )
 
     mappingsStream.print()

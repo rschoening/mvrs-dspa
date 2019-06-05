@@ -5,6 +5,7 @@ import com.sksamuel.elastic4s.http.get.GetResponse
 import com.sksamuel.elastic4s.http.{ElasticClient, Response}
 import org.apache.flink.api.scala._
 import org.mvrs.dspa.model.{CommentEvent, RawCommentEvent}
+import org.mvrs.dspa.streams.AsyncPostMappingLookupFunction._
 import org.mvrs.dspa.utils.elastic.{AsyncCachingElasticSearchFunction, ElasticSearchNode}
 
 import scala.concurrent.Future
@@ -18,9 +19,7 @@ import scala.concurrent.Future
   */
 class AsyncPostMappingLookupFunction(postMappingIndex: String, postMappingType: String, nodes: ElasticSearchNode*)
   extends AsyncCachingElasticSearchFunction[RawCommentEvent, Either[RawCommentEvent, CommentEvent], Long, GetResponse](
-    _.replyToCommentId.get.toString,
-    nodes,
-    cacheEmptyResponse = false) {
+    getCacheKey, nodes, cacheEmptyResponse = false) {
 
   /**
     * Derives the value to cache based on the input element and retrieved output element, in case of a cache miss.
@@ -33,6 +32,18 @@ class AsyncPostMappingLookupFunction(postMappingIndex: String, postMappingType: 
     output match {
       case Left(_) => None
       case Right(commentEvent) => Some(commentEvent.postId)
+    }
+
+  /**
+    * If the comment is a reply, return None (cache hit or query required)
+    *
+    * @param input the input element
+    * @return the output element to emit if direct conversion is possible, otherwise None
+    */
+  override protected def toOutput(input: RawCommentEvent): Option[Either[RawCommentEvent, CommentEvent]] =
+    input.replyToPostId match {
+      case Some(postId) => Some(Right(CommentEvent(input, postId)))
+      case None => None
     }
 
   /**
@@ -78,6 +89,23 @@ class AsyncPostMappingLookupFunction(postMappingIndex: String, postMappingType: 
           )
         )
     }
+}
+
+/**
+  * Companion object
+  */
+object AsyncPostMappingLookupFunction {
+  /**
+    * Get the cache key for the raw comment
+    *
+    * @param input The raw comment event
+    * @return parent comment id for replies, comment id of first-level comments
+    */
+  def getCacheKey(input: RawCommentEvent): String =
+    (input.replyToCommentId match {
+      case Some(parentCommentId) => parentCommentId
+      case None => input.commentId
+    }).toString
 }
 
 
