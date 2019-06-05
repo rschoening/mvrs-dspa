@@ -48,6 +48,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
     val speedupFactor = Settings.config.getInt("data.speedup-factor")
     val classifiedEventsBatchSize = Settings.config.getInt("jobs.activity-detection.classified-events-elasticsearch-batch-size")
     val clusterMetadataBatchSize = Settings.config.getInt("jobs.activity-detection.cluster-metadata-elasticsearch-batch-size")
+    val postMappingTtl = Settings.duration("jobs.post-mapping-ttl")
 
     // implicits
     implicit val esNodes: Seq[ElasticSearchNode] = Settings.elasticSearchNodes
@@ -63,7 +64,8 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
       streams.comments(
         kafkaConsumerGroup,
         lookupParentPostId = replies => streams.lookupParentPostId(
-          replies, ElasticSearchIndexes.postMappings, Settings.elasticSearchNodes: _*)
+          replies, ElasticSearchIndexes.postMappings, Settings.elasticSearchNodes: _*),
+        postMappingTtl = Some(postMappingTtl)
       )
 
     val posts: DataStream[PostEvent] = streams.posts(kafkaConsumerGroup)

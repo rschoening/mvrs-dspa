@@ -153,7 +153,8 @@ class InputStreamsITSuite extends AbstractTestBase {
       .commentsFromCsv(
         TestUtils.getResourceURIPath("/streams/comments.csv"),
         10000000,
-        lookupParentPostId = replies => replies.map(Left(_))
+        lookupParentPostId = replies => replies.map(Left(_)),
+        postMappingTtl = None
       )._1
       .map(e => (e.postId, 1))
       .keyBy(_._1)
@@ -190,7 +191,8 @@ class InputStreamsITSuite extends AbstractTestBase {
     streams
       .commentsFromCsv(
         TestUtils.getResourceURIPath("/streams/comments.csv"),
-        lookupParentPostId = replies => replies.map(Left(_))
+        lookupParentPostId = replies => replies.map(Left(_)),
+        postMappingTtl = None
       )._1
       .map(e => (e.postId, 1))
       .addSink(new CounterSink[(Long, Int)])
@@ -229,7 +231,8 @@ class InputStreamsITSuite extends AbstractTestBase {
     streams
       .commentsFromCsv(
         TestUtils.getResourceURIPath("/streams/comments.csv"), watermarkInterval = 100,
-        lookupParentPostId = replies => replies.map(Left(_))
+        lookupParentPostId = replies => replies.map(Left(_)),
+        postMappingTtl = None
       )._1
       .map(e => (e.commentId, 1))
       .addSink(new CollectionSink())

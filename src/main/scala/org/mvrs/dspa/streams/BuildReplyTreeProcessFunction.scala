@@ -1,6 +1,7 @@
 package org.mvrs.dspa.streams
 
 import org.apache.flink.api.common.state.{ListState, ListStateDescriptor}
+import org.apache.flink.api.common.time.Time
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.dropwizard.metrics.DropwizardHistogramWrapper
 import org.apache.flink.metrics.{Counter, Gauge}
@@ -25,7 +26,8 @@ import scala.collection.mutable
   * @param outputTagDroppedReplies optional output tag for dropped replies
   */
 class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[RawCommentEvent]],
-                                    outputTagResolvedReplies: OutputTag[PostMapping])
+                                    outputTagResolvedReplies: OutputTag[PostMapping],
+                                    postMappingTtl: Option[Time] = None)
   extends KeyedBroadcastProcessFunction[Long, CommentEvent, RawCommentEvent, CommentEvent]
     with CheckpointedFunction {
 
@@ -34,8 +36,6 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   //   An alternative would be the use of applyToKeyedState(), however this processes all keyed states in sequence,
   //   which might become too slow if many keys are active
   @transient private lazy val danglingReplies = mutable.Map[Long, mutable.Set[RawCommentEvent]]()
-
-  // TODO add timestamp to support ttl-based eviction
   @transient private lazy val postForComment: mutable.Map[Long, PostReference] = mutable.Map()
 
   @transient private var danglingRepliesListState: ListState[Map[Long, Set[RawCommentEvent]]] = _
@@ -46,6 +46,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
   @transient private var droppedReplyCount: Counter = _
   @transient private var danglingRepliesCount: Gauge[Int] = _
   @transient private var cacheProcessingTime: Gauge[Long] = _
+  @transient private var postMappingsCount: Gauge[Int] = _
   @transient private var cacheProcessingCount: Counter = _
 
   @transient private var danglingRepliesHistogram: DropwizardHistogramWrapper = _
@@ -74,6 +75,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
 
     danglingRepliesCount = FlinkUtils.gaugeMetric("danglingRepliesCount", group, () => danglingReplies.size)
     cacheProcessingTime = FlinkUtils.gaugeMetric("cacheProcessingTime", group, () => lastCacheProcessingTime)
+    postMappingsCount = FlinkUtils.gaugeMetric("postMappingsCount", group, () => postForComment.size)
 
     danglingRepliesHistogram = FlinkUtils.histogramMetric("danglingRepliesHistogram", group)
     cacheProcessingTimeHistogram = FlinkUtils.histogramMetric("cacheProcessingTimeHistogram", group)
@@ -97,7 +99,7 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     // consider storing it in ElasticSearch, with a LRU cache maintained in the operator
     // NOTE how to deal with cache misses? Must be in this operator, however access to ElasticSearch
     // should be non-blocking
-    postForComment(firstLevelComment.commentId) = PostReference(postId, firstLevelComment.timestamp)
+    postForComment(firstLevelComment.commentId) = PostReference(postId, firstLevelComment.timestamp, System.currentTimeMillis())
 
     out.collect(firstLevelComment)
 
@@ -188,6 +190,8 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     danglingRepliesListState.clear()
     danglingRepliesListState.add(danglingReplies.map(t => (t._1, t._2.toSet)).toMap)
 
+    postMappingTtl.foreach(applyPostMappingTtl)
+
     postForCommentListState.clear()
     postForCommentListState.add(postForComment.toMap)
   }
@@ -236,9 +240,15 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
     }
   }
 
+  private def applyPostMappingTtl(ttl: Time): Unit =
+    postForComment.retain((_, r) => r.addedProcTimestamp > System.currentTimeMillis() - ttl.toMilliseconds)
+
   private def emit(resolvedReply: CommentEvent, out: Collector[CommentEvent], emitNewlyResolved: CommentEvent => Unit): Unit = {
     // remember comment -> post mapping
-    postForComment(resolvedReply.commentId) = PostReference(resolvedReply.postId, resolvedReply.timestamp)
+    postForComment(resolvedReply.commentId) = PostReference(
+      resolvedReply.postId,
+      resolvedReply.timestamp,
+      System.currentTimeMillis())
 
     danglingReplies.remove(resolvedReply.commentId) // remove resolved replies from operator state
 
@@ -250,7 +260,10 @@ class BuildReplyTreeProcessFunction(outputTagDroppedReplies: Option[OutputTag[Ra
 
   private def drop(reply: RawCommentEvent, report: RawCommentEvent => Unit): Unit = {
     // NOTE all replies waiting for this must have been processed FIRST
-    postForComment(reply.commentId) = PostReference(Long.MinValue, Long.MaxValue)
+    postForComment(reply.commentId) = PostReference(
+      Long.MinValue,
+      Long.MaxValue,
+      System.currentTimeMillis())
 
     danglingReplies.remove(reply.commentId)
     report(reply)
@@ -400,6 +413,6 @@ object BuildReplyTreeProcessFunction {
       c.replyToCommentId,
       c.placeId)
 
-  case class PostReference(postId: Long, commentTimestamp: Long)
+  case class PostReference(postId: Long, commentTimestamp: Long, addedProcTimestamp: Long)
 
 }

@@ -31,6 +31,7 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
     val minRecommendationSimilarity = Settings.config.getInt("jobs.recommendation.min-recommendation-similarity")
     val postFeaturesBatchSize = Settings.config.getInt("jobs.recommendation.post-features-elasticsearch-batch-size")
     val recommendationsBatchSize = Settings.config.getInt("jobs.recommendation.recommendations-elasticsearch-batch-size")
+    val postMappingTtl = Settings.duration("jobs.post-mapping-ttl")
 
     // implicit values
     implicit val esNodes: Seq[ElasticSearchNode] = Settings.elasticSearchNodes
@@ -75,7 +76,8 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
       streams.comments(
         kafkaConsumerGroup,
         lookupParentPostId = replies => streams.lookupParentPostId(
-          replies, ElasticSearchIndexes.postMappings, Settings.elasticSearchNodes: _*)
+          replies, ElasticSearchIndexes.postMappings, Settings.elasticSearchNodes: _*),
+        postMappingTtl = Some(postMappingTtl)
       )
     val postsStream: DataStream[PostEvent] = streams.posts(kafkaConsumerGroup)
     val likesStream: DataStream[LikeEvent] = streams.likes(kafkaConsumerGroup)

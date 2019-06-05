@@ -20,7 +20,8 @@ object ReadCommentEventsFromKafkaJob extends FlinkStreamingJob(enableGenericType
         "testConsumer",
         0,
         Time.minutes(0),
-        lookupParentPostId = replies => replies.map(Left(_)))._1
+        lookupParentPostId = replies => replies.map(Left(_)),
+        None)._1
       .startNewChain()
       .process(new ProgressMonitorFunction[CommentEvent]())
       .map(_._2)
