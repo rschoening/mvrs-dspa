@@ -30,6 +30,7 @@ object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob(ena
       .name(s"ElasticSearch: ${esIndex.indexName}")
 
     FlinkUtils.printExecutionPlan()
+    FlinkUtils.printOperatorNames()
 
     // print complete progress information for the statistics for a popular post (943850)
     // - if data.random-delay (in application.conf) is < than the slide of the post statistics window, there should
