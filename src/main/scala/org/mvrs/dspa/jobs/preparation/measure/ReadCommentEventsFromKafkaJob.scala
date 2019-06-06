@@ -19,7 +19,7 @@ object ReadCommentEventsFromKafkaJob extends FlinkStreamingJob(enableGenericType
       .commentsFromKafka(
         "testConsumer",
         0,
-        Time.minutes(0))._1
+        Time.minutes(0))
       .startNewChain()
       .process(new ProgressMonitorFunction[CommentEvent]())
       .map(_._2)

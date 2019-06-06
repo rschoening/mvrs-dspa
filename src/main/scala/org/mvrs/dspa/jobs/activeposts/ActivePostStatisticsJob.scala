@@ -39,7 +39,7 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
 
     // consume events from kafka
     val kafkaConsumerGroup = Some("active-post-statistics")
-    val (commentsStream, postMappings) = streams.comments(
+    val commentsStream = streams.comments(
       kafkaConsumerGroup,
       lookupParentPostId = replies => streams.lookupParentPostId(
         replies, postMappingsIndex, Settings.elasticSearchNodes: _*
@@ -79,7 +79,9 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
       semantic = Semantic.EXACTLY_ONCE
     )
 
-    postMappings
+    commentsStream
+      .map(c => PostMapping(c.commentId, c.postId))
+      .name("Map -> PostMapping")
       .addSink(postMappingsIndex.createSink(100, Some(100)))
       .name(s"ElasticSearch: ${postMappingsIndex.indexName}")
 

@@ -53,7 +53,7 @@ package object streams {
                speedupFactorOverride: Option[Double] = None,
                lookupParentPostId: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]] = noOpPreResolve,
                postMappingTtl: Option[Time] = None)
-              (implicit env: StreamExecutionEnvironment): (DataStream[CommentEvent], DataStream[PostMapping]) =
+              (implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] =
     kafkaConsumerGroup.map(
       commentsFromKafka(
         _,
@@ -163,13 +163,12 @@ package object streams {
                       watermarkInterval: Long = 10000,
                       preResolve: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]] = noOpPreResolve,
                       postMappingTtl: Option[Time] = None)
-                     (implicit env: StreamExecutionEnvironment): (DataStream[CommentEvent], DataStream[PostMapping]) = {
+                     (implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] =
     resolveReplyTree(
       rawCommentsFromCsv(filePath, speedupFactor, randomDelay, watermarkInterval),
       preResolve = preResolve,
       postMappingTtl = postMappingTtl
     )
-  }
 
   def likesFromCsv(filePath: String,
                    speedupFactor: Double = 0,
@@ -222,7 +221,7 @@ package object streams {
                         maxOutOfOrderness: Time = Time.milliseconds(0),
                         preResolve: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]] = noOpPreResolve,
                         postMappingTtl: Option[Time] = None)
-                       (implicit env: StreamExecutionEnvironment): (DataStream[CommentEvent], DataStream[PostMapping]) =
+                       (implicit env: StreamExecutionEnvironment): DataStream[CommentEvent] =
     resolveReplyTree(
       fromKafka(KafkaTopics.comments, consumerGroup, _.timestamp, speedupFactor, maxOutOfOrderness),
       preResolve = preResolve,
@@ -249,10 +248,9 @@ package object streams {
 
   def resolveReplyTree(rawComments: DataStream[RawCommentEvent],
                        preResolve: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]],
-                       postMappingTtl: Option[Time]):
-  (DataStream[CommentEvent], DataStream[PostMapping]) =
+                       postMappingTtl: Option[Time]): DataStream[CommentEvent] =
     resolveReplyTree(rawComments, droppedRepliesStream = false, preResolve, postMappingTtl) match {
-      case (commentEvents, _, newPostMappings) => (commentEvents, newPostMappings)
+      case (commentEvents, _) => commentEvents
     }
 
   /**
@@ -271,8 +269,7 @@ package object streams {
   def resolveReplyTree(rawComments: DataStream[RawCommentEvent],
                        droppedRepliesStream: Boolean,
                        preResolve: DataStream[RawCommentEvent] => DataStream[Either[RawCommentEvent, CommentEvent]] = noOpPreResolve,
-                       postMappingTtl: Option[Time] = None):
-  (DataStream[CommentEvent], DataStream[RawCommentEvent], DataStream[PostMapping]) = {
+                       postMappingTtl: Option[Time] = None): (DataStream[CommentEvent], DataStream[RawCommentEvent]) = {
     // try to resolve post mappings based on individual comments
     val preResolved: DataStream[Either[RawCommentEvent, CommentEvent]] = preResolve(rawComments)
 
@@ -288,7 +285,6 @@ package object streams {
         .map(_.right.get).name("Map -> CommentEvent")
 
     val outputTagDroppedReplies = new OutputTag[RawCommentEvent]("dropped replies")
-    val outputTagNewPostMappings = new OutputTag[PostMapping](id = "newly resolved comments")
 
     val rootedComments: DataStream[CommentEvent] =
       resolvedComments
@@ -296,17 +292,12 @@ package object streams {
         .connect(repliesBroadcast)
         .process(new BuildReplyTreeProcessFunction(
           if (droppedRepliesStream) Some(outputTagDroppedReplies) else None,
-          outputTagNewPostMappings,
           postMappingTtl))
         .name("Reconstruct reply tree")
 
     val droppedReplies = rootedComments.getSideOutput(outputTagDroppedReplies)
 
-    // emit NEWLY resolved replies on side output --> sink to mapping index
-    val newPostMappings: DataStream[PostMapping] =
-      rootedComments.getSideOutput(outputTagNewPostMappings)
-
-    (rootedComments, droppedReplies, newPostMappings)
+    (rootedComments, droppedReplies)
   }
 
   def noOpPreResolve(stream: DataStream[RawCommentEvent]): DataStream[Either[RawCommentEvent, CommentEvent]] =

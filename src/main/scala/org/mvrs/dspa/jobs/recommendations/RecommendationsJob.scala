@@ -72,7 +72,7 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
 
     // read input streams from Kafka
     val kafkaConsumerGroup: Option[String] = Some("recommendations")
-    val (commentsStream: DataStream[CommentEvent], postMappings: DataStream[PostMapping]) =
+    val comments: DataStream[CommentEvent] =
       streams.comments(
         kafkaConsumerGroup,
         lookupParentPostId = replies => streams.lookupParentPostId(
@@ -83,7 +83,7 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
     val likesStream: DataStream[LikeEvent] = streams.likes(kafkaConsumerGroup)
 
     // union all streams for all event types as (person id, post id) tuples
-    val forumEvents: DataStream[(Long, Long)] = unionEvents(commentsStream, postsStream, likesStream)
+    val forumEvents: DataStream[(Long, Long)] = unionEvents(comments, postsStream, likesStream)
 
     // gather the posts that the user interacted with in a sliding window
     val postIds: DataStream[(Long, Set[Long])] = collectPostsInteractedWith(forumEvents, windowSize, windowSlide)
@@ -119,7 +119,11 @@ object RecommendationsJob extends FlinkStreamingJob(enableGenericTypes = true) {
       .addSink(ElasticSearchIndexes.recommendations.createSink(recommendationsBatchSize))
       .name("ElasticSearch: recommendations")
 
-    postMappings.addSink(ElasticSearchIndexes.postMappings.createSink(100, Some(100)))
+    comments
+      .map(c => PostMapping(c.commentId, c.postId))
+      .name("Map -> PostMapping")
+      .addSink(ElasticSearchIndexes.postMappings.createSink(100, Some(100)))
+      .name(s"ElasticSearch: ${ElasticSearchIndexes.postMappings.indexName}")
 
     // print progress information for any late events
     FlinkUtils.addProgressMonitor(recommendations) { case (_, progressInfo) => progressInfo.isLate }

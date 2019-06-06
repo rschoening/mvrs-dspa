@@ -60,7 +60,7 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
 
     // consume comments and posts from Kafka
     val kafkaConsumerGroup = Some("activity-detection")
-    val (comments: DataStream[CommentEvent], postMappings: DataStream[PostMapping]) =
+    val comments: DataStream[CommentEvent] =
       streams.comments(
         kafkaConsumerGroup,
         lookupParentPostId = replies => streams.lookupParentPostId(
@@ -115,7 +115,11 @@ object UnusualActivityDetectionJob extends FlinkStreamingJob(enableGenericTypes 
       .addSink(ElasticSearchIndexes.clusterMetadata.createSink(clusterMetadataBatchSize))
       .name(s"ElasticSearch: ${ElasticSearchIndexes.clusterMetadata.indexName}")
 
-    postMappings.addSink(ElasticSearchIndexes.postMappings.createSink(100, Some(100)))
+    comments
+      .map(c => PostMapping(c.commentId, c.postId))
+      .name("Map -> PostMapping")
+      .addSink(ElasticSearchIndexes.postMappings.createSink(100, Some(100)))
+      .name(s"ElasticSearch: ${ElasticSearchIndexes.postMappings.indexName}")
 
     // write cluster parameter parse errors to text file sink
     outputErrors(controlParameterParseErrors, clusterParameterParseErrorsOutputPath)
