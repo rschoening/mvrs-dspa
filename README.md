@@ -264,12 +264,12 @@ The following two jobs must have been run prior to running any of the analytics 
 │     │  └─ resources                       │
 │     │     └─ streams                      │ directory with reduced streaming test data files (csv)
 │     └─ scala                              │
-│     └─ categories                         │ package for definition of test categories
-│     └─ db                                 │ integration tests (ignored) for interaction with ElasticSearch
-│     └─ functions                          │ unit and integration tests for functions package
-│     └─ jobs                               │ unit and integration tests for the analytic tasks 
-│     └─ streams                            │ unit and integration tests for the primary input streams
-│     └─ utils                              │ tests and trials for utilities
+│        └─ categories                      │ package for definition of test categories
+│        └─ db                              │ integration tests (ignored) for interaction with ElasticSearch
+│        └─ functions                       │ unit and integration tests for functions package
+│        └─ jobs                            │ unit and integration tests for the analytic tasks 
+│        └─ streams                         │ unit and integration tests for the primary input streams
+│        └─ utils                           │ tests and trials for utilities
 └─ target                                   │
    └─ site                                  │
    │  └─ scaladoc                           │ scaladoc site generated with mvn scala:doc
