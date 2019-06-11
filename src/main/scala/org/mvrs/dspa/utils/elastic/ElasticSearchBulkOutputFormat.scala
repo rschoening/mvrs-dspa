@@ -10,11 +10,11 @@ import scala.collection.mutable
 /**
   * Base class for elastic4s-based output formats that support bulk requests
   *
-  * @param indexName the elasticsearch index name
-  * @param typeName  the elasticsearch type name
-  * @param nodes     the elasticsearch nodes to connect to
-  * @param batchSize the maximum number of requests to submit in one batch
-  * @tparam T the record type
+  * @param indexName The ElasticSearch index name
+  * @param typeName  The ElasticSearch type name
+  * @param nodes     The ElasticSearch nodes to connect to
+  * @param batchSize The maximum number of requests to submit in one batch
+  * @tparam T The record type
   */
 abstract class ElasticSearchBulkOutputFormat[T](indexName: String,
                                                 typeName: String,

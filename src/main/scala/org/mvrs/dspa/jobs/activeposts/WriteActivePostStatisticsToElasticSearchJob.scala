@@ -43,7 +43,7 @@ object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob(ena
 
     // Uncomment the line below to print progress information for any late events
     //
-    //   Note that there will be late events, since we're reading from multiple partitions and due to the behavior of
+    //   Note that there will be late events, since we're reading from multiple partitions and, due to the behavior of
     //   the watermark emission (stopping the auto-interval clock during backpressure phases), the watermarks have to
     //   be generated after the replay function, i.e. _not_ per partition.
     //
@@ -55,6 +55,13 @@ object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob(ena
     env.execute("Move enriched post statistics from Kafka to ElasticSearch")
   }
 
+  /**
+    * Enriches the stream of post statistics with post content and forum title
+    *
+    * @param postStatisticsStream The input stream of post statistics
+    * @param esNodes              The ElasticSearch nodes to connect to
+    * @return Stream of tuples (post statistics, post content or image file, forum title)
+    */
   private def enrichPostStatistics(postStatisticsStream: DataStream[PostStatistics])
                                   (implicit esNodes: Seq[ElasticSearchNode]): DataStream[(PostStatistics, String, String)] =
     FlinkUtils.asyncStream(

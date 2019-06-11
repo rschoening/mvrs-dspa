@@ -3,6 +3,15 @@ package org.mvrs.dspa.utils.elastic
 import com.sksamuel.elastic4s.bulk.BulkCompatibleRequest
 import com.sksamuel.elastic4s.http.ElasticDsl._
 
+/**
+  * Base class for ElasticSearch index gateway classes that provide an OutputFormat for use with the DataSet API,
+  * writing documents using upsert operations.
+  *
+  * @param indexName Name of the ElasticSearch index
+  * @param nodes     Node addresses
+  * @param batchSize The maximum number of requests to submit in one batch
+  * @tparam T The input record type
+  */
 abstract class ElasticSearchIndexWithUpsertOutputFormat[T](indexName: String,
                                                            nodes: Seq[ElasticSearchNode],
                                                            batchSize: Int = 1000)

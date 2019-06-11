@@ -8,9 +8,24 @@ import org.elasticsearch.action.update.UpdateRequest
 
 import scala.collection.JavaConverters._
 
+/**
+  * Base class for ElasticSearch index gateway classes that provide a sink for use with the streaming API,
+  * writing documents using upsert operations.
+  *
+  * @param indexName Name of the ElasticSearch index
+  * @param nodes     Node addresses
+  * @tparam T The input record type
+  */
 abstract class ElasticSearchIndexSink[T](indexName: String, nodes: ElasticSearchNode*)
   extends ElasticSearchIndex(indexName, nodes: _*) {
 
+  /**
+    * Creates the streaming sink for the index
+    *
+    * @param batchSize         The batch size for the sink
+    * @param bulkFlushInterval The optional bulk flush interval (in milliseconds)
+    * @return The sink
+    */
   def createSink(batchSize: Int, bulkFlushInterval: Option[Long] = None): ElasticsearchSink[T] = {
     require(batchSize > 0, s"invalid batch size: $batchSize")
 

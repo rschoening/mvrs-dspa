@@ -9,6 +9,13 @@ import org.mvrs.dspa.utils.elastic.{AsyncCachingElasticSearchFunction, ElasticSe
 
 import scala.concurrent.Future
 
+/**
+  * Async I/O function to look up forum titles for a stream of post events, and produce a stream of post events with
+  * the forum title.
+  *
+  * @param forumFeaturesIndex The ElasticSearch index containing the forum features
+  * @param nodes              The elastic search nodes to connect to
+  */
 class AsyncForumTitleLookupFunction(forumFeaturesIndex: String, nodes: ElasticSearchNode*)
   extends AsyncCachingElasticSearchFunction[PostEvent, (PostEvent, String), String, SearchResponse](_.forumId.toString, nodes) {
 

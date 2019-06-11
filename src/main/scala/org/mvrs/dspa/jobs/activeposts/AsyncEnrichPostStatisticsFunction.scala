@@ -10,6 +10,13 @@ import org.mvrs.dspa.utils.elastic.{AsyncCachingElasticSearchFunction, ElasticSe
 
 import scala.concurrent.Future
 
+/**
+  * Async I/O function to retrieve post information from an ElasticSearch index and produce a stream of post statistics
+  * enriched with post content and forum title information.
+  *
+  * @param postInfosIndexName The name of the index containing post information
+  * @param nodes              The ElasticSearch nodes to connect to
+  */
 class AsyncEnrichPostStatisticsFunction(postInfosIndexName: String, nodes: ElasticSearchNode*)
   extends AsyncCachingElasticSearchFunction[PostStatistics, (PostStatistics, String, String), PostInfos, SearchResponse](_.postId.toString, nodes) {
 

@@ -10,6 +10,13 @@ import org.mvrs.dspa.utils.elastic
 
 import scala.concurrent.ExecutionContext
 
+/**
+  * Base class for Async I/O functions for accessing ElasticSearch indexes
+  *
+  * @param nodes The ElasticSearch nodes to connect to
+  * @tparam IN  The input record type
+  * @tparam OUT The output record type
+  */
 abstract class AsyncElasticSearchFunction[IN, OUT: TypeInformation](nodes: Seq[ElasticSearchNode])
   extends RichAsyncFunction[IN, OUT] with ResultTypeQueryable[OUT] {
   require(nodes.nonEmpty, "at least one node must be provided")

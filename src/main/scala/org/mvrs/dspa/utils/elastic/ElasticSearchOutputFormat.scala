@@ -8,8 +8,8 @@ import org.mvrs.dspa.utils.elastic
 /**
   * Base class for elastic4s based output formats
   *
-  * @param nodes the elasticsearch nodes to connect to
-  * @tparam T the record type
+  * @param nodes The ElasticSearch nodes to connect to
+  * @tparam T The record type
   */
 abstract class ElasticSearchOutputFormat[T](nodes: Seq[ElasticSearchNode]) extends OutputFormat[T] {
 

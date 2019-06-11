@@ -22,20 +22,20 @@ import scala.util.{Failure, Success}
 /**
   * Function base class for asynchronous requests to ElasticSearch that use an LRU cache
   *
-  * @param getCacheKey        function to get the cache key (string) from an input element
-  * @param nodes              the elastic search nodes to connect to
-  * @param maximumCacheSize   the maximum cache size for the LRU cache
-  * @param cacheEmptyResponse indicates if an empty database response is cached, i.e. the query is not retried if it
+  * @param getCacheKey        Function to get the cache key (string) from an input element
+  * @param nodes              The ElasticSearch nodes to connect to
+  * @param maximumCacheSize   The maximum cache size for the LRU cache
+  * @param cacheEmptyResponse Indicates if an empty database response is cached, i.e. the query is not retried if it
   *                           once returned empty for a given cache key.
-  * @param checkpointCache    indicates if the cache content should be included in checkpoints. If false, the cache will
+  * @param checkpointCache    Indicates if the cache content should be included in checkpoints. If false, the cache will
   *                           be empty on recovery.
-  * @param ttl                the optional time-to-live duration (in processing time) for cached records.
-  * @tparam IN  type of input elements
-  * @tparam OUT type of output elements
-  * @tparam V   type of cached value. This value can be different from the output element, which often also included
+  * @param ttl                The optional time-to-live duration (in processing time) for cached records.
+  * @tparam IN  Type of input elements
+  * @tparam OUT Type of output elements
+  * @tparam V   Type of cached value. This value can be different from the output element, which often also included
   *             the input element (or some transformation of it). The output element is produced based on the
   *             input element and the cached value.
-  * @tparam R   the type of ElasticSearch response
+  * @tparam R   The type of ElasticSearch response
   */
 abstract class AsyncCachingElasticSearchFunction[IN, OUT: TypeInformation, V: TypeInformation, R](getCacheKey: IN => String,
                                                                                                   nodes: Seq[ElasticSearchNode],
