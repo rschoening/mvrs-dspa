@@ -38,7 +38,7 @@ object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob(ena
     // -> in the progress monitor output:
     //   - bn (time behind newest) must always be 'latest'
     //   - bnc (behind events seen so far) must be 0
-    //   - bmx (maximum time behind newest seen so far) must be -
+    //   - bmx (maximum time behind newest seen so far) must be '-'
     FlinkUtils.addProgressMonitor(enrichedStream.filter(_._1.postId == 943850), prefix = "POST")()
 
     // Uncomment the line below to print progress information for any late events
