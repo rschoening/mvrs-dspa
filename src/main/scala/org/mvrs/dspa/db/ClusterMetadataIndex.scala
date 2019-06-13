@@ -2,7 +2,7 @@ package org.mvrs.dspa.db
 
 import java.util
 
-import com.sksamuel.elastic4s.http.ElasticDsl.{dateField, doubleField, intField, keywordField, nestedField}
+import com.sksamuel.elastic4s.http.ElasticDsl.{dateField, doubleField, intField, keywordField, longField, nestedField}
 import com.sksamuel.elastic4s.mappings.FieldDefinition
 import org.mvrs.dspa.model.{Cluster, ClusterMetadata}
 import org.mvrs.dspa.utils.elastic.{ElasticSearchIndexSink, ElasticSearchNode}
@@ -13,10 +13,11 @@ class ClusterMetadataIndex(indexName: String, esNode: ElasticSearchNode*)
   extends ElasticSearchIndexSink[ClusterMetadata](indexName, esNode: _*) {
 
   override protected def getDocumentId(record: ClusterMetadata): String =
-    s"${record.timestamp}" // NOTE timestamp not deterministic on retried attempts - should use sequence# ("ith model")
+    s"${record.modelVersion}" // sequentially increasing number, checkpointed in clustering function, to ensure idempotent upserts
 
   override protected def createDocument(record: ClusterMetadata): Map[String, Any] =
     Map(
+      "version" -> record.modelVersion,
       "timestamp" -> record.timestamp,
       "k" -> record.clusters.size,
       "kDifference" -> record.kDifference,
@@ -27,6 +28,7 @@ class ClusterMetadataIndex(indexName: String, esNode: ElasticSearchNode*)
 
   override protected def createFields(): Iterable[FieldDefinition] =
     Iterable(
+      longField("version"),
       dateField("timestamp"),
       doubleField("k"),
       doubleField("kDifference"),

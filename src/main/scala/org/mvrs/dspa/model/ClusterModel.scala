@@ -63,6 +63,7 @@ final case class Cluster(index: Int, centroid: Point, weight: Double, label: Opt
   * Metadata about a cluster model and its differences to the preceding model
   *
   * @param timestamp               Creation time of this version of the model
+  * @param modelVersion            sequentially increasing, unique model version (to ensure idempotent upserts to ElasticSearch)
   * @param clusters                The collection of clusters, with metadata for each cluster (difference vector,
   *                                length of difference vector, weight difference)
   * @param averageVectorDistance   The average length of the difference vectors per cluster
@@ -70,6 +71,7 @@ final case class Cluster(index: Int, centroid: Point, weight: Double, label: Opt
   * @param kDifference             The difference of the number of clusters compared to the preceding model
   */
 final case class ClusterMetadata(timestamp: Long,
+                                 modelVersion: Long,
                                  clusters: Vector[(Cluster, Vector[Double], Double, Double)],
                                  averageVectorDistance: Double,
                                  averageWeightDifference: Double,

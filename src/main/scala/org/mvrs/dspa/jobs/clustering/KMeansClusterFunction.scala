@@ -76,6 +76,7 @@ class KMeansClusterFunction(@Nonnegative k: Int, @Nonnegative decay: Double = 0.
   @transient private lazy val nextTimerState = getRuntimeContext.getState(nextTimerStateDescriptor)
   @transient private lazy val windowExtendedState = getRuntimeContext.getState(windowExtendedStateDescriptor)
   @transient private lazy val elementCountState = getRuntimeContext.getState(elementCountStateDescriptor)
+  @transient private lazy val clusterModelVersionState = getRuntimeContext.getState(clusterModelVersionStateDescriptor)
 
   // state descriptors
   // NOTE: use createTypeInformation to ensure serialization by Flink (not Kryo)
@@ -86,6 +87,7 @@ class KMeansClusterFunction(@Nonnegative k: Int, @Nonnegative decay: Double = 0.
   @transient private lazy val nextTimerStateDescriptor = new ValueStateDescriptor("next-timer", classOf[Long])
   @transient private lazy val windowExtendedStateDescriptor = new ValueStateDescriptor("window-extended", classOf[Boolean])
   @transient private lazy val elementCountStateDescriptor = new ValueStateDescriptor("element-count", classOf[Int])
+  @transient private lazy val clusterModelVersionStateDescriptor = new ValueStateDescriptor("cluster-model-version", classOf[Long])
 
   @transient private lazy val LOG = LoggerFactory.getLogger(classOf[KMeansClusterFunction])
 
@@ -245,14 +247,17 @@ class KMeansClusterFunction(@Nonnegative k: Int, @Nonnegative decay: Double = 0.
     }
     else {
       val previousModel = Option(clusterState.value())
+      val previousModelVersion = clusterModelVersionState.value()
 
       val newClusterModel = cluster(points, previousModel, params, random)
+      val newModelVersion = previousModelVersion + 1
 
       out.collect((timestamp, points.size, newClusterModel))
 
       // update state
 
       clusterState.update(newClusterModel)
+      clusterModelVersionState.update(newModelVersion)
 
       elementsState.clear()
       elementCount.update(0)
@@ -265,7 +270,7 @@ class KMeansClusterFunction(@Nonnegative k: Int, @Nonnegative decay: Double = 0.
         nextElementsState.clear()
       }
 
-      emitClusterMetadata(createMetadata(newClusterModel, previousModel, timestamp))
+      emitClusterMetadata(createMetadata(newClusterModel, previousModel, timestamp, newModelVersion))
     }
 
     val duration = System.currentTimeMillis() - startMillis
@@ -329,7 +334,7 @@ object KMeansClusterFunction {
     * @param timestamp       the timestamp for the cluster update
     * @return cluster metadata
     */
-  def createMetadata(newClusterModel: ClusterModel, previousModel: Option[ClusterModel], timestamp: Long): ClusterMetadata = {
+  def createMetadata(newClusterModel: ClusterModel, previousModel: Option[ClusterModel], timestamp: Long, modelVersion: Long): ClusterMetadata = {
     require(newClusterModel.clusters.nonEmpty, "no clusters in new model")
 
     val prevByIndex: Map[Int, Cluster] = previousModel.map(_.clusters.map(c => (c.index, c)).toMap).getOrElse(Map())
@@ -359,6 +364,7 @@ object KMeansClusterFunction {
 
     ClusterMetadata(
       timestamp,
+      modelVersion,
       newClustersWithDifferences,
       avgVectorDifference,
       avgWeightDifference,
