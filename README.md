@@ -16,7 +16,7 @@ This uses a streaming K-Means implementation, even if an unsupervised approach i
 [Execution plan](https://github.com/rschoening/mvrs-dspa/blob/master/doc/plans/unusual_activity.pdf)
 
 ### Solution architecture
-<img src="https://raw.githubusercontent.com/rschoening/mvrs-dspa/master/doc/images/solution-architecture-crop.png" width="55%" style="display:block; margin-left:auto; margin-right:auto" />
+<img src="https://raw.githubusercontent.com/rschoening/mvrs-dspa/master/doc/images/solution-architecture-crop.png" width="75%" style="display:block; margin-left:auto; margin-right:auto" />
 
 ## Setup overview (details below)
 1. `git clone https://github.com/rschoening/mvrs-dspa.git`
