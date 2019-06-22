@@ -8,6 +8,14 @@ import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer, FlinkKaf
 import org.mvrs.dspa.utils.avro.{Avro4sDeserializationSchema, Avro4sSerializationSchema}
 import org.mvrs.dspa.utils.{FlinkUtils, kafka}
 
+/**
+  * Helper class for accessing a Kafka topic containing Avro-serialized records
+  *
+  * @param name
+  * @param cluster
+  * @param schemaFor
+  * @tparam T
+  */
 class KafkaTopic[T: Decoder : Encoder : TypeInformation](val name: String, val cluster: KafkaCluster)
                                                         (implicit val schemaFor: SchemaFor[T]) {
 

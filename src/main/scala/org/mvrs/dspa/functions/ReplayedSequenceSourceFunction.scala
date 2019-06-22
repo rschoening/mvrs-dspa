@@ -14,7 +14,8 @@ class ReplayedSequenceSourceFunction[T](sequence: Seq[T],
                                         maximumDelayMillis: Int,
                                         delay: T => Long,
                                         watermarkInterval: Int)
-  extends ReplayedSourceFunction[T, T](identity[T], extractEventTime, speedupFactor, maximumDelayMillis, delay, watermarkInterval, 1000) {
+  extends ReplayedSourceFunction[T, T](
+    identity[T], extractEventTime, speedupFactor, maximumDelayMillis, delay, watermarkInterval, 1000) {
 
   def this(sequence: Seq[T],
            extractEventTime: T => Long,

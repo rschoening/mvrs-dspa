@@ -1,7 +1,7 @@
 package org.mvrs.dspa
 
 /**
-  * Gateway types for accessing the project database (ElasticSearch)
+  * ElasticSearch index repositories for accessing the project database
   */
 package object db {
 

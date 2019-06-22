@@ -5,6 +5,12 @@ import com.sksamuel.elastic4s.mappings.FieldDefinition
 import org.mvrs.dspa.model.PostInfo
 import org.mvrs.dspa.utils.elastic.{ElasticSearchIndexSink, ElasticSearchNode}
 
+/**
+  * Index of post information enriched with the forum title (active post statistics job)
+  *
+  * @param indexName Name of the ElasticSearch index
+  * @param nodes     Node addresses
+  */
 class PostInfoIndex(indexName: String, nodes: ElasticSearchNode*)
   extends ElasticSearchIndexSink[PostInfo](indexName, nodes: _*) {
   override protected def getDocumentId(record: PostInfo): String = record.postId.toString

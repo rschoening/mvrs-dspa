@@ -7,8 +7,14 @@ import org.mvrs.dspa.utils.elastic.{ElasticSearchIndexSink, ElasticSearchNode}
 
 import scala.collection.JavaConverters._
 
-class ActivityClassificationIndex(indexName: String, esNode: ElasticSearchNode*)
-  extends ElasticSearchIndexSink[ClassifiedEvent](indexName, esNode: _*) {
+/**
+  * Index for events with cluster assignment (unusual activity detection job)
+  *
+  * @param indexName Name of the ElasticSearch index
+  * @param nodes    Node addresses
+  */
+class ActivityClassificationIndex(indexName: String, nodes: ElasticSearchNode*)
+  extends ElasticSearchIndexSink[ClassifiedEvent](indexName, nodes: _*) {
 
   override protected def getDocumentId(record: ClassifiedEvent): String = s"${record.eventId}#${getKeySuffix(record)}"
 

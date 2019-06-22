@@ -3,7 +3,7 @@ package org.mvrs.dspa.db
 import org.mvrs.dspa.Settings
 
 /**
-  * static registry of ElasticSearch indexes used in the project
+  * Static registry of ElasticSearch indexes used in the project
   */
 object ElasticSearchIndexes {
   private val nodes = Settings.elasticSearchNodes
@@ -16,7 +16,7 @@ object ElasticSearchIndexes {
 
   val recommendations = new RecommendationsIndex("mvrs-recommendations", nodes: _*)
   val postFeatures = new PostFeaturesIndex("mvrs-recommendation-post-features", nodes: _*)
-  val personFeatures = new FeaturesIndex("mvrs-recommendation-person-features", nodes: _*)
+  val personFeatures = new PersonFeaturesIndex("mvrs-recommendation-person-features", nodes: _*)
   val forumFeatures = new ForumFeaturesIndex("mvrs-recommendation-forum-features", nodes: _*)
   val personMinHashes = new PersonMinHashIndex("mvrs-recommendation-person-minhash", nodes: _*)
   val knownPersons = new KnownUsersIndex("mvrs-recommendation-known-persons", nodes: _*)

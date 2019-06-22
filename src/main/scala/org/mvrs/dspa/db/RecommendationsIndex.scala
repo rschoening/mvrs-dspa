@@ -7,9 +7,21 @@ import org.mvrs.dspa.utils.elastic.{ElasticSearchIndexSink, ElasticSearchNode}
 
 import scala.collection.JavaConverters._
 
-class RecommendationsIndex(indexName: String, hosts: ElasticSearchNode*)
-  extends ElasticSearchIndexSink[(Recommendation, Long)](indexName, hosts: _*) {
+/**
+  * Index of person recommendations per person
+  *
+  * @param indexName Name of the ElasticSearch index
+  * @param nodes     Node addresses
+  */
+class RecommendationsIndex(indexName: String, nodes: ElasticSearchNode*)
+  extends ElasticSearchIndexSink[(Recommendation, Long)](indexName, nodes: _*) {
 
+  /**
+    * Creates the document to insert
+    *
+    * @param record tuple of recommendation (top 5 most similar persons ordered by similarity) and timestamp
+    * @return document as map
+    */
   override protected def createDocument(record: (Recommendation, Long)): Map[String, Any] =
     Map(
       "users" -> record._1.recommendations.map(createNestedDocument).toList.asJava,

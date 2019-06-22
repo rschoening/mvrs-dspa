@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory
 import scala.collection.mutable
 
 /**
+  * Event scheduler supporting time-scaled and delayed (and thus potentially reordered) emission of events and watermarks
   *
   * @param speedupFactor                      the speedup factor relative to event time
   * @param watermarkIntervalMillis            the watermark interval in milliseconds, at event time scale (to be scaled by speedupFactor).

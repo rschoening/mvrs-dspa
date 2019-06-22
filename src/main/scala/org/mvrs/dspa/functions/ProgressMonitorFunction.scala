@@ -141,17 +141,17 @@ class ProgressMonitorFunction[I]() extends ProcessFunction[I, (I, ProgressInfo)]
       if (sumOfProcTimeBetweenWatermarksMillis == 0)
         Double.NaN
       else
-        watermarkCount.toDouble / (sumOfProcTimeBetweenWatermarksMillis / 1000) // incorrect after restore from checkpoint (metric is checkpointed, sum is not)
+        watermarkCount.toDouble / (sumOfProcTimeBetweenWatermarksMillis / 1000) // TODO revise, consider checkpointing (counters aren't)
 
     val avgElementsPerSecond =
       if (sumOfProcTimeBetweenEventsMillis == 0)
         Double.NaN
       else
-        elementCount.toDouble / (sumOfProcTimeBetweenEventsMillis / 1000) // incorrect after restore from checkpoint (metric is checkpointed, sum is not)
+        elementCount.toDouble / (sumOfProcTimeBetweenEventsMillis / 1000) // TODO revise, consider checkpointing (counters aren't)
 
     out.collect(
       (
-        value,
+        value, // input record
         ProgressInfo(
           getRuntimeContext.getIndexOfThisSubtask,
           elementTimestamp,

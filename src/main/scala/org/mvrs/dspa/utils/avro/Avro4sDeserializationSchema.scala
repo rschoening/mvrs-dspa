@@ -12,7 +12,6 @@ import org.apache.flink.api.scala.createTypeInformation
   * @param schemaJSon The JSon string with the Avro schema for the type
   * @tparam T The type to deserialize
   */
-
 class Avro4sDeserializationSchema[T: Decoder : TypeInformation](schemaJSon: String)
   extends AbstractDeserializationSchema[T](createTypeInformation[T]) {
 

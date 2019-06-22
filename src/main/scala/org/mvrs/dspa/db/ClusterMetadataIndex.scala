@@ -9,8 +9,14 @@ import org.mvrs.dspa.utils.elastic.{ElasticSearchIndexSink, ElasticSearchNode}
 
 import scala.collection.JavaConverters._
 
-class ClusterMetadataIndex(indexName: String, esNode: ElasticSearchNode*)
-  extends ElasticSearchIndexSink[ClusterMetadata](indexName, esNode: _*) {
+/**
+  * Index for cluster metadata (unusual activity detection job)
+  *
+  * @param indexName Name of the ElasticSearch index
+  * @param nodes     Node addresses
+  */
+class ClusterMetadataIndex(indexName: String, nodes: ElasticSearchNode*)
+  extends ElasticSearchIndexSink[ClusterMetadata](indexName, nodes: _*) {
 
   override protected def getDocumentId(record: ClusterMetadata): String =
     s"${record.modelVersion}" // sequentially increasing number, checkpointed in clustering function, to ensure idempotent upserts
