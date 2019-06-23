@@ -304,18 +304,18 @@ object ProgressMonitorFunction {
         |-  ts :  the timestamp of the element (short format, seconds resolution)
         |- ect : the total number of elements seen so far
         |- e/s : the average number of elements per second (processing time) so far
-        |-------
+        |------------------------------------------------------------------------------------------------------------------------
         |-  bn : the number of seconds (in event time) the element is behind the maximum event time seen so far ('latest' if this
         |        element has the highest event time so far)
         |- bnc : the number of elements seen so far that were behined the maximum event time seen when they were received
         |- bmx : the maximum time difference (in event time) that an element seen so far was behind the maximum event time when
         |        it was received
-        |-------
+        |------------------------------------------------------------------------------------------------------------------------
         |-  lt : the number of seconds (in event time) the element is late, i.e. that its timestamp is behind the current
         |        watermark ('on time' if the element has a timestamp >= than the current watermark)
         |- ltc : the number of elements seen so far that were late
         |- lmx : the maximum time difference that an element seen so far was behind the watermark wen it was received
-        |-------
+        |------------------------------------------------------------------------------------------------------------------------
         |-  wn : the timestamp of the current watermark ('NO watermark') if no watermark has been received yet. If the watermark
         |        has increased, '+' with the watermark time increment is appended to the timestamp. '=' indicates that the
         |        watermark has stayed the same since the last element on the input stream
@@ -324,10 +324,10 @@ object ProgressMonitorFunction {
         |- +/s : the average number of times per second (processing time) that an increase of the watermark timestamp was
         |        observed between two elements
         |- nwm : the number of elements seen that were received before the first watermark
-        |-------
+        |------------------------------------------------------------------------------------------------------------------------
         |-  ew : the number of elements seen since the last increase of the watermark
         |- emx : the maximum number of elements for which the watermark stayed the same since the previous increase
-        |-------
+        |------------------------------------------------------------------------------------------------------------------------
         |-  rt : the run time since the (re)start of the task
         |------------------------------------------------------------------------------------------------------------------------""".stripMargin
     }
