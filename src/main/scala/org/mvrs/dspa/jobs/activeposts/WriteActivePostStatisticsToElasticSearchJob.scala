@@ -9,6 +9,8 @@ import org.mvrs.dspa.utils.FlinkUtils
 import org.mvrs.dspa.utils.elastic.ElasticSearchNode
 import org.mvrs.dspa.{Settings, streams}
 
+import scala.collection.JavaConverters._
+
 /**
   * Streaming job for reading post statistics from Kafka, enriching them based on post information available in
   * ElasticSearch, and writing them to ElasticSearch (DSPA Task #1)
@@ -17,39 +19,36 @@ object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob(ena
   def execute(): JobExecutionResult = {
     // read settings
     implicit val esNodes: Seq[ElasticSearchNode] = Settings.elasticSearchNodes
-    val batchSize = Settings.config.getInt("jobs.active-post-statistics.post-statistics-elasticsearch-batch-size")
+    val batchSize = Settings.config.getInt("jobs.active-post-statistics.to-elasticsearch.batch-size")
+    val monitoredPosts = Settings.config.getLongList("jobs.active-post-statistics.to-elasticsearch.monitored-posts").asScala.toSet
+    val monitorLateness = Settings.config.getBoolean("jobs.active-post-statistics.to-elasticsearch.monitor-lateness")
 
+    // (re)create ElasticSearch index for post statistics
     val esIndex = ElasticSearchIndexes.activePostStatistics
     esIndex.create()
 
+    // consume post statistics from Kafka
     val postStatisticsStream: DataStream[PostStatistics] = streams.postStatistics("move-post-statistics")
 
+    // enrich post statistics with post content and forum title
     val enrichedStream: DataStream[(PostStatistics, String, String)] = enrichPostStatistics(postStatisticsStream)
 
+    // write to enriched statistics to ElasticSearch
     enrichedStream.addSink(esIndex.createSink(batchSize))
       .name(s"ElasticSearch: ${esIndex.indexName}")
 
     FlinkUtils.printExecutionPlan()
     FlinkUtils.printOperatorNames()
 
-    // print complete progress information for the statistics for a popular post (943850)
-    // - if data.random-delay (in application.conf) is < than the slide of the post statistics window, there should
-    //   never be any "behind" events, i.e. statistics for a given post must be strictly ordered by timestamp:
-    // -> in the progress monitor output:
-    //   - bn (time behind newest) must always be 'latest'
-    //   - bnc (behind events seen so far) must be 0
-    //   - bmx (maximum time behind newest seen so far) must be '-'
-    FlinkUtils.addProgressMonitor(enrichedStream.filter(_._1.postId == 943850), prefix = "POST")()
+    // monitor progress information on statistics records for selected posts configured in settings
+    if (monitoredPosts.nonEmpty)
+      FlinkUtils.addProgressMonitor(
+        enrichedStream.filter(t => monitoredPosts.contains(t._1.postId)),
+        prefix = "POST")()
 
-    // Uncomment the line below to print progress information for any late events
-    //
-    //   Note that there will be late events, since we're reading from multiple partitions and, due to the behavior of
-    //   the watermark emission (stopping the auto-interval clock during backpressure phases), the watermarks have to
-    //   be generated after the replay function, i.e. _not_ per partition.
-    //
-    //   However, these late events are no problem for the result in ElasticSearch.
-    //
-    // FlinkUtils.addProgressMonitor(enrichedStream, prefix = "LATE") { case (_, progressInfo) => progressInfo.isLate }
+    // monitor late events if configured in settings
+    if (monitorLateness)
+      FlinkUtils.addProgressMonitor(enrichedStream, prefix = "LATE") { case (_, progressInfo) => progressInfo.isLate }
 
     // execute program
     env.execute("Move enriched post statistics from Kafka to ElasticSearch")
@@ -72,5 +71,3 @@ object WriteActivePostStatisticsToElasticSearchJob extends FlinkStreamingJob(ena
       )
     ).name("Async I/O: enrich post statistics")
 }
-
-
