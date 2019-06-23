@@ -32,19 +32,25 @@ object ReadCommentEventsFromKafkaJob extends FlinkStreamingJob(enableGenericType
     // end date:   2013-02-17T11:50:23Z
     // -> ~ 550000 minutes
 
-    // no speedup definition, 4 workers:
-    // - duration: 15 seconds (corresponds to a speedup factor of ~2'200'000)
-    // - 11 K events per second per worker (1 broker, 4 workers, one partition)
+    // original implementation:
+    //  no speedup definition, 4 workers:
+    //  - duration: 15 seconds (corresponds to a speedup factor of ~2'200'000)
+    //  - 11 K events per second per worker (1 broker, 4 workers, one partition)
+    //  no speedup definition, 1 worker:
+    //  - duration: 14 seconds (corresponds to a speedup factor of ~2'300'000)
+    //  - 40 K events per second (1 broker, one worker, one partition)
 
-    // no speedup definition, 1 worker:
-    // - duration: 14 seconds (corresponds to a speedup factor of ~2'300'000)
-    // - 40 K events per second (1 broker, one worker, one partition)
+    //  with speedup factor 100000, 4 workers
+    //  - duration: 5 min 19 seconds (expected: ~5.5 minutes) --> OK
+    //  with speedup factor 200000, 4 workers
+    //  - duration: 2 min 40 seconds (expected: ~2.75 minutes) --> OK
 
-    // with speedup factor 100000, 4 workers
-    // - duration: 5 min 19 seconds (expected: ~5.5 minutes) --> OK
-
-    // with speedup factor 200000, 4 workers
-    // - duration: 2 min 40 seconds (expected: ~2.75 minutes) --> OK
+    // measurements after refactoring of reply tree reconstruction (to ensure bounded function state)
+    //  no speedup definition, 4 workers.
+    //  - duration: 20 seconds
+    //  no speedup definition, 1 worker
+    //  - parallelism 1: 19 seconds
+    // -> relatively minor performance degradation (15 sec -> 20 sec) in spite of elasticsearch lookup on critical path
 
     env.execute("Read comments from Kafka")
   }
