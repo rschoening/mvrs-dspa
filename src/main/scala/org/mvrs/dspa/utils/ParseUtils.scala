@@ -17,7 +17,7 @@ object ParseUtils {
 
   def toSet(str: String): Set[Int] = str match {
     case "" | null => Set()
-    case _ => str // TODO regex-based parsing
+    case _ => str // TODO regex-based parsing, as in ClusteringParameter.parse()
       .replace("[", "")
       .replace("]", "")
       .split(',')
