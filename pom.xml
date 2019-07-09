@@ -74,6 +74,14 @@ under the License.
             <scope>provided</scope>
         </dependency>
 
+        <!-- https://mvnrepository.com/artifact/org.scala-lang/scala-compiler -->
+        <!-- current workaround to avoid Exception in thread "main" org.apache.flink.shaded.guava18.com.google.common.util.concurrent.ExecutionError: java.lang.NoClassDefFoundError: scala/tools/reflect/package$ -->
+        <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-compiler</artifactId>
+            <version>${scala.version}</version>
+        </dependency>
+
         <!-- table api -->
 
         <!-- https://mvnrepository.com/artifact/org.apache.flink/flink-table -->
