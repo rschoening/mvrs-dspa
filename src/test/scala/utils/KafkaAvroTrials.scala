@@ -5,8 +5,8 @@ import org.apache.flink.api.scala._
 import org.apache.flink.formats.avro.AvroRowSerializationSchema
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
+import org.apache.flink.table.api.Table
 import org.apache.flink.table.api.scala._
-import org.apache.flink.table.api.{Table, TableEnvironment}
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.experimental.categories.Category
 import org.junit.{Ignore, Test}
@@ -59,8 +59,7 @@ class KafkaAvroTrials extends AbstractTestBase {
     env.setParallelism(3)
 
     val stream = testStream(env)
-    val tableEnv: StreamTableEnvironment = TableEnvironment.getTableEnvironment(env)
-
+    val tableEnv: StreamTableEnvironment = StreamTableEnvironment.create(env)
     //    tableEnv
     //      .connect(new Kafka())
     //      .withFormat(new AvroOutputFormat[]())

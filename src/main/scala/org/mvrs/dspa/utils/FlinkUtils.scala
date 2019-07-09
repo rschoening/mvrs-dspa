@@ -21,9 +21,9 @@ import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrderness
 import org.apache.flink.streaming.api.graph.StreamNode
 import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer.Semantic
+import org.apache.flink.streaming.connectors.kafka.internals.KeyedSerializationSchemaWrapper
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer, FlinkKafkaProducer}
-import org.apache.flink.streaming.util.serialization.KeyedSerializationSchemaWrapper
 import org.mvrs.dspa.functions.ProgressMonitorFunction
 import org.mvrs.dspa.functions.ProgressMonitorFunction.ProgressInfo
 import org.mvrs.dspa.utils.kafka.KafkaTopic
