@@ -9,7 +9,7 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.test.util.AbstractTestBase
 import org.junit.Test
-import org.mvrs.dspa.model.{CommentEvent, PostMapping, RawCommentEvent}
+import org.mvrs.dspa.model.{CommentEvent, RawCommentEvent}
 import org.mvrs.dspa.streams
 import org.mvrs.dspa.streams.BuildReplyTreeProcessFunction
 import org.mvrs.dspa.utils.{DateTimeUtils, FlinkUtils}

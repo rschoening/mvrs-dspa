@@ -91,6 +91,19 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
     env.execute("Write post statistics to kafka (and post info to ElasticSearch)")
   }
 
+  /**
+    * Aggregate comments, post and likes streams to derive post statistics in sliding window
+    *
+    * @param commentsStream  The stream of comments
+    * @param postsStream     The stream of post submissions
+    * @param likesStream     The stream of likes
+    * @param windowSize      the window size
+    * @param slide           the window slide
+    * @param stateTtl        the time-to-live for buckets (in processing time, i.e. has to take into account speedup to
+    *                        ensure that in-use state is not evicted early)
+    * @param countPostAuthor indicates if the original post author should be counted as one of the involved users
+    * @return Stream of post statistics
+    */
   //noinspection ConvertibleToMethodValue
   def statisticsStream(commentsStream: DataStream[CommentEvent],
                        postsStream: DataStream[PostEvent],
@@ -120,6 +133,13 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
       )
   }
 
+  /**
+    * Enriches the stream of post events by looking up the forum title from ElasticSearch
+    *
+    * @param postsStream The input stream of post submission events
+    * @param esNodes     The ElasticSearch nodes to connect to
+    * @return Output stream of enriched post events
+    */
   private def lookupForumFeatures(postsStream: DataStream[PostEvent])
                                  (implicit esNodes: Seq[ElasticSearchNode]): DataStream[PostInfo] =
     FlinkUtils.asyncStream(

@@ -107,7 +107,6 @@ class PostStatisticsFunctionITSuite extends AbstractTestBase {
 
     // create a stream of custom elements and apply transformations
 
-    // TODO check if property-based testing can somehow be used in conjunction with Flink's AbstractTestBase
     val events: List[Event] = List(
       Event(EventType.Comment, postId = 1, personId = 100, timestamp = 0),
       Event(EventType.Comment, postId = 2, personId = 100, timestamp = 0),
@@ -122,7 +121,6 @@ class PostStatisticsFunctionITSuite extends AbstractTestBase {
     val maxOutofOrderness = Time.milliseconds(1)
 
     val stream = env.fromCollection(events)
-      // .process(new ScaledReplayFunction[Event](_.timestamp, 0.01, 0)) // NOTE this causes assertion violation below - function is not finished, but no obvious cause found yet
       .assignTimestampsAndWatermarks(FlinkUtils.timeStampExtractor[Event](maxOutofOrderness, _.timestamp))
       .keyBy(_.postId)
       .process(
