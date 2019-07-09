@@ -99,8 +99,7 @@ object ActivePostStatisticsJob extends FlinkStreamingJob(enableGenericTypes = tr
     * @param likesStream     The stream of likes
     * @param windowSize      the window size
     * @param slide           the window slide
-    * @param stateTtl        the time-to-live for buckets (in processing time, i.e. has to take into account speedup to
-    *                        ensure that in-use state is not evicted early)
+    * @param stateTtl        the time-to-live for buckets (in processing time)
     * @param countPostAuthor indicates if the original post author should be counted as one of the involved users
     * @return Stream of post statistics
     */
