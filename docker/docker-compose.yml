@@ -39,7 +39,7 @@ services:
 #        target: /kafka
 
   jobmanager:
-    image: flink:1.7.2-scala_2.12
+    image: flink:1.8.1-scala_2.12
     expose:
       - "6123"
       - "9249" # to publish prometheus metrics
@@ -54,13 +54,13 @@ services:
       - MVRS_DSPA_DATA_DIR=file:///usr/share/flink/data
     volumes:
       - ./flink/conf/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
-      - ./flink/lib/flink-metrics-prometheus-1.7.2.jar:/opt/flink/lib/flink-metrics-prometheus-1.7.2.jar
+      - ./flink/lib/flink-metrics-prometheus-1.8.1.jar:/opt/flink/lib/flink-metrics-prometheus-1.8.1.jar
       - type: bind                                 # bind mapping for test data
         source: ${MVRS_DSPA_DATA_DIR_HOST:-./data} # default: ./data
         target: /usr/share/flink/data              # path in container
 
   taskmanager:
-    image:  flink:1.7.2-scala_2.12
+    image:  flink:1.8.1-scala_2.12
     expose:
       - "6121"
       - "6122"
@@ -78,7 +78,7 @@ services:
       - MVRS_DSPA_DATA_DIR=file:///usr/share/flink/data
     volumes:
       - ./flink/conf/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
-      - ./flink/lib/flink-metrics-prometheus-1.7.2.jar:/opt/flink/lib/flink-metrics-prometheus-1.7.2.jar
+      - ./flink/lib/flink-metrics-prometheus-1.8.1.jar:/opt/flink/lib/flink-metrics-prometheus-1.8.1.jar
       - type: bind                                 # bind mapping for test data
         source: ${MVRS_DSPA_DATA_DIR_HOST:-./data} # default: ./data
         target: /usr/share/flink/data              # path in container
