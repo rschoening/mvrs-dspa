@@ -1,15 +1,7 @@
 <component name="ProjectCodeStyleConfiguration">
   <code_scheme name="Project" version="173">
     <ScalaCodeStyleSettings>
-      <option name="alwaysUsedImports">
-        <array>
-          <option value="org.mvrs.dspa.utils.avro.AvroUtils._" />
-        </array>
-      </option>
       <option name="USE_SCALADOC2_FORMATTING" value="true" />
     </ScalaCodeStyleSettings>
-    <codeStyleSettings language="Rust">
-      <option name="ALIGN_MULTILINE_CHAINED_METHODS" value="true" />
-    </codeStyleSettings>
   </code_scheme>
 </component>
