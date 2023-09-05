@@ -102,7 +102,7 @@ under the License.
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka_${scala.binary.version}</artifactId>
-            <version>2.2.0</version>
+            <version>2.6.3</version>
         </dependency>
 
         <!-- Add connector dependencies here. They must be in the default scope (compile). -->
